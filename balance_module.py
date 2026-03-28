@@ -75,7 +75,7 @@ class BalanceModule(QWidget):
 
         debtor_id = int(self.balance_table.item(row, 0).text())
         cust_name = self.balance_table.item(row, 1).text()
-        current_bal_str = self.balance_table.item(row, 5).text().replace("₱", "")
+        current_bal_str = self.balance_table.item(row, 5).text().replace("₱", "").replace(",", "")
         current_bal = float(current_bal_str)
         sale_id = int(self.balance_table.item(row, 3).text())
 

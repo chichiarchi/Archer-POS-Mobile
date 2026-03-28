@@ -33,6 +33,11 @@ class InventoryModule(QWidget):
         QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self.show_edit_dialog)
         top_layout.addWidget(self.btn_edit_product)
 
+        self.btn_delete_product = QPushButton("Delete Product (Del)")
+        self.btn_delete_product.clicked.connect(self.delete_product)
+        QShortcut(QKeySequence("Del"), self).activated.connect(self.delete_product)
+        top_layout.addWidget(self.btn_delete_product)
+
         layout.addLayout(top_layout)
 
         # Search Bar
@@ -195,6 +200,38 @@ class InventoryModule(QWidget):
             
             self.load_inventory()
             QMessageBox.information(self, "Success", "Product updated successfully.")
+
+    def delete_product(self):
+        if self.user_role != "admin":
+            QMessageBox.warning(self, "Access Denied", "Only Admin can delete products.")
+            return
+            
+        current_row = self.inventory_table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "Selection Required", "Please select a product from the table first.")
+            return
+            
+        barcode = self.inventory_table.item(current_row, 0).text()
+        product_name = self.inventory_table.item(current_row, 1).text()
+        
+        reply = QMessageBox.question(
+            self, "Confirm Delete", 
+            f"Are you sure you want to completely delete '{product_name}'?\nThis will permanently delete its inventory tracking data.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+                                     
+        if reply == QMessageBox.Yes:
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM inventory WHERE product_id=?", (barcode,))
+            cursor.execute("DELETE FROM products WHERE id=?", (barcode,))
+            conn.commit()
+            conn.close()
+            
+            database.log_action("PRODUCT_DELETED", f"Deleted product: {product_name} (Barcode: {barcode})", self.user_role)
+            
+            QMessageBox.information(self, "Success", f"Product '{product_name}' has been deleted from the database.")
+            self.load_inventory()
 
 
 class StockInDialog(QDialog):
