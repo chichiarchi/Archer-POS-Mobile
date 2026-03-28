@@ -307,6 +307,7 @@ class CheckoutDialog(QDialog):
     def __init__(self, total, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Checkout")
+        self.setMinimumWidth(400)
         self.total = total
         self.setup_ui()
 
@@ -382,6 +383,7 @@ class AddToCartDialog(QDialog):
     def __init__(self, product_name, default_qty, default_price, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Add Item")
+        self.setMinimumWidth(350)
         self.setup_ui(product_name, default_qty, default_price)
 
     def setup_ui(self, name, qty, price):

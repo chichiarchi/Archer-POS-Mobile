@@ -30,7 +30,7 @@ class DashboardModule(QWidget):
         """)
         warning_layout = QVBoxLayout(warning_frame)
 
-        warning_lbl = QLabel("⚠️ Nearly Expired Items (Within 30 Days)")
+        warning_lbl = QLabel("Nearly Expired Items (Within 30 Days)")
         warning_lbl.setStyleSheet("color: #ef4444; font-size: 18px; font-weight: bold; border: none;")
         warning_layout.addWidget(warning_lbl)
 
