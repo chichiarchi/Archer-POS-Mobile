@@ -452,7 +452,6 @@ class AddToCartDialog(QDialog):
         self.inp_qty.setDecimals(2)
         self.inp_qty.setSingleStep(1.0)
         self.inp_qty.setValue(max(1.0, float(qty)))
-        self.inp_qty.setStyleSheet("padding: 5px;")
         
         form.addRow("Quantity:", self.inp_qty)
         

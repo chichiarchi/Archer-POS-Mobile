@@ -82,13 +82,52 @@ class ArcherPOS(QMainWindow):
                 font-size: 13px;
                 text-transform: uppercase;
             }
-            QLineEdit, QDateEdit, QDoubleSpinBox {
+            QLineEdit {
                 background-color: #FFFFFF;
                 border: 1px solid #CBD5E1;
                 border-radius: 6px;
                 padding: 10px 14px;
                 color: #2D3748;
                 font-size: 14px;
+            }
+            QDateEdit, QDoubleSpinBox {
+                background-color: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                padding: 4px 34px 4px 8px; /* Leave space on the right for buttons */
+                color: #2D3748;
+                font-size: 14px;
+                min-height: 28px;
+            }
+            QDoubleSpinBox::up-button, QDateEdit::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 26px;
+                border-left: 1px solid #CBD5E1;
+                border-bottom: 1px solid #CBD5E1;
+                background-color: #F8FAFC;
+                border-top-right-radius: 6px;
+            }
+            QDoubleSpinBox::down-button, QDateEdit::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 26px;
+                border-left: 1px solid #CBD5E1;
+                background-color: #F8FAFC;
+                border-bottom-right-radius: 6px;
+            }
+            QDoubleSpinBox::up-button:hover, QDateEdit::up-button:hover, QDoubleSpinBox::down-button:hover, QDateEdit::down-button:hover {
+                background-color: #E2E8F0;
+            }
+            QDoubleSpinBox::up-arrow, QDateEdit::up-arrow {
+                image: url(up_arrow.svg);
+                width: 12px;
+                height: 12px;
+            }
+            QDoubleSpinBox::down-arrow, QDateEdit::down-arrow {
+                image: url(down_arrow.svg);
+                width: 12px;
+                height: 12px;
             }
             QLineEdit:focus, QDateEdit:focus, QDoubleSpinBox:focus {
                 border: 2px solid #00C6FF;
