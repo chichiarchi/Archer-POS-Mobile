@@ -13,79 +13,120 @@ class ArcherPOS(QMainWindow):
         super().__init__()
         self.user_role = user_role
         self.setWindowTitle("Archer POS v2 - Dashboard")
-        self.resize(1000, 700)
+        self.showMaximized()
         self.setup_ui()
 
     def setup_ui(self):
         # Modern Light Theme for Main Window
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #f8f9fa;
+                background-color: #E8EEF2;
             }
             QWidget {
-                background-color: #f8f9fa;
-                color: #333333;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                background-color: #E8EEF2;
+                color: #2B3A4A;
+                font-family: 'Segoe UI', 'Inter', sans-serif;
             }
             QTabWidget::pane {
-                border-top: 2px solid #0ea5e9;
-                background-color: #ffffff;
+                border: 1px solid #CFD8DC;
+                border-top: 3px solid #00C6FF;
+                background-color: #FFFFFF;
+                border-radius: 8px;
             }
             QTabBar::tab {
-                background-color: #e9ecef;
-                color: #495057;
-                padding: 10px 20px;
-                margin-right: 2px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                font-weight: bold;
+                background-color: #DDE4EA;
+                color: #5C6B79;
+                padding: 12px 24px;
+                margin-right: 4px;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                font-weight: 600;
                 font-size: 14px;
-                border: 1px solid #ced4da;
+                border: 1px solid #CFD8DC;
                 border-bottom: none;
             }
             QTabBar::tab:selected {
-                background-color: #0ea5e9;
-                color: #ffffff;
-                border-color: #0ea5e9;
+                background-color: #FFFFFF;
+                color: #0072FF;
+                border-color: #CFD8DC;
+                border-top: 3px solid #00C6FF;
             }
             QTabBar::tab:hover:!selected {
-                background-color: #dee2e6;
+                background-color: #E6ECF1;
+                color: #0072FF;
             }
             QTableWidget {
-                background-color: #ffffff;
-                alternate-background-color: #f8f9fa;
-                gridline-color: #dee2e6;
-                border: 1px solid #ced4da;
-                color: #333333;
+                background-color: #FFFFFF;
+                alternate-background-color: #F8FAFC;
+                gridline-color: #E2E8F0;
+                border: 1px solid #E2E8F0;
+                border-radius: 8px;
+                color: #2D3748;
+                font-size: 14px;
+            }
+            QTableView::item {
+                padding: 5px;
+            }
+            QTableView::item:selected {
+                background-color: #E1F5FE;
+                color: #005F99;
             }
             QHeaderView::section {
-                background-color: #e9ecef;
-                color: #495057;
-                padding: 5px;
-                border: 1px solid #ced4da;
-                font-weight: bold;
+                background-color: #F1F5F9;
+                color: #4A5568;
+                padding: 10px;
+                border: none;
+                border-bottom: 2px solid #CBD5E1;
+                border-right: 1px solid #F1F5F9;
+                font-weight: 700;
+                font-size: 13px;
+                text-transform: uppercase;
             }
-            QLineEdit, QDateEdit {
-                background-color: #ffffff;
-                border: 1px solid #ced4da;
-                border-radius: 4px;
-                padding: 6px;
-                color: #333333;
+            QLineEdit, QDateEdit, QDoubleSpinBox {
+                background-color: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                padding: 10px 14px;
+                color: #2D3748;
+                font-size: 14px;
             }
-            QLineEdit:focus, QDateEdit:focus {
-                border: 2px solid #0ea5e9;
+            QLineEdit:focus, QDateEdit:focus, QDoubleSpinBox:focus {
+                border: 2px solid #00C6FF;
+                background-color: #FFFFFF;
             }
             QPushButton {
-                background-color: #ffffff;
-                color: #333333;
-                border: 1px solid #ced4da;
+                background-color: #FFFFFF;
+                color: #4A5568;
+                border: 1px solid #CBD5E1;
                 border-radius: 6px;
-                padding: 8px 16px;
-                font-weight: bold;
+                padding: 10px 18px;
+                font-weight: 600;
+                font-size: 13px;
+                letter-spacing: 0.5px;
             }
             QPushButton:hover {
-                background-color: #e9ecef;
-                border: 1px solid #0ea5e9;
+                background-color: #F0F9FF;
+                border: 1px solid #00C6FF;
+                color: #0072FF;
+            }
+            QPushButton:pressed {
+                background-color: #E0F2FE;
+            }
+            /* Custom Scrollbar */
+            QScrollBar:vertical {
+                border: none;
+                background: #E8EEF2;
+                width: 8px;
+                margin: 0px 0px 0px 0px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical {
+                background: #CBD5E1;
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #94A3B8;
             }
         """)
 

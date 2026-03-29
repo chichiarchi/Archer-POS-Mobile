@@ -19,38 +19,39 @@ class LoginWindow(QWidget):
         # Apply Light Theme with Sky Blue
         self.setStyleSheet("""
             QWidget {
-                background-color: #f8f9fa;
-                color: #333333;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                background-color: #E8EEF2;
+                color: #2B3A4A;
+                font-family: 'Segoe UI', 'Inter', sans-serif;
             }
             QLabel {
                 font-size: 14px;
             }
             QLineEdit {
-                background-color: #ffffff;
-                border: 1px solid #ced4da;
-                border-radius: 6px;
-                padding: 10px;
-                font-size: 14px;
-                color: #333333;
+                background-color: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 15px;
+                color: #2D3748;
             }
             QLineEdit:focus {
-                border: 2px solid #0ea5e9;
+                border: 2px solid #00C6FF;
             }
             QPushButton {
-                background-color: #0ea5e9;
-                color: #ffffff;
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00C6FF, stop:1 #0072FF);
+                color: #FFFFFF;
                 border: none;
-                border-radius: 6px;
-                padding: 12px;
+                border-radius: 8px;
+                padding: 14px;
                 font-size: 16px;
-                font-weight: bold;
+                font-weight: 800;
+                letter-spacing: 1px;
             }
             QPushButton:hover {
-                background-color: #0284c7;
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00E5FF, stop:1 #0088FF);
             }
             QPushButton:pressed {
-                background-color: #0369a1;
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #0099CC, stop:1 #0055CC);
             }
         """)
 
@@ -63,7 +64,7 @@ class LoginWindow(QWidget):
         title_label.setAlignment(Qt.AlignCenter)
         title_font = QFont("Segoe UI", 24, QFont.Bold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #0ea5e9; margin-bottom: 20px;")
+        title_label.setStyleSheet("color: #0072FF; margin-bottom: 20px; font-weight: 900;")
         layout.addWidget(title_label)
         
         # Subtitle

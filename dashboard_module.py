@@ -19,14 +19,14 @@ class DashboardModule(QWidget):
 
         # Welcome Text
         welcome_lbl = QLabel(f"Dashboard - Logged in as: {self.user_role.capitalize()}")
-        welcome_lbl.setStyleSheet("font-size: 24px; font-weight: bold; color: #0ea5e9; margin-bottom: 5px;")
+        welcome_lbl.setStyleSheet("font-size: 26px; font-weight: 900; color: #0072FF; margin-bottom: 5px; letter-spacing: 0.5px;")
         self.layout_main.addWidget(welcome_lbl)
 
         # Stats Cards Layout
         stats_layout = QHBoxLayout()
         stats_layout.setSpacing(15)
 
-        self.sales_card = self.create_stat_card("Today's Sales (₱)", "₱0.00", "#0ea5e9")
+        self.sales_card = self.create_stat_card("Today's Sales (₱)", "₱0.00", "#0072FF")
         self.trans_card = self.create_stat_card("Today's Transactions", "0", "#6366f1")
         self.inventory_card = self.create_stat_card("Total Products", "0", "#10b981")
         self.balance_card = self.create_stat_card("Overall Balance (₱)", "₱0.00", "#f59e0b")
@@ -69,7 +69,8 @@ class DashboardModule(QWidget):
 
         table = QTableWidget(0, len(headers))
         table.setHorizontalHeaderLabels(headers)
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        # Apply stretch mode to all columns so text isn't cut off
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         table.setStyleSheet("""
             QTableWidget {
                 border: none;
@@ -107,7 +108,7 @@ class DashboardModule(QWidget):
         title_lbl.setStyleSheet(f"color: #6b7280; font-size: 13px; font-weight: 600; text-transform: uppercase; border: none;")
         
         val_lbl = QLabel(value)
-        val_lbl.setStyleSheet(f"color: {color}; font-size: 26px; font-weight: 800; border: none;")
+        val_lbl.setStyleSheet(f"color: {color}; font-size: 28px; font-weight: 900; border: none;")
         
         layout.addWidget(title_lbl)
         layout.addWidget(val_lbl)

@@ -64,14 +64,38 @@ class POSModule(QWidget):
         # Bottom Bar: Total & Checkout
         bottom_layout = QHBoxLayout()
         self.total_label = QLabel("Total: ₱0.00")
-        self.total_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #0ea5e9;")
+        self.total_label.setStyleSheet("""
+            font-size: 28px; 
+            font-weight: 900; 
+            color: #00A8CC; 
+            background-color: #FFFFFF;
+            border: 1px solid #CCEEFF;
+            border-radius: 8px;
+            padding: 10px 20px;
+        """)
         bottom_layout.addWidget(self.total_label)
 
         bottom_layout.addStretch()
 
         self.btn_checkout = QPushButton("Checkout (F12)")
-        self.btn_checkout.setMinimumWidth(150)
-        self.btn_checkout.setStyleSheet("background-color: #0ea5e9; color: #ffffff; font-weight: bold; font-size: 18px;")
+        self.btn_checkout.setMinimumWidth(180)
+        self.btn_checkout.setStyleSheet("""
+            QPushButton {
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00C6FF, stop:1 #0072FF); 
+                color: #FFFFFF; 
+                font-weight: bold; 
+                font-size: 18px;
+                border-radius: 8px;
+                padding: 12px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00E5FF, stop:1 #0088FF); 
+            }
+            QPushButton:pressed {
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #0099CC, stop:1 #0055CC); 
+            }
+        """)
         self.btn_checkout.clicked.connect(self.checkout)
         QShortcut(QKeySequence("F12"), self).activated.connect(self.checkout)
         bottom_layout.addWidget(self.btn_checkout)
@@ -338,7 +362,7 @@ class CheckoutDialog(QDialog):
         layout = QVBoxLayout(self)
 
         lbl_total = QLabel(f"Total Amount: ₱{self.total:,.2f}")
-        lbl_total.setStyleSheet("font-size: 20px; font-weight: bold;")
+        lbl_total.setStyleSheet("font-size: 24px; font-weight: 900; color: #0072FF; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;")
         layout.addWidget(lbl_total)
 
         form = QFormLayout()
@@ -413,7 +437,7 @@ class AddToCartDialog(QDialog):
         layout = QVBoxLayout(self)
         
         lbl = QLabel(f"Adding: {name}")
-        lbl.setStyleSheet("font-size: 16px; font-weight: bold; color: #0ea5e9;")
+        lbl.setStyleSheet("font-size: 18px; font-weight: 800; color: #0072FF;")
         layout.addWidget(lbl)
         
         stock_color = "#10b981" if stock > 0 else "#ef4444"
@@ -438,7 +462,19 @@ class AddToCartDialog(QDialog):
         layout.addLayout(form)
         
         btn_confirm = QPushButton("Confirm (Enter)")
-        btn_confirm.setStyleSheet("background-color: #0ea5e9; color: #ffffff; font-weight: bold;")
+        btn_confirm.setStyleSheet("""
+            QPushButton {
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00C6FF, stop:1 #0072FF); 
+                color: #FFFFFF; 
+                font-weight: bold;
+                border-radius: 6px;
+                padding: 10px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00E5FF, stop:1 #0088FF); 
+            }
+        """)
         btn_confirm.clicked.connect(self.accept)
         layout.addWidget(btn_confirm)
 
