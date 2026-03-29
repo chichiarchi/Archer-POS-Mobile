@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, 
-    QPushButton, QHBoxLayout
+    QPushButton, QHBoxLayout, QLabel, QDateEdit
 )
+from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QShortcut, QKeySequence
 import database
 
@@ -16,6 +17,22 @@ class LogsModule(QWidget):
         
         # Actions
         top_layout = QHBoxLayout()
+        
+        # Date Filters
+        top_layout.addWidget(QLabel("From:"))
+        self.date_from = QDateEdit()
+        self.date_from.setCalendarPopup(True)
+        self.date_from.setDate(QDate.currentDate())
+        self.date_from.dateChanged.connect(self.load_logs)
+        top_layout.addWidget(self.date_from)
+        
+        top_layout.addWidget(QLabel("To:"))
+        self.date_to = QDateEdit()
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setDate(QDate.currentDate())
+        self.date_to.dateChanged.connect(self.load_logs)
+        top_layout.addWidget(self.date_to)
+
         self.btn_refresh = QPushButton("Refresh Logs (Ctrl+R)")
         self.btn_refresh.clicked.connect(self.load_logs)
         QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.load_logs)
@@ -34,9 +51,18 @@ class LogsModule(QWidget):
         self.load_logs()
 
     def load_logs(self):
+        date_from_str = self.date_from.date().toString("yyyy-MM-dd")
+        date_to_str = self.date_to.date().toString("yyyy-MM-dd")
+
         conn = database.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT timestamp, user_id, action, details FROM audit_logs ORDER BY id DESC LIMIT 500")
+        cursor.execute("""
+            SELECT timestamp, user_id, action, details 
+            FROM audit_logs 
+            WHERE DATE(timestamp) BETWEEN ? AND ?
+            ORDER BY id DESC 
+            LIMIT 500
+        """, (date_from_str, date_to_str))
         rows = cursor.fetchall()
         conn.close()
 
