@@ -106,6 +106,31 @@ def init_db():
 
     conn.commit()
     conn.close()
+    
+    # Run data retention policy to keep only 90 days of logs
+    enforce_data_retention_policy()
+
+def enforce_data_retention_policy():
+    """
+    Implements the '90-day Rolling Window' policy:
+    1. Purge: Deletes audit logs older than 90 days.
+    2. Compaction: Runs VACUUM to reclaim disk space.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # Step 1: Identify and remove records from Day 91 and older
+        cursor.execute("DELETE FROM audit_logs WHERE timestamp < date('now', '-90 days')")
+        deleted_count = cursor.rowcount
+        conn.commit()
+        
+        # Step 2: Perform Database Compaction to reclaim space on the hard drive
+        cursor.execute("VACUUM")
+        
+    except sqlite3.Error as e:
+        print(f"Data Retention Policy Error: {e}")
+    finally:
+        conn.close()
 
 def hash_password(password, salt=None):
     if salt is None:
@@ -164,7 +189,7 @@ def log_action(action, details=None, user_id="system"):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO audit_logs (action, details, user_id) VALUES (?, ?, ?)",
+        "INSERT INTO audit_logs (action, details, user_id, timestamp) VALUES (?, ?, ?, datetime('now', '+8 hours'))",
         (action, details, user_id)
     )
     conn.commit()

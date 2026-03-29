@@ -117,15 +117,26 @@ class POSModule(QWidget):
 
         conn = database.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, price FROM products WHERE id=?", (barcode,))
-        product = cursor.fetchone()
-        conn.close()
+        product = None
+        current_stock = 0
+        try:
+            cursor.execute("SELECT id, name, price FROM products WHERE id=?", (barcode,))
+            product = cursor.fetchone()
+            if product:
+                p_id, p_name, p_price = product
+                cursor.execute("""
+                    SELECT COALESCE(SUM(CASE WHEN type='IN' THEN quantity ELSE -quantity END), 0)
+                    FROM inventory WHERE product_id=?
+                """, (p_id,))
+                current_stock = cursor.fetchone()[0]
+        finally:
+            conn.close()
 
         if product:
             p_id, p_name, p_price = product
             
-            # Popup confirmation dialog
-            dialog = AddToCartDialog(p_name, qty_to_add, p_price, self)
+            # Popup confirmation dialog with stock warning
+            dialog = AddToCartDialog(p_name, qty_to_add, p_price, current_stock, self)
             if dialog.exec():
                 final_qty, final_price = dialog.get_data()
                 
@@ -134,6 +145,18 @@ class POSModule(QWidget):
                     self.search_input.setFocus()
                     return
                 
+                # Soft Warning for negative stock
+                if current_stock <= 0:
+                    reply = QMessageBox.warning(
+                        self, "Stock Warning", 
+                        f"System shows 0 stock for '{p_name}', but item is available physically. Proceed with sale?",
+                        QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+                    )
+                    if reply == QMessageBox.No:
+                        self.search_input.clear()
+                        self.search_input.setFocus()
+                        return
+
                 # If price is changed, require admin
                 if abs(final_price - p_price) > 0.001:
                     if not self.verify_admin():
@@ -244,23 +267,23 @@ class POSModule(QWidget):
                 customer_id = cursor.lastrowid
 
             cursor.execute("""
-                INSERT INTO sales (total_amount, amount_paid, balance_due, customer_id)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO sales (total_amount, amount_paid, balance_due, customer_id, timestamp)
+                VALUES (?, ?, ?, ?, datetime('now', '+8 hours'))
             """, (total, amount_paid, balance_due, customer_id))
             sale_id = cursor.lastrowid
             
             # Save Debtors
             if balance_due > 0 and customer_id:
                 cursor.execute("""
-                    INSERT INTO debtors (customer_id, sale_id, balance_amount)
-                    VALUES (?, ?, ?)
+                    INSERT INTO debtors (customer_id, sale_id, balance_amount, created_at)
+                    VALUES (?, ?, ?, datetime('now', '+8 hours'))
                 """, (customer_id, sale_id, balance_due))
 
             # Update Inventory (Stock Out)
             for item in self.cart:
                 cursor.execute("""
-                    INSERT INTO inventory (product_id, quantity, type)
-                    VALUES (?, ?, 'OUT')
+                    INSERT INTO inventory (product_id, quantity, type, timestamp)
+                    VALUES (?, ?, 'OUT', datetime('now', '+8 hours'))
                 """, (item["barcode"], item["qty"]))
 
             conn.commit()
@@ -380,18 +403,23 @@ class CheckoutDialog(QDialog):
         return paid, customer_info
 
 class AddToCartDialog(QDialog):
-    def __init__(self, product_name, default_qty, default_price, parent=None):
+    def __init__(self, product_name, default_qty, default_price, current_stock, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Add Item")
         self.setMinimumWidth(350)
-        self.setup_ui(product_name, default_qty, default_price)
+        self.setup_ui(product_name, default_qty, default_price, current_stock)
 
-    def setup_ui(self, name, qty, price):
+    def setup_ui(self, name, qty, price, stock):
         layout = QVBoxLayout(self)
         
         lbl = QLabel(f"Adding: {name}")
         lbl.setStyleSheet("font-size: 16px; font-weight: bold; color: #0ea5e9;")
         layout.addWidget(lbl)
+        
+        stock_color = "#10b981" if stock > 0 else "#ef4444"
+        stock_lbl = QLabel(f"System Stock: {int(stock)} units")
+        stock_lbl.setStyleSheet(f"color: {stock_color}; font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(stock_lbl)
         
         form = QFormLayout()
         

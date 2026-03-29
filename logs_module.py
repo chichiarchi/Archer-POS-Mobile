@@ -22,16 +22,20 @@ class LogsModule(QWidget):
         top_layout.addWidget(QLabel("From:"))
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
-        self.date_from.setDate(QDate.currentDate())
-        self.date_from.dateChanged.connect(self.load_logs)
+        self.date_from.setDate(QDate.currentDate().addDays(-7)) # Default to last 7 days
+        self.date_from.dateChanged.connect(self.update_date_limits)
         top_layout.addWidget(self.date_from)
         
         top_layout.addWidget(QLabel("To:"))
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
         self.date_to.setDate(QDate.currentDate())
-        self.date_to.dateChanged.connect(self.load_logs)
+        self.date_to.setMinimumDate(self.date_from.date())
+        self.date_to.dateChanged.connect(self.update_date_limits)
         top_layout.addWidget(self.date_to)
+        
+        # Initial set of limits
+        self.date_from.setMaximumDate(self.date_to.date())
 
         self.btn_refresh = QPushButton("Refresh Logs (Ctrl+R)")
         self.btn_refresh.clicked.connect(self.load_logs)
@@ -48,6 +52,25 @@ class LogsModule(QWidget):
         self.logs_table.setEditTriggers(QTableWidget.NoEditTriggers)
         layout.addWidget(self.logs_table)
 
+        self.load_logs()
+
+    def reset_dates(self):
+        # Reset to Today
+        today = QDate.currentDate()
+        # To avoid mutual constraint blocking, reset To first if we were moving to past, 
+        # but since we move to Today, setting both to today is safer.
+        self.date_from.setMaximumDate(today.addDays(3650)) # Temporarily lift
+        self.date_to.setMinimumDate(today.addDays(-3650)) # Temporarily lift
+        
+        self.date_from.setDate(today)
+        self.date_to.setDate(today)
+        self.update_date_limits()
+
+    def update_date_limits(self):
+        # Mutual constraints
+        self.date_to.setMinimumDate(self.date_from.date())
+        self.date_from.setMaximumDate(self.date_to.date())
+        # Re-fetch logs based on new range
         self.load_logs()
 
     def load_logs(self):
@@ -71,5 +94,9 @@ class LogsModule(QWidget):
             self.logs_table.insertRow(i)
             self.logs_table.setItem(i, 0, QTableWidgetItem(str(row[0])))
             self.logs_table.setItem(i, 1, QTableWidgetItem(str(row[1])))
-            self.logs_table.setItem(i, 2, QTableWidgetItem(str(row[2])))
+            
+            # Format action name (replace underscores with spaces)
+            action_text = str(row[2]).replace('_', ' ') if row[2] else ""
+            self.logs_table.setItem(i, 2, QTableWidgetItem(action_text))
+            
             self.logs_table.setItem(i, 3, QTableWidgetItem(str(row[3]) if row[3] else ""))

@@ -134,12 +134,14 @@ class ArcherPOS(QMainWindow):
         if index == 0:
             self.dashboard_tab.load_all()
         elif index == 1:
+            self.pos_tab.refresh_completer()
             self.pos_tab.search_input.setFocus()
         elif index == 2:
             self.inventory_tab.load_inventory()
         elif index == 3:
             self.balance_tab.load_balances()
         elif index == 4:
+            self.logs_tab.reset_dates()
             self.logs_tab.load_logs()
 
 if __name__ == "__main__":

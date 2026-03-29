@@ -38,26 +38,39 @@ class DashboardModule(QWidget):
 
         self.layout_main.addLayout(stats_layout)
 
-        # Expiry Warning Widget
-        warning_frame = QFrame()
-        warning_frame.setStyleSheet("""
+        self.expiry_card = self.create_table_card("Nearly Expired Items (Within 30 Days)", ["Product Name", "Expiry Date", "Stock Remaining"], "#ef4444")
+        self.expiry_table = self.expiry_card["table"]
+        self.layout_main.addWidget(self.expiry_card["frame"])
+
+        # Negative Stock Alerts
+        self.neg_stock_card = self.create_table_card("Negative Stock Alert (Reconciliation Required)", ["Product Name", "Current Level", "Action Required"], "#f97316")
+        self.neg_stock_table = self.neg_stock_card["table"]
+        self.layout_main.addWidget(self.neg_stock_card["frame"])
+
+        self.layout_main.addStretch()
+
+        self.load_all()
+
+    def create_table_card(self, title, headers, color):
+        frame = QFrame()
+        frame.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
                 border: 1px solid #e5e7eb; 
                 border-radius: 12px;
             }
         """)
-        warning_layout = QVBoxLayout(warning_frame)
-        warning_layout.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(20, 20, 20, 20)
 
-        warning_lbl = QLabel("⚠️ Nearly Expired Items (Within 30 Days)")
-        warning_lbl.setStyleSheet("color: #ef4444; font-size: 18px; font-weight: bold; border: none; margin-bottom: 10px;")
-        warning_layout.addWidget(warning_lbl)
+        lbl = QLabel(title)
+        lbl.setStyleSheet(f"color: {color}; font-size: 18px; font-weight: bold; border: none; margin-bottom: 10px;")
+        layout.addWidget(lbl)
 
-        self.expiry_table = QTableWidget(0, 3)
-        self.expiry_table.setHorizontalHeaderLabels(["Product Name", "Expiry Date", "Stock Remaining"])
-        self.expiry_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.expiry_table.setStyleSheet("""
+        table = QTableWidget(0, len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        table.setStyleSheet("""
             QTableWidget {
                 border: none;
                 background-color: #ffffff;
@@ -70,13 +83,10 @@ class DashboardModule(QWidget):
                 font-weight: bold;
             }
         """)
-        self.expiry_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        warning_layout.addWidget(self.expiry_table)
-
-        self.layout_main.addWidget(warning_frame)
-        self.layout_main.addStretch()
-
-        self.load_all()
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        layout.addWidget(table)
+        
+        return {"frame": frame, "table": table}
 
     def create_stat_card(self, title, value, color):
         frame = QFrame()
@@ -108,6 +118,41 @@ class DashboardModule(QWidget):
     def load_all(self):
         self.load_stats()
         self.load_expiry_warnings()
+        self.load_negative_stock()
+
+    def load_negative_stock(self):
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT p.name, 
+                   SUM(CASE WHEN i.type='IN' THEN i.quantity ELSE -i.quantity END) as total_stock
+            FROM products p
+            JOIN inventory i ON p.id = i.product_id
+            GROUP BY p.id
+            HAVING total_stock < 0
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        conn.close()
+
+        self.neg_stock_table.setRowCount(0)
+        for i, row in enumerate(rows):
+            name, qty = row
+            self.neg_stock_table.insertRow(i)
+            
+            item_name = QTableWidgetItem(name)
+            item_name.setForeground(QColor("#f97316"))
+            
+            item_qty = QTableWidgetItem(str(int(qty)))
+            item_qty.setForeground(QColor("#f97316"))
+            
+            item_action = QTableWidgetItem("STOCK RECONCILIATION REQUIRED")
+            item_action.setForeground(QColor("#f97316"))
+            
+            self.neg_stock_table.setItem(i, 0, item_name)
+            self.neg_stock_table.setItem(i, 1, item_qty)
+            self.neg_stock_table.setItem(i, 2, item_action)
 
     def load_stats(self):
         conn = database.get_connection()

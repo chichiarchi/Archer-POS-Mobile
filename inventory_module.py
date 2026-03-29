@@ -33,10 +33,10 @@ class InventoryModule(QWidget):
         QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self.show_edit_dialog)
         top_layout.addWidget(self.btn_edit_product)
 
-        self.btn_delete_product = QPushButton("Delete Product (Del)")
-        self.btn_delete_product.clicked.connect(self.delete_product)
-        QShortcut(QKeySequence("Del"), self).activated.connect(self.delete_product)
-        top_layout.addWidget(self.btn_delete_product)
+        self.btn_stock_adj = QPushButton("Stock Adjustment (Ctrl+A)")
+        self.btn_stock_adj.clicked.connect(self.show_adjustment_dialog)
+        QShortcut(QKeySequence("Ctrl+A"), self).activated.connect(self.show_adjustment_dialog)
+        top_layout.addWidget(self.btn_stock_adj)
 
         layout.addLayout(top_layout)
 
@@ -125,8 +125,8 @@ class InventoryModule(QWidget):
 
             # Insert into inventory
             cursor.execute("""
-                INSERT INTO inventory (product_id, quantity, expiry_date, type)
-                VALUES (?, ?, ?, 'IN')
+                INSERT INTO inventory (product_id, quantity, expiry_date, type, timestamp)
+                VALUES (?, ?, ?, 'IN', datetime('now', '+8 hours'))
             """, (data["barcode"], data["qty"], data["expiry"]))
 
             conn.commit()
@@ -151,8 +151,8 @@ class InventoryModule(QWidget):
                 cursor.execute("SELECT id FROM products WHERE id=?", (barcode,))
                 if cursor.fetchone():
                     cursor.execute("""
-                        INSERT INTO inventory (product_id, quantity, type)
-                        VALUES (?, ?, 'OUT')
+                        INSERT INTO inventory (product_id, quantity, type, timestamp)
+                        VALUES (?, ?, 'OUT', datetime('now', '+8 hours'))
                     """, (barcode, qty))
                     conn.commit()
                     database.log_action("STOCK_OUT", f"Removed {qty}x of barcode {barcode} manually", self.user_role)
@@ -161,6 +161,64 @@ class InventoryModule(QWidget):
                     QMessageBox.warning(self, "Error", "Product not found.")
                 conn.close()
                 self.load_inventory()
+
+    def show_adjustment_dialog(self):
+        if self.user_role != "admin":
+            QMessageBox.warning(self, "Access Denied", "Only Admin can perform Physical Stock Adjustments.")
+            return
+
+        barcode, ok = QInputDialog.getText(self, "Physical Reconciliation", "Enter Product Barcode:")
+        if not ok or not barcode:
+            return
+
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        
+        # Get Current System Stock
+        cursor.execute("""
+            SELECT name, COALESCE(SUM(CASE WHEN type='IN' THEN quantity ELSE -quantity END), 0)
+            FROM products p
+            LEFT JOIN inventory i ON p.id = i.product_id
+            WHERE p.id = ?
+            GROUP BY p.id
+        """, (barcode,))
+        result = cursor.fetchone()
+        
+        if not result:
+            QMessageBox.warning(self, "Not Found", "Product barcode not found in database.")
+            conn.close()
+            return
+            
+        p_name, system_stock = result
+        
+        # Ask for Physical Count
+        physical_count, ok_p = QInputDialog.getDouble(
+            self, "Physical Reconciliation", 
+            f"Product: {p_name}\nSystem Shows: {int(system_stock)}\n\nEnter Actual Physical Count Found:", 
+            0, -10000, 100000
+        )
+        
+        if ok_p:
+            # Ask for Reason
+            reasons = ["Initial count error", "Missed Delivery Entry", "Spoilage/Damage Not Recorded", "Found extra stock", "Other"]
+            reason, ok_r = QInputDialog.getItem(self, "Adjustment Reason", "Select Reason for Discrepancy:", reasons, 0, False)
+            
+            if ok_r:
+                adjustment_qty = physical_count - system_stock
+                adj_type = 'IN' if adjustment_qty > 0 else 'OUT'
+                
+                cursor.execute("""
+                    INSERT INTO inventory (product_id, quantity, type, timestamp)
+                    VALUES (?, ?, ?, datetime('now', '+8 hours'))
+                """, (barcode, abs(adjustment_qty), adj_type))
+                
+                conn.commit()
+                database.log_action("STOCK_ADJUSTMENT", f"Adjusted {p_name} by {adjustment_qty:+} units to match physical count of {physical_count}. Reason: {reason}", self.user_role)
+                
+                QMessageBox.information(self, "Success", f"Stock adjusted. New levels set to {int(physical_count)}.")
+        
+        conn.close()
+        self.load_inventory()
 
     def show_edit_dialog(self):
         if self.user_role != "admin":
@@ -272,6 +330,11 @@ class StockInDialog(QDialog):
     def check_existing_product(self, barcode):
         barcode = barcode.strip()
         if not barcode:
+            # Clear fields if barcode is empty
+            self.inp_name.clear()
+            self.inp_category.clear()
+            self.inp_cost.clear()
+            self.inp_sell.clear()
             return
             
         conn = database.get_connection()
@@ -285,6 +348,12 @@ class StockInDialog(QDialog):
             self.inp_category.setText(product[1] if product[1] else "")
             self.inp_cost.setText(str(product[2] if product[2] else 0.0))
             self.inp_sell.setText(str(product[3] if product[3] else 0.0))
+        else:
+            # Clear fields if no match is found
+            self.inp_name.clear()
+            self.inp_category.clear()
+            self.inp_cost.clear()
+            self.inp_sell.clear()
 
     def get_data(self):
         return {
