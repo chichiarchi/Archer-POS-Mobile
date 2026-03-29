@@ -132,7 +132,7 @@ class ArcherPOS(QMainWindow):
     def on_tab_change(self, index):
         # Refresh Data dynamically if needed
         if index == 0:
-            self.dashboard_tab.load_expiry_warnings()
+            self.dashboard_tab.load_all()
         elif index == 1:
             self.pos_tab.search_input.setFocus()
         elif index == 2:
