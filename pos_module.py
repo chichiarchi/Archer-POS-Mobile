@@ -318,8 +318,9 @@ class POSModule(QWidget):
 
             # Print Receipt
             receipt_data = {
-                'header': 'ARCHER POS MEGA STORE',
-                'subheader': f'Cashier: {self.user_role.capitalize()}\nSale ID: {sale_id}',
+                'header': 'ARCHER STORE',
+                'cashier': self.user_role.capitalize(),
+                'sale_id': sale_id,
                 'items': [{'name': i["name"], 'qty': i["qty"], 'price': i["price"]} for i in self.cart],
                 'total': total,
                 'amount_paid': amount_paid,
@@ -327,23 +328,16 @@ class POSModule(QWidget):
                 'footer': 'Thank you! Come again!'
             }
             printer = ReceiptPrinter()
-            if not printer.is_connected:
-                # Still prints via Dummy, maybe you want a popup if printer is not physically there
-                # But dummy mode helps for testing. The prompt says: "simply shows a Printer Not Detected message"
-                import logging
-                logging.info("Skipping real hardware, running dummy")
+            if printer.is_connected:
+                success = printer.print_receipt(receipt_data)
+                if not success:
+                    QMessageBox.warning(self, "Printer Error", "Failed to print the receipt.")
+            else:
+                QMessageBox.warning(self, "Printer Status", "Printer Not Detected. Receipt was not printed.")
 
             change_amount = amount_paid - total if amount_paid > total else 0.0
             msg = f"Transaction Completed!\nChange: ₱{change_amount:,.2f}" if change_amount > 0 else "Transaction Completed!"
             QMessageBox.information(self, "Success", msg)
-            
-            # Ask if printer was connected. Wait... The mock printer doesn't crash. 
-            # We can check physically but python-escpos isn't physically there right now.
-            if not printer.is_connected and printer_helper.ESCPOS_AVAILABLE:
-                pass # Already logged 
-
-            if not getattr(printer, 'is_connected', False):
-                QMessageBox.warning(self, "Printer Status", "Printer Not Detected. Receipt was not printed.")
 
             # Clear Cart
             self.cart.clear()
