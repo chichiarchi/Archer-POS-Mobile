@@ -126,12 +126,9 @@ class DashboardModule(QWidget):
         cursor = conn.cursor()
         
         query = """
-            SELECT p.name, 
-                   SUM(CASE WHEN i.type='IN' THEN i.quantity ELSE -i.quantity END) as total_stock
-            FROM products p
-            JOIN inventory i ON p.id = i.product_id
-            GROUP BY p.id
-            HAVING total_stock < 0
+            SELECT name, current_stock
+            FROM products
+            WHERE current_stock < 0
         """
         cursor.execute(query)
         rows = cursor.fetchall()
@@ -200,15 +197,14 @@ class DashboardModule(QWidget):
         cursor = conn.cursor()
 
         query = """
-            SELECT p.name, i.expiry_date, 
-                   SUM(CASE WHEN i.type='IN' THEN i.quantity ELSE -i.quantity END) as batch_qty
+            SELECT p.name, i.expiry_date, p.current_stock
             FROM inventory i
             JOIN products p ON i.product_id = p.id
             WHERE i.expiry_date IS NOT NULL 
               AND i.expiry_date <= date('now', '+30 days')
               AND i.expiry_date >= date('now', '-30 days')
+              AND p.current_stock > 0
             GROUP BY p.id, i.expiry_date
-            HAVING batch_qty > 0
             ORDER BY i.expiry_date ASC
         """
         cursor.execute(query)

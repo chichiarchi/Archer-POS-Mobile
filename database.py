@@ -5,7 +5,8 @@ import os
 DB_NAME = "archer_pos.db"
 
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    # Added timeout to prevent "Database is locked" errors in the long run
+    return sqlite3.connect(DB_NAME, timeout=20)
 
 def init_db():
     conn = get_connection()
@@ -22,13 +23,13 @@ def init_db():
         )
     """)
     
-    # Create Products Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS products (
             id TEXT PRIMARY KEY, -- Using barcode as ID
             name TEXT NOT NULL,
             price REAL NOT NULL,
             cost_price REAL DEFAULT 0,
+            current_stock REAL DEFAULT 0, -- Cached stock for performance
             category TEXT
         )
     """)
@@ -98,11 +99,19 @@ def init_db():
     if cursor.fetchone()[0] == 0:
         create_user('admin', 'admin', 'admin')
 
-    # Migrations for new columns if the database existed previously
+    # Migrations for new columns
     try:
         cursor.execute("ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT 0")
     except sqlite3.OperationalError:
-        pass  # Column already exists
+        pass 
+
+    try:
+        cursor.execute("ALTER TABLE products ADD COLUMN current_stock REAL DEFAULT 0")
+        conn.commit()
+        # If we just added the column, recalculate it once
+        recalculate_all_stock_logic(cursor)
+    except sqlite3.OperationalError:
+        pass
 
     conn.commit()
     conn.close()
@@ -192,6 +201,25 @@ def log_action(action, details=None, user_id="system"):
         "INSERT INTO audit_logs (action, details, user_id, timestamp) VALUES (?, ?, ?, datetime('now', '+8 hours'))",
         (action, details, user_id)
     )
+    conn.commit()
+    conn.close()
+
+def recalculate_all_stock_logic(cursor):
+    """Internal helper to sync current_stock with inventory logs"""
+    cursor.execute("""
+        UPDATE products 
+        SET current_stock = (
+            SELECT COALESCE(SUM(CASE WHEN type='IN' THEN quantity ELSE -quantity END), 0)
+            FROM inventory 
+            WHERE inventory.product_id = products.id
+        )
+    """)
+
+def update_stock_cache(product_id, quantity_change):
+    """Efficiently update the cached stock level without recalculating everything"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (quantity_change, product_id))
     conn.commit()
     conn.close()
 

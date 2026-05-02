@@ -38,6 +38,11 @@ class InventoryModule(QWidget):
         QShortcut(QKeySequence("Ctrl+A"), self).activated.connect(self.show_adjustment_dialog)
         top_layout.addWidget(self.btn_stock_adj)
 
+        self.btn_recalc = QPushButton("Sync Cache")
+        self.btn_recalc.setToolTip("Force recalculate stock from logs")
+        self.btn_recalc.clicked.connect(self.force_recalculate)
+        top_layout.addWidget(self.btn_recalc)
+
         layout.addLayout(top_layout)
 
         # Search Bar
@@ -69,20 +74,17 @@ class InventoryModule(QWidget):
         cursor = conn.cursor()
         
         query = """
-            SELECT p.id, p.name, 
-                   COALESCE(SUM(CASE WHEN i.type='IN' THEN i.quantity ELSE -i.quantity END), 0) as total_stock,
-                   p.category, p.cost_price
-            FROM products p
-            LEFT JOIN inventory i ON p.id = i.product_id
+            SELECT id, name, current_stock, category, cost_price
+            FROM products
         """
         
         params = ()
         if search_text:
-            query += " WHERE p.id LIKE ? OR p.name LIKE ?"
+            query += " WHERE id LIKE ? OR p.name LIKE ?"
             like_val = f"%{search_text}%"
             params = (like_val, like_val)
             
-        query += " GROUP BY p.id"
+        query += " LIMIT 100" # Pagination Limit (Issue #2 fix)
             
         cursor.execute(query, params)
         rows = cursor.fetchall()
@@ -129,12 +131,17 @@ class InventoryModule(QWidget):
                 VALUES (?, ?, ?, 'IN', datetime('now', '+8 hours'))
             """, (data["barcode"], data["qty"], data["expiry"]))
 
-            conn.commit()
-            conn.close()
+            # Update stock cache (Issue #1 fix)
+            cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (data["qty"], data["barcode"]))
             
             # Log action
-            database.log_action("STOCK_IN", f"Received {data['qty']}x of {data['name']} (Barcode: {data['barcode']})", self.user_role)
-            
+            cursor.execute(
+                "INSERT INTO audit_logs (action, details, user_id, timestamp) VALUES (?, ?, ?, datetime('now', '+8 hours'))",
+                ("STOCK_IN", f"Received {data['qty']}x of {data['name']} (Barcode: {data['barcode']})", self.user_role)
+            )
+
+            conn.commit()
+            conn.close()
             self.load_inventory()
 
     def show_stock_out_dialog(self):
@@ -144,7 +151,7 @@ class InventoryModule(QWidget):
 
         barcode, ok = QInputDialog.getText(self, "Stock Out", "Enter Product Barcode:")
         if ok and barcode:
-            qty, ok_qty = QInputDialog.getDouble(self, "Quantity", "Enter Quantity to Remove (Spoilage/Damage):", 1.0, 0.1, 100000)
+            qty, ok_qty = QInputDialog.getInt(self, "Quantity", "Enter Quantity to Remove (Spoilage/Damage):", 1, 1, 100000)
             if ok_qty:
                 conn = database.get_connection()
                 cursor = conn.cursor()
@@ -154,12 +161,19 @@ class InventoryModule(QWidget):
                         INSERT INTO inventory (product_id, quantity, type, timestamp)
                         VALUES (?, ?, 'OUT', datetime('now', '+8 hours'))
                     """, (barcode, qty))
+                    
+                    # Update stock cache
+                    cursor.execute("UPDATE products SET current_stock = current_stock - ? WHERE id = ?", (qty, barcode))
+                    
+                    # Log action
+                    cursor.execute(
+                        "INSERT INTO audit_logs (action, details, user_id, timestamp) VALUES (?, ?, ?, datetime('now', '+8 hours'))",
+                        ("STOCK_OUT", f"Removed {qty}x of barcode {barcode} manually", self.user_role)
+                    )
+
                     conn.commit()
-                    database.log_action("STOCK_OUT", f"Removed {qty}x of barcode {barcode} manually", self.user_role)
+                    conn.close()
                     QMessageBox.information(self, "Success", "Stock removed manually.")
-                else:
-                    QMessageBox.warning(self, "Error", "Product not found.")
-                conn.close()
                 self.load_inventory()
 
     def show_adjustment_dialog(self):
@@ -174,13 +188,11 @@ class InventoryModule(QWidget):
         conn = database.get_connection()
         cursor = conn.cursor()
         
-        # Get Current System Stock
+        # Get Current System Stock (Optimized to prevent freezing - Issue #1 fix)
         cursor.execute("""
-            SELECT name, COALESCE(SUM(CASE WHEN type='IN' THEN quantity ELSE -quantity END), 0)
-            FROM products p
-            LEFT JOIN inventory i ON p.id = i.product_id
-            WHERE p.id = ?
-            GROUP BY p.id
+            SELECT name, current_stock
+            FROM products
+            WHERE id = ?
         """, (barcode,))
         result = cursor.fetchone()
         
@@ -192,10 +204,10 @@ class InventoryModule(QWidget):
         p_name, system_stock = result
         
         # Ask for Physical Count
-        physical_count, ok_p = QInputDialog.getDouble(
+        physical_count, ok_p = QInputDialog.getInt(
             self, "Physical Reconciliation", 
             f"Product: {p_name}\nSystem Shows: {int(system_stock)}\n\nEnter Actual Physical Count Found:", 
-            0, -10000, 100000
+            int(system_stock), 0, 100000
         )
         
         if ok_p:
@@ -212,8 +224,17 @@ class InventoryModule(QWidget):
                     VALUES (?, ?, ?, datetime('now', '+8 hours'))
                 """, (barcode, abs(adjustment_qty), adj_type))
                 
+                # Update stock cache
+                cursor.execute("UPDATE products SET current_stock = ? WHERE id = ?", (int(physical_count), barcode))
+                
+                # Log action
+                cursor.execute(
+                    "INSERT INTO audit_logs (action, details, user_id, timestamp) VALUES (?, ?, ?, datetime('now', '+8 hours'))",
+                    ("STOCK_ADJUSTMENT", f"Adjusted {p_name} by {adjustment_qty:+} units to match physical count of {physical_count}. Reason: {reason}", self.user_role)
+                )
+
                 conn.commit()
-                database.log_action("STOCK_ADJUSTMENT", f"Adjusted {p_name} by {adjustment_qty:+} units to match physical count of {physical_count}. Reason: {reason}", self.user_role)
+                conn.close()
                 
                 QMessageBox.information(self, "Success", f"Stock adjusted. New levels set to {int(physical_count)}.")
         
@@ -291,6 +312,21 @@ class InventoryModule(QWidget):
             QMessageBox.information(self, "Success", f"Product '{product_name}' has been deleted from the database.")
             self.load_inventory()
 
+    def force_recalculate(self):
+        if self.user_role != "admin":
+            QMessageBox.warning(self, "Access Denied", "Only Admin can sync cache.")
+            return
+            
+        reply = QMessageBox.question(self, "Confirm Sync", "This will recalculate all stock levels from historical logs. Continue?", QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            database.recalculate_all_stock_logic(cursor)
+            conn.commit()
+            conn.close()
+            self.load_inventory()
+            QMessageBox.information(self, "Success", "Stock cache synchronized successfully.")
+
 
 class StockInDialog(QDialog):
     def __init__(self, parent=None):
@@ -360,7 +396,7 @@ class StockInDialog(QDialog):
             "barcode": self.inp_barcode.text().strip(),
             "name": self.inp_name.text().strip() or "Unnamed",
             "category": self.inp_category.text().strip() or "General",
-            "qty": float(self.inp_qty.text().strip() or 0.0),
+            "qty": int(self.inp_qty.text().strip() or 0),
             "cost_price": float(self.inp_cost.text().strip() or 0.0),
             "sell_price": float(self.inp_sell.text().strip() or 0.0),
             "expiry": self.inp_expiry.date().toString(Qt.ISODate)

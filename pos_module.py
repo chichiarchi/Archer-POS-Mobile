@@ -27,6 +27,7 @@ class POSModule(QWidget):
         self.completer = QCompleter()
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.completer.setFilterMode(Qt.MatchContains)
+        self.completer.activated.connect(self.on_completer_activated)
         self.search_input.setCompleter(self.completer)
         self.refresh_completer()
         
@@ -116,6 +117,10 @@ class POSModule(QWidget):
         model = QStringListModel(self.product_list)
         self.completer.setModel(model)
 
+    def on_completer_activated(self, text):
+        self.search_input.setText(text)
+        self.add_item_to_cart()
+
     def add_item_to_cart(self):
         text = self.search_input.text().strip()
         if not text:
@@ -144,23 +149,18 @@ class POSModule(QWidget):
         product = None
         current_stock = 0
         try:
-            cursor.execute("SELECT id, name, price FROM products WHERE id=?", (barcode,))
+            cursor.execute("SELECT id, name, price, current_stock FROM products WHERE id=?", (barcode,))
             product = cursor.fetchone()
             if product:
-                p_id, p_name, p_price = product
-                cursor.execute("""
-                    SELECT COALESCE(SUM(CASE WHEN type='IN' THEN quantity ELSE -quantity END), 0)
-                    FROM inventory WHERE product_id=?
-                """, (p_id,))
-                current_stock = cursor.fetchone()[0]
+                p_id, p_name, p_price, current_stock = product
         finally:
             conn.close()
 
         if product:
-            p_id, p_name, p_price = product
+            p_id, p_name, p_price, current_stock = product
             
             # Popup confirmation dialog with stock warning
-            dialog = AddToCartDialog(p_name, qty_to_add, p_price, current_stock, self)
+            dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, int(current_stock), self)
             if dialog.exec():
                 final_qty, final_price = dialog.get_data()
                 
@@ -237,9 +237,9 @@ class POSModule(QWidget):
             return
 
         current_qty = self.cart[current_row]["qty"]
-        new_qty, ok = QInputDialog.getDouble(self, "Change Quantity", "Enter New Quantity:", current_qty, 0.1, 100000)
+        new_qty, ok = QInputDialog.getInt(self, "Change Quantity", "Enter New Quantity:", int(current_qty), 1, 100000)
         if ok and new_qty > 0:
-            self.cart[current_row]["qty"] = new_qty
+            self.cart[current_row]["qty"] = int(new_qty)
             database.log_action("POS_QTY_UPDATE", f"Changed qty of {self.cart[current_row]['name']} to {new_qty}", self.user_role)
             self.update_cart_display()
 
@@ -309,6 +309,9 @@ class POSModule(QWidget):
                     INSERT INTO inventory (product_id, quantity, type, timestamp)
                     VALUES (?, ?, 'OUT', datetime('now', '+8 hours'))
                 """, (item["barcode"], item["qty"]))
+                
+                # Update stock cache (Issue #1 fix)
+                cursor.execute("UPDATE products SET current_stock = current_stock - ? WHERE id = ?", (item["qty"], item["barcode"]))
 
             conn.commit()
             conn.close()
@@ -441,11 +444,9 @@ class AddToCartDialog(QDialog):
         
         form = QFormLayout()
         
-        self.inp_qty = QDoubleSpinBox()
-        self.inp_qty.setRange(1.0, 10000.0)
-        self.inp_qty.setDecimals(2)
-        self.inp_qty.setSingleStep(1.0)
-        self.inp_qty.setValue(max(1.0, float(qty)))
+        self.inp_qty = QSpinBox()
+        self.inp_qty.setRange(1, 10000)
+        self.inp_qty.setValue(max(1, int(qty)))
         
         form.addRow("Quantity:", self.inp_qty)
         
