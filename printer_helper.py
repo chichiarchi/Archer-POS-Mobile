@@ -1,131 +1,221 @@
 import logging
+import os
 from datetime import datetime
+import database
+
 try:
-    from escpos.printer import Usb, Network, Dummy
-    ESCPOS_AVAILABLE = True
+    import win32print
+    import win32ui
+    import win32con
+    WIN32_AVAILABLE = True
 except ImportError:
-    ESCPOS_AVAILABLE = False
-    logging.warning("python-escpos is not installed. Printer will run in dummy mode.")
+    WIN32_AVAILABLE = False
+    logging.warning("pywin32 is not installed.")
 
 class ReceiptPrinter:
-    def __init__(self, vendor_id=None, product_id=None, host=None, port=9100):
-        self.vendor_id = vendor_id
-        self.product_id = product_id
-        self.host = host
-        self.port = port
-        self.printer = None
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(ReceiptPrinter, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self, printer_name=None):
+        if self._initialized:
+            return
+        
+        saved_name = database.get_setting('printer_name')
+        self.printer_name = printer_name or saved_name
         self.is_connected = False
+        self.last_error = ""
         self.connect()
+        self._initialized = True
 
     def connect(self):
-        """Attempts to connect to the network or USB thermal printer."""
-        if not ESCPOS_AVAILABLE:
-            logging.error("escpos library missing. Cannot connect to physical printer.")
+        """Attempts to find the thermal printer in Windows Spooler."""
+        if not WIN32_AVAILABLE:
             return False
 
-        if self.host:
-            try:
-                # Try connecting to Network Printer Simulator first
-                self.printer = Network(self.host, port=self.port, profile="POS-5890")
-                self.is_connected = True
-                logging.info(f"Successfully connected to network printer at {self.host}:{self.port}.")
-                return True
-            except Exception as e:
-                logging.warning(f"Failed to connect to network printer at {self.host}:{self.port}. Error: {e}")
-
-        if not self.vendor_id or not self.product_id:
-            logging.info("No Vendor/Product ID provided. Running Printer in Dummy Mode.")
-            self.printer = Dummy()
-            self.is_connected = True
-            return True
-
         try:
-            # Connect to USB printer
-            self.printer = Usb(self.vendor_id, self.product_id, profile="POS-5890")
-            self.is_connected = True
-            logging.info(f"Successfully connected to USB printer ({hex(self.vendor_id)}:{hex(self.product_id)}).")
-            return True
-        except Exception as e:
-            self.is_connected = False
-            logging.error(f"Failed to connect to USB printer: {e}")
-            # Fallback to Dummy printer so app doesn't crash
-            self.printer = Dummy() if ESCPOS_AVAILABLE else None
-            if self.printer:
+            if not self.printer_name:
+                # Auto-discover
+                printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)
+                for flags, description, name, comment in printers:
+                    n = name.lower()
+                    if any(x in n for x in ["pdf", "xps", "onenote", "fax", "webex", "snagit", "send to", "print to"]):
+                        continue
+                    if any(x in n for x in ["pos", "thermal", "58", "xp-", "xprinter", "receipt"]):
+                        self.printer_name = name
+                        break
+                
+                if not self.printer_name:
+                    try:
+                        default_printer = win32print.GetDefaultPrinter()
+                        if not any(x in default_printer.lower() for x in ["pdf", "xps", "onenote", "fax"]):
+                            self.printer_name = default_printer
+                    except:
+                        pass
+                
+                if not self.printer_name:
+                    for flags, description, name, comment in printers:
+                        n = name.lower()
+                        if not any(x in n for x in ["pdf", "xps", "onenote", "fax", "webex", "snagit", "send to", "print to"]):
+                            self.printer_name = name
+                            break
+
+            if self.printer_name:
+                # Test connection and close handle immediately
+                hprinter = win32print.OpenPrinter(self.printer_name)
+                win32print.ClosePrinter(hprinter)
                 self.is_connected = True
+                return True
+            else:
+                self.is_connected = False
+                self.last_error = "No valid printer found. Please go to System Settings -> Printer Settings, select your printer from the dropdown, and click 'Set as System Printer'."
+                return False
+
+        except Exception as e:
+            self.last_error = str(e)
+            logging.error(f"Failed to connect to Windows printer: {e}")
+            self.is_connected = False
             return False
 
     def print_receipt(self, receipt_data):
         """
-        Prints the receipt. 
-        receipt_data should be a dictionary with 'header', 'items', 'total', 'footer'.
+        Prints the receipt using GDI (Graphics Device Interface).
+        This works on ALL Windows printers by 'drawing' the text.
         """
-        if not self.printer:
-            logging.error("No printer instance available to print.")
+        if not WIN32_AVAILABLE:
             return False
 
+        if not self.is_connected or not self.printer_name:
+            self.connect()
+            if not self.is_connected:
+                return False
+
         try:
-            # Header
-            self.printer.set(align='center', bold=True, double_height=True, double_width=True)
-            self.printer.text(f"{receipt_data.get('header', 'ARCHER STORE')}\n")
-            self.printer.set(align='center', bold=False, double_height=False, double_width=False)
-            self.printer.text("Narvacan, Ilocos Sur\n") # Centered by printer.set(align='center')
-            self.printer.text("-" * 32 + "\n")
+            # Create a Device Context (DC) for the printer
+            hdc = win32ui.CreateDC()
+            hdc.CreatePrinterDC(self.printer_name)
             
-            # Sub-header (Date, Sale ID, Cashier)
+            # Start the print job
+            hdc.StartDoc("Archer POS Receipt")
+            hdc.StartPage()
+            
+            # Use a monospaced font for alignment
+            font_size = 28 # Height for legibility
+            char_width = 11 # 32 chars * 11 width = 352 dots (fits 384 dot 58mm paper)
+            font = win32ui.CreateFont({
+                "name": "Consolas",
+                "height": font_size,
+                "width": char_width,
+                "weight": 400,
+            })
+            hdc.SelectObject(font)
+            
+            # Use a bold font for the header
+            font_bold = win32ui.CreateFont({
+                "name": "Consolas",
+                "height": int(font_size * 1.5),
+                "width": int(char_width * 1.5),
+                "weight": 800,
+            })
+
+            y = 20 # Vertical position
+            
+            # 1. Header (Centered approx)
+            hdc.SelectObject(font_bold)
+            hdc.TextOut(20, y, receipt_data.get('header', 'ARCHER STORE'))
+            y += int(font_size * 1.8)
+            
+            hdc.SelectObject(font)
+            hdc.TextOut(10, y, " Narvacan, Ilocos Sur ")
+            y += font_size
+            hdc.TextOut(0, y, "-" * 32)
+            y += font_size
+            
+            # 2. Sub-header
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.printer.set(align='left')
-            self.printer.text(f"Date: {current_time}\n")
-            if 'sale_id' in receipt_data:
-                self.printer.text(f"Sale ID: {receipt_data['sale_id']}\n")
-            if 'cashier' in receipt_data:
-                self.printer.text(f"Cashier: {receipt_data['cashier']}\n")
-            elif 'subheader' in receipt_data:
-                 self.printer.text(f"{receipt_data['subheader']}\n")
-            self.printer.text("-" * 32 + "\n")
-            self.printer.text("Item             Qty       Price\n")
-            self.printer.text("-" * 32 + "\n")
+            hdc.TextOut(0, y, f"Date: {current_time}")
+            y += font_size
+            hdc.TextOut(0, y, "-" * 32)
+            y += font_size
+            
+            # 3. Items Header
+            hdc.TextOut(0, y, "Item             Qty      Price")
+            y += font_size
+            hdc.TextOut(0, y, "-" * 32)
+            y += font_size
                 
-            # Items
-            self.printer.set(align='left')
+            # 4. Items
             for item in receipt_data.get('items', []):
-                line = f"{item['name'][:16]:<16} {int(item['qty']):>3} {item['price']:>11,.2f}\n"
-                self.printer.text(line)
+                name = item['name'][:16]
+                qty = str(int(item['qty']))
+                price = f"{item['price']:,.2f}"
+                
+                line = f"{name:<16} {qty:>3} {price:>10}"
+                hdc.TextOut(0, y, line)
+                y += font_size
 
-            self.printer.text("-" * 32 + "\n")
+            hdc.TextOut(0, y, "-" * 32)
+            y += font_size
 
-            # Totals
-            self.printer.set(align='left', bold=True)
-            self.printer.text(f"TOTAL:               Php {receipt_data.get('total', 0):>7,.2f}\n")
+            # 5. Totals
+            font_total = win32ui.CreateFont({
+                "name": "Consolas",
+                "height": int(font_size * 1.2),
+                "width": int(char_width * 1.2),
+                "weight": 700,
+            })
+            hdc.SelectObject(font_total)
+            hdc.TextOut(0, y, f"TOTAL:        Php {receipt_data.get('total', 0):>7,.2f}")
+            y += int(font_size * 1.2)
+            
+            hdc.SelectObject(font)
             if 'amount_paid' in receipt_data:
-                 self.printer.text(f"PAID:                Php {receipt_data['amount_paid']:>7,.2f}\n")
+                 hdc.TextOut(0, y, f"PAID:         Php {receipt_data['amount_paid']:>7,.2f}")
+                 y += font_size
                  if receipt_data['amount_paid'] > receipt_data.get('total', 0):
                       change = receipt_data['amount_paid'] - receipt_data.get('total', 0)
-                      self.printer.text(f"CHANGE:              Php {change:>7,.2f}\n")
-            if 'balance_due' in receipt_data:
-                 if receipt_data['balance_due'] > 0:
-                      self.printer.text(f"DUE:                 Php {receipt_data['balance_due']:>7,.2f}\n")
-
-            self.printer.text("\n")
-
-            # Footer
-            self.printer.set(align='center', bold=False, double_height=False, double_width=False)
-            self.printer.text(f"{receipt_data.get('footer', 'Thank you! Come again!')}\n")
-            self.printer.text("Agyamanak unay!\n")
-            self.printer.text("-" * 32 + "\n")
+                      hdc.TextOut(0, y, f"CHANGE:       Php {change:>7,.2f}")
+                      y += font_size
             
-            # Cut paper if supported
-            try:
-                self.printer.cut()
-            except:
-                pass
-                
+            y += font_size
+
+            # 6. Footer
+            hdc.TextOut(0, y, receipt_data.get('footer', 'Thank you! Come again!'))
+            y += font_size
+            hdc.TextOut(0, y, "Agyamanak unay!")
+            y += font_size
+            hdc.TextOut(0, y, "-" * 32)
+            y += font_size
+            
+            # Feed paper
+            y += font_size * 5
+            hdc.TextOut(0, y, " ")
+
+            # Finish
+            hdc.EndPage()
+            hdc.EndDoc()
+            hdc.DeleteDC()
+
             return True
             
         except Exception as e:
-            logging.error(f"Error during printing receipt: {e}")
+            self.last_error = str(e)
+            logging.error(f"GDI Print Error: {e}")
             return False
 
+    def reconnect(self):
+        self._initialized = False
+        self.connect()
+        self._initialized = True
+        return self.is_connected
+
 if __name__ == "__main__":
+    printer = ReceiptPrinter()
+    print(f"Detected Printer: {printer.printer_name}")
     # Test printing helper without crashing
     printer = ReceiptPrinter() # No IDs provided -> Dummy fallback
     test_receipt = {

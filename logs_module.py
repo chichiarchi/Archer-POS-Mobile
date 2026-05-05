@@ -269,11 +269,9 @@ class LogsModule(QWidget):
         preview = ReceiptPreviewDialog(receipt_data, self)
         if preview.exec():
             printer = ReceiptPrinter()
-            if printer.is_connected:
-                success = printer.print_receipt(receipt_data)
-                if success:
-                    QMessageBox.information(self, "Success", "Receipt reprinted successfully.")
-                else:
-                    QMessageBox.warning(self, "Printer Error", "Failed to print the receipt.")
+            # Rely on print_receipt() to handle connection/reconnection
+            success = printer.print_receipt(receipt_data)
+            if success:
+                QMessageBox.information(self, "Success", "Receipt reprinted successfully.")
             else:
-                QMessageBox.warning(self, "Printer Status", "Printer Not Detected.")
+                QMessageBox.warning(self, "Printer Error", "Printer Not Detected or Failed to Print.\nPlease check settings and connections.")

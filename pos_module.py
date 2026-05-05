@@ -453,12 +453,11 @@ class POSModule(QWidget):
                     'footer': 'Thank you! Come again!'
                 }
                 printer = ReceiptPrinter()
-                if printer.is_connected:
-                    success = printer.print_receipt(receipt_data)
-                    if not success:
-                        QMessageBox.warning(self, "Printer Error", "Failed to print the receipt.")
-                else:
-                    QMessageBox.warning(self, "Printer Status", "Printer Not Detected. Receipt was not printed.")
+                # Rely on print_receipt() to handle connection/reconnection
+                success = printer.print_receipt(receipt_data)
+                if not success:
+                    err_msg = getattr(printer, 'last_error', 'Unknown Error')
+                    QMessageBox.warning(self, "Printer Error", f"Printer Not Detected or Failed to Print.\nError: {err_msg}")
 
             change_amount = amount_paid - total if amount_paid > total else 0.0
             msg = f"Transaction Completed!\nChange: ₱{change_amount:,.2f}" if change_amount > 0 else "Transaction Completed!"

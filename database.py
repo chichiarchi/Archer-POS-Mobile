@@ -125,7 +125,11 @@ def init_db():
     # Add an initial admin user if the table is empty
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
-        create_user('admin', 'admin', 'admin')
+        password_hash, salt = hash_password('admin')
+        cursor.execute(
+            "INSERT INTO users (username, password_hash, salt, role) VALUES (?, ?, ?, ?)",
+            ('admin', password_hash, salt, 'admin')
+        )
 
     # Migrations for new columns
     pass
@@ -261,7 +265,7 @@ def get_setting(key, default=None):
 def set_setting(key, value):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value).lower()))
+    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
     conn.commit()
     conn.close()
 

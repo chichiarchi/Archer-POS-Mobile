@@ -10,6 +10,8 @@ class InventoryModule(QWidget):
     def __init__(self, user_role="staff"):
         super().__init__()
         self.user_role = user_role
+        self.current_page = 0
+        self.page_size = 100
         self.setup_ui()
 
     def setup_ui(self):
@@ -61,14 +63,14 @@ class InventoryModule(QWidget):
         self.search_input.setMinimumHeight(45)
         self.search_input.setStyleSheet("font-size: 16px; padding: 5px;")
         self.search_input.setPlaceholderText("Enter Barcode or Product Name...")
-        self.search_input.textChanged.connect(self.load_inventory)
+        self.search_input.textChanged.connect(self.on_search_changed)
         self.search_input.returnPressed.connect(self.check_not_found_on_enter)
         search_layout.addWidget(self.search_input)
         layout.addLayout(search_layout)
 
         # Inventory Table
-        self.inventory_table = QTableWidget(0, 4)
-        self.inventory_table.setHorizontalHeaderLabels(["Barcode", "Name", "Total Stock", "Category"])
+        self.inventory_table = QTableWidget(0, 5)
+        self.inventory_table.setHorizontalHeaderLabels(["Barcode", "Name", "Price", "Total Stock", "Category"])
         self.inventory_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.inventory_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.inventory_table.setStyleSheet("font-size: 15px;")
@@ -76,9 +78,29 @@ class InventoryModule(QWidget):
         self.inventory_table.verticalHeader().setDefaultSectionSize(35)
         layout.addWidget(self.inventory_table)
 
-        self.btn_refresh = QPushButton("Refresh Inventory (Ctrl+R)")
-        self.btn_refresh.clicked.connect(self.load_inventory)
-        QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.load_inventory)
+        # Pagination Controls
+        pagination_layout = QHBoxLayout()
+        self.btn_prev = QPushButton("Previous 100")
+        self.btn_prev.clicked.connect(self.prev_page)
+        self.btn_prev.setEnabled(False)
+        
+        self.page_label = QLabel("Page 1")
+        self.page_label.setAlignment(Qt.AlignCenter)
+        self.page_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        
+        self.btn_next = QPushButton("Next 100")
+        self.btn_next.clicked.connect(self.next_page)
+        
+        pagination_layout.addWidget(self.btn_prev)
+        pagination_layout.addStretch()
+        pagination_layout.addWidget(self.page_label)
+        pagination_layout.addStretch()
+        pagination_layout.addWidget(self.btn_next)
+        layout.addLayout(pagination_layout)
+
+        self.btn_refresh = QPushButton("Refresh (Ctrl+R)")
+        self.btn_refresh.clicked.connect(self.refresh_all)
+        QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.refresh_all)
         layout.addWidget(self.btn_refresh)
 
         self.load_inventory()
@@ -88,14 +110,14 @@ class InventoryModule(QWidget):
         self.btn_stock_in.setText("Add/Update Item (Ctrl+I)" if database.is_stock_management_disabled() else "Stock In (Ctrl+I)")
         self.btn_stock_out.setVisible(not database.is_stock_management_disabled())
         self.btn_stock_adj.setVisible(not database.is_stock_management_disabled())
-        self.inventory_table.setColumnHidden(2, database.is_stock_management_disabled())
+        self.inventory_table.setColumnHidden(3, database.is_stock_management_disabled())
         
         search_text = self.search_input.text().strip()
         conn = database.get_connection()
         cursor = conn.cursor()
         
         query = """
-            SELECT id, name, current_stock, category
+            SELECT id, name, price, current_stock, category
             FROM products
         """
         
@@ -105,10 +127,15 @@ class InventoryModule(QWidget):
             like_val = f"%{search_text}%"
             params = (like_val, like_val)
             
-        query += " LIMIT 100" # Pagination Limit (Issue #2 fix)
+        query += f" LIMIT {self.page_size} OFFSET {self.current_page * self.page_size}"
             
         cursor.execute(query, params)
         rows = cursor.fetchall()
+        
+        # Check if there's a next page
+        cursor.execute(f"SELECT COUNT(*) FROM products {'WHERE id LIKE ? OR name LIKE ?' if search_text else ''}", params)
+        total_count = cursor.fetchone()[0]
+        
         conn.close()
 
         self.inventory_table.setRowCount(0)
@@ -116,8 +143,32 @@ class InventoryModule(QWidget):
             self.inventory_table.insertRow(i)
             self.inventory_table.setItem(i, 0, QTableWidgetItem(str(row[0])))
             self.inventory_table.setItem(i, 1, QTableWidgetItem(str(row[1])))
-            self.inventory_table.setItem(i, 2, QTableWidgetItem(f"{int(row[2])}"))
-            self.inventory_table.setItem(i, 3, QTableWidgetItem(str(row[3]) if row[3] else "N/A"))
+            self.inventory_table.setItem(i, 2, QTableWidgetItem(f"₱{row[2]:,.2f}"))
+            self.inventory_table.setItem(i, 3, QTableWidgetItem(f"{int(row[3])}"))
+            self.inventory_table.setItem(i, 4, QTableWidgetItem(str(row[4]) if row[4] else "N/A"))
+
+        # Update Pagination UI
+        self.page_label.setText(f"Page {self.current_page + 1} (Showing {len(rows)} of {total_count} items)")
+        self.btn_prev.setEnabled(self.current_page > 0)
+        self.btn_next.setEnabled((self.current_page + 1) * self.page_size < total_count)
+
+    def on_search_changed(self):
+        self.current_page = 0
+        self.load_inventory()
+
+    def next_page(self):
+        self.current_page += 1
+        self.load_inventory()
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 0
+            self.current_page -= 1
+            self.load_inventory()
+
+    def refresh_all(self):
+        self.current_page = 0
+        self.load_inventory()
 
     def show_stock_in_dialog(self):
         if self.user_role != "admin":
@@ -437,6 +488,10 @@ class StockInDialog(QDialog):
         form.addRow("Product Name:", self.inp_name)
         form.addRow("Category:", self.inp_category)
         form.addRow("Quantity:", self.inp_qty)
+        
+        if database.is_stock_management_disabled():
+            self.inp_qty.setVisible(False)
+            form.labelForField(self.inp_qty).setVisible(False)
         form.addRow("Selling Price (₱):", self.inp_sell)
         
         self.expiry_row_idx = form.rowCount()

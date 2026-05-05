@@ -1,10 +1,23 @@
-# Ignore the virtual environment
-archer/
-venv/
-.venv/
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
-# Ignore the database (optional, keep it if you want it on GitHub)
+# PyInstaller
+#  Often these folders are the source of many file changes
+build/
+dist/
+*.spec
+
+# Database
 *.db
+*.db-journal
 
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# OS generated files
+.DS_Store
+Thumbs.db
