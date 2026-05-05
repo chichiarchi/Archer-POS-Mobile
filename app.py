@@ -206,7 +206,7 @@ class ArcherPOS(QMainWindow):
 
         # Tab 3: Inventory
         self.inventory_tab = InventoryModule(self.user_role)
-        self.tabs.addTab(self.inventory_tab, QIcon(resource_path("archer_logo.png")), "Stock Manager (F3)")
+        self.tabs.addTab(self.inventory_tab, QIcon(resource_path("archer_logo.png")), "Product Manager (F3)")
 
         # Tab 4: Balance
         self.balance_tab = BalanceModule(self.user_role)
