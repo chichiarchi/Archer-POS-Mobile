@@ -28,7 +28,6 @@ def init_db():
             id TEXT PRIMARY KEY, -- Using barcode as ID
             name TEXT NOT NULL,
             price REAL NOT NULL,
-            cost_price REAL DEFAULT 0,
             current_stock REAL DEFAULT 0, -- Cached stock for performance
             category TEXT
         )
@@ -94,16 +93,29 @@ def init_db():
         )
     """)
     
+    # Create Settings Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
+    
+    # Initialize default settings
+    default_settings = {
+        'disable_stock_management': 'false',
+        'disable_expiry_tracking': 'false'
+    }
+    for key, val in default_settings.items():
+        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, val))
+    
     # Add an initial admin user if the table is empty
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
         create_user('admin', 'admin', 'admin')
 
     # Migrations for new columns
-    try:
-        cursor.execute("ALTER TABLE products ADD COLUMN cost_price REAL DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass 
+    pass
 
     try:
         cursor.execute("ALTER TABLE products ADD COLUMN current_stock REAL DEFAULT 0")
@@ -222,6 +234,29 @@ def update_stock_cache(product_id, quantity_change):
     cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (quantity_change, product_id))
     conn.commit()
     conn.close()
+
+def get_setting(key, default=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row[0]
+    return default
+
+def set_setting(key, value):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value).lower()))
+    conn.commit()
+    conn.close()
+
+def is_stock_management_disabled():
+    return True
+
+def is_expiry_tracking_disabled():
+    return True
 
 if __name__ == "__main__":
     init_db()

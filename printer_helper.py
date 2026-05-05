@@ -8,7 +8,7 @@ except ImportError:
     logging.warning("python-escpos is not installed. Printer will run in dummy mode.")
 
 class ReceiptPrinter:
-    def __init__(self, vendor_id=None, product_id=None, host="127.0.0.1", port=9100):
+    def __init__(self, vendor_id=None, product_id=None, host=None, port=9100):
         self.vendor_id = vendor_id
         self.product_id = product_id
         self.host = host
@@ -28,7 +28,7 @@ class ReceiptPrinter:
                 # Try connecting to Network Printer Simulator first
                 self.printer = Network(self.host, port=self.port, profile="POS-5890")
                 self.is_connected = True
-                logging.info(f"Successfully connected to network printer simulator at {self.host}:{self.port}.")
+                logging.info(f"Successfully connected to network printer at {self.host}:{self.port}.")
                 return True
             except Exception as e:
                 logging.warning(f"Failed to connect to network printer at {self.host}:{self.port}. Error: {e}")
@@ -50,6 +50,8 @@ class ReceiptPrinter:
             logging.error(f"Failed to connect to USB printer: {e}")
             # Fallback to Dummy printer so app doesn't crash
             self.printer = Dummy() if ESCPOS_AVAILABLE else None
+            if self.printer:
+                self.is_connected = True
             return False
 
     def print_receipt(self, receipt_data):
@@ -86,14 +88,6 @@ class ReceiptPrinter:
             # Items
             self.printer.set(align='left')
             for item in receipt_data.get('items', []):
-                # Format: Item (16) Qty (3) Price (8) (aligned with Item Qty Price header)
-                # "Item             Qty       Price" (16 chars + 13 chars + 3 chars?) wait
-                # "Item            " (16) "Qty" (3) "Price" (5)?? wait. 32 chars total.
-                # Item (16) + Qty (8) + Price (8) = 32. 
-                # Item (16) "          " Qty (3) "    " Price (8)??
-                # Let's align Item(17) Qty(5) Price(10)??
-                # Mockup row shows P1(2) spaces(15) 1(1) spaces(7) 130.00(6)
-                # It seems more like Item Name is left-aligned, Qty is centered/right, Price is right.
                 line = f"{item['name'][:16]:<16} {int(item['qty']):>3} {item['price']:>11,.2f}\n"
                 self.printer.text(line)
 
@@ -101,16 +95,15 @@ class ReceiptPrinter:
 
             # Totals
             self.printer.set(align='left', bold=True)
-            # Use fixed width for label to align with user's mockup
             self.printer.text(f"TOTAL:               Php {receipt_data.get('total', 0):>7,.2f}\n")
             if 'amount_paid' in receipt_data:
                  self.printer.text(f"PAID:                Php {receipt_data['amount_paid']:>7,.2f}\n")
                  if receipt_data['amount_paid'] > receipt_data.get('total', 0):
-                     change = receipt_data['amount_paid'] - receipt_data.get('total', 0)
-                     self.printer.text(f"CHANGE:              Php {change:>7,.2f}\n")
+                      change = receipt_data['amount_paid'] - receipt_data.get('total', 0)
+                      self.printer.text(f"CHANGE:              Php {change:>7,.2f}\n")
             if 'balance_due' in receipt_data:
                  if receipt_data['balance_due'] > 0:
-                     self.printer.text(f"DUE:                 Php {receipt_data['balance_due']:>7,.2f}\n")
+                      self.printer.text(f"DUE:                 Php {receipt_data['balance_due']:>7,.2f}\n")
 
             self.printer.text("\n")
 
@@ -121,7 +114,11 @@ class ReceiptPrinter:
             self.printer.text("-" * 32 + "\n")
             
             # Cut paper if supported
-            self.printer.cut()
+            try:
+                self.printer.cut()
+            except:
+                pass
+                
             return True
             
         except Exception as e:

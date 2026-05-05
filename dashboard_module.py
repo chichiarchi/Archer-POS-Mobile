@@ -64,7 +64,7 @@ class DashboardModule(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
 
         lbl = QLabel(title)
-        lbl.setStyleSheet(f"color: {color}; font-size: 18px; font-weight: bold; border: none; margin-bottom: 10px;")
+        lbl.setStyleSheet(f"color: {color}; font-size: 20px; font-weight: 900; border: none; margin-bottom: 10px;")
         layout.addWidget(lbl)
 
         table = QTableWidget(0, len(headers))
@@ -76,14 +76,17 @@ class DashboardModule(QWidget):
                 border: none;
                 background-color: #ffffff;
                 border-top: 1px solid #e5e7eb;
+                font-size: 16px;
             }
             QHeaderView::section {
                 background-color: #f9fafb;
                 border: none;
-                padding: 10px;
+                padding: 12px;
                 font-weight: bold;
+                font-size: 16px;
             }
         """)
+        table.verticalHeader().setDefaultSectionSize(40)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         layout.addWidget(table)
         
@@ -91,24 +94,24 @@ class DashboardModule(QWidget):
 
     def create_stat_card(self, title, value, color):
         frame = QFrame()
-        frame.setFixedHeight(120)
+        frame.setFixedHeight(150)
         frame.setStyleSheet(f"""
             QFrame {{
                 background-color: #ffffff;
-                border: 1px solid #e5e7eb;
-                border-radius: 12px;
+                border: 2px solid #f1f5f9;
+                border-radius: 16px;
             }}
         """)
         
         # Inner Shadow/Indicator
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setContentsMargins(20, 20, 20, 20)
         
         title_lbl = QLabel(title)
-        title_lbl.setStyleSheet(f"color: #6b7280; font-size: 13px; font-weight: 600; text-transform: uppercase; border: none;")
+        title_lbl.setStyleSheet(f"color: #6b7280; font-size: 15px; font-weight: 700; text-transform: uppercase; border: none;")
         
         val_lbl = QLabel(value)
-        val_lbl.setStyleSheet(f"color: {color}; font-size: 28px; font-weight: 900; border: none;")
+        val_lbl.setStyleSheet(f"color: {color}; font-size: 42px; font-weight: 900; border: none;")
         
         layout.addWidget(title_lbl)
         layout.addWidget(val_lbl)
@@ -118,8 +121,18 @@ class DashboardModule(QWidget):
 
     def load_all(self):
         self.load_stats()
-        self.load_expiry_warnings()
-        self.load_negative_stock()
+        
+        if database.is_expiry_tracking_disabled():
+            self.expiry_card["frame"].setVisible(False)
+        else:
+            self.expiry_card["frame"].setVisible(True)
+            self.load_expiry_warnings()
+
+        if database.is_stock_management_disabled():
+            self.neg_stock_card["frame"].setVisible(False)
+        else:
+            self.neg_stock_card["frame"].setVisible(True)
+            self.load_negative_stock()
 
     def load_negative_stock(self):
         conn = database.get_connection()

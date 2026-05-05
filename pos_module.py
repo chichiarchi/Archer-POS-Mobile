@@ -1,19 +1,30 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, 
-    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox
+    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox
 )
-from PySide6.QtCore import Qt, QStringListModel
+from PySide6.QtCore import Qt, QStringListModel, QTimer
+import time
 from PySide6.QtGui import QKeySequence, QShortcut
 import database
 import printer_helper
 from printer_helper import ReceiptPrinter
+# Import StockInDialog for the "Add Product" prompt
+from inventory_module import StockInDialog
 
 class POSModule(QWidget):
     def __init__(self, user_role="staff"):
         super().__init__()
         self.user_role = user_role
         self.cart = []  # List of dicts {barcode, name, price, qty}
+        self._last_add_time = 0
         self.setup_ui()
+
+    def get_bold_font(self, size):
+        from PySide6.QtGui import QFont
+        font = QFont()
+        font.setPointSize(size)
+        font.setBold(True)
+        return font
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -22,12 +33,16 @@ class POSModule(QWidget):
         top_layout = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Scan Barcode or Enter Product ID (F4)...")
+        self.search_input.setMinimumHeight(50)
+        self.search_input.setStyleSheet("font-size: 18px; font-weight: 500; padding: 5px;")
         self.search_input.returnPressed.connect(self.add_item_to_cart)
         
         self.completer = QCompleter()
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.completer.setFilterMode(Qt.MatchContains)
         self.completer.activated.connect(self.on_completer_activated)
+        # Completer popup font
+        self.completer.popup().setStyleSheet("font-size: 16px;")
         self.search_input.setCompleter(self.completer)
         self.refresh_completer()
         
@@ -40,22 +55,31 @@ class POSModule(QWidget):
         self.cart_table.setHorizontalHeaderLabels(["Barcode", "Product Name", "Price", "Qty"])
         self.cart_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.cart_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.cart_table.setStyleSheet("font-size: 16px;")
+        self.cart_table.horizontalHeader().setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.cart_table.verticalHeader().setDefaultSectionSize(40) # Taller rows
         layout.addWidget(self.cart_table)
 
         # Action Buttons Layout
         btn_layout = QHBoxLayout()
 
         self.btn_qty = QPushButton("Change Qty (Ctrl+Q)")
+        self.btn_qty.setMinimumHeight(45)
+        self.btn_qty.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_qty.clicked.connect(self.change_qty)
         QShortcut(QKeySequence("Ctrl+Q"), self).activated.connect(self.change_qty)
         btn_layout.addWidget(self.btn_qty)
 
-        self.btn_delete = QPushButton("Delete Selected Item (Del)")
+        self.btn_delete = QPushButton("Delete Item (Del)")
+        self.btn_delete.setMinimumHeight(45)
+        self.btn_delete.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_delete.clicked.connect(self.delete_item)
         QShortcut(QKeySequence("Del"), self).activated.connect(self.delete_item)
         btn_layout.addWidget(self.btn_delete)
 
-        self.btn_discount = QPushButton("Apply Discount (Ctrl+D)")
+        self.btn_discount = QPushButton("Discount (Ctrl+D)")
+        self.btn_discount.setMinimumHeight(45)
+        self.btn_discount.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_discount.clicked.connect(self.apply_discount)
         QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(self.apply_discount)
         btn_layout.addWidget(self.btn_discount)
@@ -66,13 +90,13 @@ class POSModule(QWidget):
         bottom_layout = QHBoxLayout()
         self.total_label = QLabel("Total: ₱0.00")
         self.total_label.setStyleSheet("""
-            font-size: 28px; 
+            font-size: 42px; 
             font-weight: 900; 
-            color: #00A8CC; 
-            background-color: #FFFFFF;
-            border: 1px solid #CCEEFF;
-            border-radius: 8px;
-            padding: 10px 20px;
+            color: #0072FF; 
+            background-color: #F8FAFC;
+            border: 2px solid #0072FF;
+            border-radius: 12px;
+            padding: 15px 30px;
         """)
         bottom_layout.addWidget(self.total_label)
 
@@ -85,9 +109,9 @@ class POSModule(QWidget):
                 background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00C6FF, stop:1 #0072FF); 
                 color: #FFFFFF; 
                 font-weight: bold; 
-                font-size: 18px;
+                font-size: 24px;
                 border-radius: 8px;
-                padding: 12px;
+                padding: 20px;
                 border: none;
             }
             QPushButton:hover {
@@ -118,103 +142,172 @@ class POSModule(QWidget):
         self.completer.setModel(model)
 
     def on_completer_activated(self, text):
+        self.search_input.blockSignals(True)
         self.search_input.setText(text)
         self.add_item_to_cart()
+        self.search_input.blockSignals(False)
 
     def add_item_to_cart(self):
+        # Ultimate fix for double trigger: Disable input while processing
+        if not self.search_input.isEnabled():
+            return
+            
+        now = time.time()
+        if now - self._last_add_time < 0.3: # 300ms debounce
+            return
+        
         text = self.search_input.text().strip()
         if not text:
             return
 
-        qty_to_add = 1.0
-        barcode_raw = text.split(" - ")[0].strip()
-
-        # Handle formatting like '5*12345' or '12345*5'
-        if '*' in barcode_raw:
-            parts = barcode_raw.split('*')
-            try:
-                qty_to_add = float(parts[0])
-                barcode = parts[1].strip()
-            except ValueError:
-                try:
-                    qty_to_add = float(parts[1])
-                    barcode = parts[0].strip()
-                except ValueError:
-                    barcode = barcode_raw
-        else:
-            barcode = barcode_raw
-
-        conn = database.get_connection()
-        cursor = conn.cursor()
-        product = None
-        current_stock = 0
+        # self._last_add_time moved to finally block to prevent immediate re-trigger
+        self.search_input.setEnabled(False) # BLOCK FURTHER INPUT
+        self.search_input.clear()
+        
         try:
-            cursor.execute("SELECT id, name, price, current_stock FROM products WHERE id=?", (barcode,))
-            product = cursor.fetchone()
+
+            qty_to_add = 1.0
+            barcode_raw = text.split(" - ")[0].strip()
+
+            # Handle formatting like '5*12345' or '12345*5'
+            if '*' in barcode_raw:
+                parts = barcode_raw.split('*')
+                try:
+                    qty_to_add = float(parts[0])
+                    barcode = parts[1].strip()
+                except ValueError:
+                    try:
+                        qty_to_add = float(parts[1])
+                        barcode = parts[0].strip()
+                    except ValueError:
+                        barcode = barcode_raw
+            else:
+                barcode = barcode_raw
+
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            product = None
+            current_stock = 0
+            try:
+                cursor.execute("SELECT id, name, price, current_stock FROM products WHERE id=?", (barcode,))
+                product = cursor.fetchone()
+                if product:
+                    p_id, p_name, p_price, current_stock = product
+            finally:
+                conn.close()
+
             if product:
                 p_id, p_name, p_price, current_stock = product
-        finally:
-            conn.close()
-
-        if product:
-            p_id, p_name, p_price, current_stock = product
-            
-            # Popup confirmation dialog with stock warning
-            dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, int(current_stock), self)
-            if dialog.exec():
-                final_qty, final_price = dialog.get_data()
                 
-                if final_qty <= 0:
-                    self.search_input.clear()
-                    self.search_input.setFocus()
-                    return
-                
-                # Soft Warning for negative stock
-                if current_stock <= 0:
-                    reply = QMessageBox.warning(
-                        self, "Stock Warning", 
-                        f"System shows 0 stock for '{p_name}', but item is available physically. Proceed with sale?",
-                        QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-                    )
-                    if reply == QMessageBox.No:
-                        self.search_input.clear()
-                        self.search_input.setFocus()
+                # Popup confirmation dialog with stock warning
+                dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, int(current_stock), self)
+                if dialog.exec():
+                    final_qty, final_price = dialog.get_data()
+                    
+                    if final_qty <= 0:
                         return
+                    
+                    # Soft Warning for negative stock - Only if stock management is enabled
+                    if not database.is_stock_management_disabled() and current_stock <= 0:
+                        reply = QMessageBox.warning(
+                            self, "Stock Warning", 
+                            f"System shows 0 stock for '{p_name}', but item is available physically. Proceed with sale?",
+                            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+                        )
+                        if reply == QMessageBox.No:
+                            return
 
-                # If price is changed, require admin
-                if abs(final_price - p_price) > 0.001:
+                    # If price is changed, require admin
+                    if abs(final_price - p_price) > 0.001:
+                        if not self.verify_admin():
+                            return
+
+                    # Check if already in cart with exact same price
+                    merged = False
+                    for item in self.cart:
+                        if item["barcode"] == p_id and abs(item["price"] - final_price) < 0.001:
+                            item["qty"] += final_qty
+                            merged = True
+                            break
+
+                    if not merged:
+                        self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
+                    
+                    self.update_cart_display()
+            else:
+                # Prompt to add new product
+                reply = QMessageBox.question(
+                    self, "Product Not Found", 
+                    f"Barcode '{barcode}' was not found in the database.\nWould you like to add this as a new product?",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+                )
+                if reply == QMessageBox.Yes:
                     if not self.verify_admin():
-                        self.search_input.clear()
-                        self.search_input.setFocus()
+                        return
+                    
+                    dialog = StockInDialog(self)
+                    dialog.inp_barcode.setText(barcode)
+                    if dialog.exec():
+                        # The actual saving logic is in InventoryModule, but we can replicate it here 
+                        # or better, just perform the save and refresh.
+                        # Since we want to keep it simple, we'll do the save here.
+                        data = dialog.get_data()
+                        conn = database.get_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            INSERT INTO products (id, name, price, category, current_stock)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (data["barcode"], data["name"], data["sell_price"], data["category"], data["qty"]))
+                        
+                        if data["qty"] > 0:
+                            cursor.execute("""
+                                INSERT INTO inventory (product_id, quantity, type, timestamp)
+                                VALUES (?, ?, 'IN', datetime('now', '+8 hours'))
+                            """, (data["barcode"], data["qty"]))
+                        
+                        conn.commit()
+                        conn.close()
+                        
+                        database.log_action("PRODUCT_ADDED", f"Quick-added product '{data['name']}' from POS", self.user_role)
+                        self.refresh_completer()
+                        
+                        # Automatically trigger Add to Cart workflow
+                        p_id, p_name, p_price = data["barcode"], data["name"], data["sell_price"]
+                        current_stock = data["qty"]
+                        
+                        dialog_cart = AddToCartDialog(p_name, 1, p_price, int(current_stock), self)
+                        if dialog_cart.exec():
+                            final_qty, final_price = dialog_cart.get_data()
+                            if final_qty > 0:
+                                self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
+                                self.update_cart_display()
                         return
 
-                # Check if already in cart with exact same price
-                merged = False
-                for item in self.cart:
-                    if item["barcode"] == p_id and abs(item["price"] - final_price) < 0.001:
-                        item["qty"] += final_qty
-                        merged = True
-                        break
-
-                if not merged:
-                    self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
-                
-                self.update_cart_display()
-        else:
-            QMessageBox.warning(self, "Not Found", "Product not found!")
-
-        self.search_input.clear()
-        self.search_input.setFocus()
+        finally:
+            self._last_add_time = time.time() # Update debounce AFTER processing
+            self.search_input.setEnabled(True) # UNBLOCK
+            self.search_input.setFocus()
+            # Ensure input is cleared (handles completer re-fill race condition)
+            QTimer.singleShot(50, self.search_input.clear)
 
     def update_cart_display(self):
         self.cart_table.setRowCount(0)
         total = 0.0
         for i, item in enumerate(self.cart):
             self.cart_table.insertRow(i)
-            self.cart_table.setItem(i, 0, QTableWidgetItem(item["barcode"]))
-            self.cart_table.setItem(i, 1, QTableWidgetItem(item["name"]))
-            self.cart_table.setItem(i, 2, QTableWidgetItem(f"₱{item['price']:,.2f}"))
-            self.cart_table.setItem(i, 3, QTableWidgetItem(str(item["qty"])))
+            item_barcode = QTableWidgetItem(item["barcode"])
+            item_name = QTableWidgetItem(item["name"])
+            
+            item_price = QTableWidgetItem(f"₱{item['price']:,.2f}")
+            item_price.setFont(self.get_bold_font(16)) # Bold and bigger price
+            
+            item_qty = QTableWidgetItem(str(item["qty"]))
+            item_qty.setFont(self.get_bold_font(16))
+            
+            self.cart_table.setItem(i, 0, item_barcode)
+            self.cart_table.setItem(i, 1, item_name)
+            self.cart_table.setItem(i, 2, item_price)
+            self.cart_table.setItem(i, 3, item_qty)
             total += item["price"] * item["qty"]
 
         self.total_label.setText(f"Total: ₱{total:,.2f}")
@@ -251,9 +344,17 @@ class POSModule(QWidget):
         if not self.verify_admin():
             return
 
-        item = self.cart.pop(current_row)
-        database.log_action("POS_DELETE", f"Removed {item['qty']}x {item['name']} from cart", self.user_role)
-        self.update_cart_display()
+        item = self.cart[current_row]
+        reply = QMessageBox.question(
+            self, "Confirm Removal", 
+            f"Remove {item['qty']}x '{item['name']}' from cart?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self.cart.pop(current_row)
+            database.log_action("POS_DELETE", f"Removed {item['qty']}x {item['name']} from cart", self.user_role)
+            self.update_cart_display()
 
     def apply_discount(self):
         current_row = self.cart_table.currentRow()
@@ -303,21 +404,28 @@ class POSModule(QWidget):
                     VALUES (?, ?, ?, datetime('now', '+8 hours'))
                 """, (customer_id, sale_id, balance_due))
 
-            # Update Inventory (Stock Out)
-            for item in self.cart:
-                cursor.execute("""
-                    INSERT INTO inventory (product_id, quantity, type, timestamp)
-                    VALUES (?, ?, 'OUT', datetime('now', '+8 hours'))
-                """, (item["barcode"], item["qty"]))
-                
-                # Update stock cache (Issue #1 fix)
-                cursor.execute("UPDATE products SET current_stock = current_stock - ? WHERE id = ?", (item["qty"], item["barcode"]))
+            # Update Inventory (Stock Out) - Only if stock management is enabled
+            if not database.is_stock_management_disabled():
+                for item in self.cart:
+                    cursor.execute("""
+                        INSERT INTO inventory (product_id, quantity, type, timestamp)
+                        VALUES (?, ?, 'OUT', datetime('now', '+8 hours'))
+                    """, (item["barcode"], item["qty"]))
+                    
+                    # Update stock cache (Issue #1 fix)
+                    cursor.execute("UPDATE products SET current_stock = current_stock - ? WHERE id = ?", (item["qty"], item["barcode"]))
 
             conn.commit()
             conn.close()
 
             # Log
-            database.log_action("POS_SALE", f"Sale #{sale_id} - Total: ₱{total:,.2f}, Paid: ₱{amount_paid:,.2f}, Balance: ₱{balance_due:,.2f}", self.user_role)
+            log_details = f"Sale #{sale_id} - Total: ₱{total:,.2f}, Paid: ₱{amount_paid:,.2f}"
+            if balance_due < 0:
+                log_details += f", Change: ₱{abs(balance_due):,.2f}"
+            else:
+                log_details += f", Balance: ₱{balance_due:,.2f}"
+                
+            database.log_action("POS_SALE", log_details, self.user_role)
 
             # Print Receipt
             receipt_data = {
@@ -340,7 +448,34 @@ class POSModule(QWidget):
 
             change_amount = amount_paid - total if amount_paid > total else 0.0
             msg = f"Transaction Completed!\nChange: ₱{change_amount:,.2f}" if change_amount > 0 else "Transaction Completed!"
-            QMessageBox.information(self, "Success", msg)
+            
+            # BIG SUCCESS MESSAGE
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Transaction Successful")
+            msg_box.setText(msg)
+            msg_box.setIcon(QMessageBox.Information)
+            msg_box.setStyleSheet("""
+                QMessageBox {
+                    background-color: #F0FDF4;
+                    min-width: 500px;
+                }
+                QLabel {
+                    font-size: 32px;
+                    font-weight: 900;
+                    color: #10B981;
+                    padding: 40px;
+                }
+                QPushButton {
+                    background-color: #10B981;
+                    color: white;
+                    font-size: 20px;
+                    font-weight: bold;
+                    padding: 15px 30px;
+                    border-radius: 8px;
+                    min-width: 120px;
+                }
+            """)
+            msg_box.exec()
 
             # Clear Cart
             self.cart.clear()
@@ -359,17 +494,24 @@ class CheckoutDialog(QDialog):
         layout = QVBoxLayout(self)
 
         lbl_total = QLabel(f"Total Amount: ₱{self.total:,.2f}")
-        lbl_total.setStyleSheet("font-size: 24px; font-weight: 900; color: #0072FF; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;")
+        lbl_total.setStyleSheet("font-size: 32px; font-weight: 900; color: #0072FF; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;")
         layout.addWidget(lbl_total)
 
         form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignRight)
+        
         self.amount_paid_input = QLineEdit()
-        form.addRow("Amount Paid (₱):", self.amount_paid_input)
+        self.amount_paid_input.setMinimumHeight(60)
+        self.amount_paid_input.setStyleSheet("font-size: 28px; font-weight: bold; color: #1E293B;")
+        
+        lbl_paid = QLabel("Amount Paid (₱):")
+        lbl_paid.setStyleSheet("font-size: 18px; font-weight: bold;")
+        form.addRow(lbl_paid, self.amount_paid_input)
         layout.addLayout(form)
 
         # Reactive Change Label
         self.lbl_change = QLabel("Change: ₱0.00")
-        self.lbl_change.setStyleSheet("font-size: 18px; font-weight: bold; color: green;")
+        self.lbl_change.setStyleSheet("font-size: 26px; font-weight: 900; color: #10B981; background-color: #F0FDF4; padding: 10px; border-radius: 8px;")
         self.lbl_change.setVisible(False)
         layout.addWidget(self.lbl_change)
 
@@ -389,6 +531,17 @@ class CheckoutDialog(QDialog):
         self.amount_paid_input.textChanged.connect(self.check_balance)
 
         self.btn_confirm = QPushButton("Confirm Payment")
+        self.btn_confirm.setMinimumHeight(60)
+        self.btn_confirm.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                font-size: 22px;
+                font-weight: bold;
+                border-radius: 10px;
+            }
+            QPushButton:hover { background-color: #059669; }
+        """)
         self.btn_confirm.clicked.connect(self.accept)
         layout.addWidget(self.btn_confirm)
 
@@ -434,24 +587,37 @@ class AddToCartDialog(QDialog):
         layout = QVBoxLayout(self)
         
         lbl = QLabel(f"Adding: {name}")
-        lbl.setStyleSheet("font-size: 18px; font-weight: 800; color: #0072FF;")
+        lbl.setStyleSheet("font-size: 22px; font-weight: 900; color: #0072FF; margin-bottom: 5px;")
         layout.addWidget(lbl)
         
         stock_color = "#10b981" if stock > 0 else "#ef4444"
         stock_lbl = QLabel(f"System Stock: {int(stock)} units")
-        stock_lbl.setStyleSheet(f"color: {stock_color}; font-weight: bold; margin-bottom: 10px;")
+        stock_lbl.setStyleSheet(f"color: {stock_color}; font-size: 14px; font-weight: bold; margin-bottom: 15px;")
         layout.addWidget(stock_lbl)
         
+        if database.is_stock_management_disabled():
+            stock_lbl.setVisible(False)
+        
         form = QFormLayout()
+        form.setSpacing(15)
         
         self.inp_qty = QSpinBox()
+        self.inp_qty.setMinimumHeight(50)
         self.inp_qty.setRange(1, 10000)
         self.inp_qty.setValue(max(1, int(qty)))
+        self.inp_qty.setStyleSheet("font-size: 22px; font-weight: bold;")
         
-        form.addRow("Quantity:", self.inp_qty)
+        lbl_q = QLabel("Quantity:")
+        lbl_q.setStyleSheet("font-size: 16px; font-weight: bold;")
+        form.addRow(lbl_q, self.inp_qty)
         
         self.inp_price = QLineEdit(f"{price:.2f}")
-        form.addRow("Custom Price (₱):", self.inp_price)
+        self.inp_price.setMinimumHeight(50)
+        self.inp_price.setStyleSheet("font-size: 22px; font-weight: bold;")
+        
+        lbl_p = QLabel("Custom Price (₱):")
+        lbl_p.setStyleSheet("font-size: 16px; font-weight: bold;")
+        form.addRow(lbl_p, self.inp_price)
         
         layout.addLayout(form)
         
@@ -470,6 +636,7 @@ class AddToCartDialog(QDialog):
             }
         """)
         btn_confirm.clicked.connect(self.accept)
+        btn_confirm.setDefault(True)
         layout.addWidget(btn_confirm)
 
     def get_data(self):

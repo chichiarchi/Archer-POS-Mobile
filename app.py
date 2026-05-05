@@ -7,6 +7,7 @@ from inventory_module import InventoryModule
 from dashboard_module import DashboardModule
 from balance_module import BalanceModule
 from logs_module import LogsModule
+from settings_module import SettingsModule
 
 class ArcherPOS(QMainWindow):
     def __init__(self, user_role="staff"):
@@ -175,6 +176,14 @@ class ArcherPOS(QMainWindow):
         
         # Tabs
         self.tabs = QTabWidget()
+        self.tabs.setStyleSheet("""
+            QTabBar::tab {
+                height: 50px;
+                width: 180px;
+                font-size: 15px;
+                font-weight: bold;
+            }
+        """)
         layout.addWidget(self.tabs)
 
         # Tab 1: Dashboard
@@ -197,12 +206,17 @@ class ArcherPOS(QMainWindow):
         self.logs_tab = LogsModule(self.user_role)
         self.tabs.addTab(self.logs_tab, "Data Logs (F6)")
 
+        # # Tab 6: Settings
+        # self.settings_tab = SettingsModule(self.user_role)
+        # self.tabs.addTab(self.settings_tab, "Settings (F7)")
+
         # Keyboard shortcuts for Tabs
         QShortcut(QKeySequence("F1"), self).activated.connect(lambda: self.tabs.setCurrentIndex(0))
         QShortcut(QKeySequence("F2"), self).activated.connect(lambda: self.tabs.setCurrentIndex(1))
         QShortcut(QKeySequence("F3"), self).activated.connect(lambda: self.tabs.setCurrentIndex(2))
         QShortcut(QKeySequence("F5"), self).activated.connect(lambda: self.tabs.setCurrentIndex(3))
         QShortcut(QKeySequence("F6"), self).activated.connect(lambda: self.tabs.setCurrentIndex(4))
+        QShortcut(QKeySequence("F7"), self).activated.connect(lambda: self.tabs.setCurrentIndex(5))
         
         # Update dashboard elements every time user clicks tabs (Refresh warnings)
         self.tabs.currentChanged.connect(self.on_tab_change)

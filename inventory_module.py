@@ -19,46 +19,61 @@ class InventoryModule(QWidget):
         top_layout = QHBoxLayout()
 
         self.btn_stock_in = QPushButton("Stock In (Ctrl+I)")
+        self.btn_stock_in.setMinimumHeight(45)
+        self.btn_stock_in.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.btn_stock_in.clicked.connect(self.show_stock_in_dialog)
         QShortcut(QKeySequence("Ctrl+I"), self).activated.connect(self.show_stock_in_dialog)
         top_layout.addWidget(self.btn_stock_in)
 
         self.btn_stock_out = QPushButton("Stock Out (Ctrl+O)")
+        self.btn_stock_out.setMinimumHeight(45)
+        self.btn_stock_out.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.btn_stock_out.clicked.connect(self.show_stock_out_dialog)
         QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self.show_stock_out_dialog)
         top_layout.addWidget(self.btn_stock_out)
 
         self.btn_edit_product = QPushButton("Edit Product (Ctrl+E)")
+        self.btn_edit_product.setMinimumHeight(45)
+        self.btn_edit_product.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.btn_edit_product.clicked.connect(self.show_edit_dialog)
         QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self.show_edit_dialog)
         top_layout.addWidget(self.btn_edit_product)
 
         self.btn_stock_adj = QPushButton("Stock Adjustment (Ctrl+A)")
+        self.btn_stock_adj.setMinimumHeight(45)
+        self.btn_stock_adj.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.btn_stock_adj.clicked.connect(self.show_adjustment_dialog)
         QShortcut(QKeySequence("Ctrl+A"), self).activated.connect(self.show_adjustment_dialog)
         top_layout.addWidget(self.btn_stock_adj)
 
-        self.btn_recalc = QPushButton("Sync Cache")
-        self.btn_recalc.setToolTip("Force recalculate stock from logs")
-        self.btn_recalc.clicked.connect(self.force_recalculate)
-        top_layout.addWidget(self.btn_recalc)
+        self.btn_delete_product = QPushButton("Delete Product (Del)")
+        self.btn_delete_product.setMinimumHeight(45)
+        self.btn_delete_product.setStyleSheet("font-size: 14px; font-weight: bold; color: #ef4444;")
+        self.btn_delete_product.clicked.connect(self.delete_product)
+        QShortcut(QKeySequence(Qt.Key_Delete), self).activated.connect(self.delete_product)
+        top_layout.addWidget(self.btn_delete_product)
 
         layout.addLayout(top_layout)
-
-        # Search Bar
+         # Search Bar
         search_layout = QHBoxLayout()
         search_layout.addWidget(QLabel("Search Stock:"))
         self.search_input = QLineEdit()
+        self.search_input.setMinimumHeight(45)
+        self.search_input.setStyleSheet("font-size: 16px; padding: 5px;")
         self.search_input.setPlaceholderText("Enter Barcode or Product Name...")
         self.search_input.textChanged.connect(self.load_inventory)
+        self.search_input.returnPressed.connect(self.check_not_found_on_enter)
         search_layout.addWidget(self.search_input)
         layout.addLayout(search_layout)
 
         # Inventory Table
-        self.inventory_table = QTableWidget(0, 5)
-        self.inventory_table.setHorizontalHeaderLabels(["Barcode", "Name", "Total Stock", "Category", "Cost Price"])
+        self.inventory_table = QTableWidget(0, 4)
+        self.inventory_table.setHorizontalHeaderLabels(["Barcode", "Name", "Total Stock", "Category"])
         self.inventory_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.inventory_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.inventory_table.setStyleSheet("font-size: 15px;")
+        self.inventory_table.horizontalHeader().setStyleSheet("font-size: 15px; font-weight: bold;")
+        self.inventory_table.verticalHeader().setDefaultSectionSize(35)
         layout.addWidget(self.inventory_table)
 
         self.btn_refresh = QPushButton("Refresh Inventory (Ctrl+R)")
@@ -69,18 +84,24 @@ class InventoryModule(QWidget):
         self.load_inventory()
 
     def load_inventory(self):
+        # Update UI state based on settings
+        self.btn_stock_in.setText("Add/Update Item (Ctrl+I)" if database.is_stock_management_disabled() else "Stock In (Ctrl+I)")
+        self.btn_stock_out.setVisible(not database.is_stock_management_disabled())
+        self.btn_stock_adj.setVisible(not database.is_stock_management_disabled())
+        self.inventory_table.setColumnHidden(2, database.is_stock_management_disabled())
+        
         search_text = self.search_input.text().strip()
         conn = database.get_connection()
         cursor = conn.cursor()
         
         query = """
-            SELECT id, name, current_stock, category, cost_price
+            SELECT id, name, current_stock, category
             FROM products
         """
         
         params = ()
         if search_text:
-            query += " WHERE id LIKE ? OR p.name LIKE ?"
+            query += " WHERE id LIKE ? OR name LIKE ?"
             like_val = f"%{search_text}%"
             params = (like_val, like_val)
             
@@ -97,7 +118,6 @@ class InventoryModule(QWidget):
             self.inventory_table.setItem(i, 1, QTableWidgetItem(str(row[1])))
             self.inventory_table.setItem(i, 2, QTableWidgetItem(f"{int(row[2])}"))
             self.inventory_table.setItem(i, 3, QTableWidgetItem(str(row[3]) if row[3] else "N/A"))
-            self.inventory_table.setItem(i, 4, QTableWidgetItem(f"₱{row[4]:,.2f}" if row[4] else "₱0.00"))
 
     def show_stock_in_dialog(self):
         if self.user_role != "admin":
@@ -115,29 +135,31 @@ class InventoryModule(QWidget):
             if cursor.fetchone() is None:
                 # Insert product
                 cursor.execute("""
-                    INSERT INTO products (id, name, price, cost_price, category)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (data["barcode"], data["name"], data["sell_price"], data["cost_price"], data["category"]))
+                    INSERT INTO products (id, name, price, category)
+                    VALUES (?, ?, ?, ?)
+                """, (data["barcode"], data["name"], data["sell_price"], data["category"]))
             else:
                 # Update product prices/name
                 cursor.execute("""
-                    UPDATE products SET name=?, price=?, cost_price=?, category=?
+                    UPDATE products SET name=?, price=?, category=?
                     WHERE id=?
-                """, (data["name"], data["sell_price"], data["cost_price"], data["category"], data["barcode"]))
+                """, (data["name"], data["sell_price"], data["category"], data["barcode"]))
 
-            # Insert into inventory
-            cursor.execute("""
-                INSERT INTO inventory (product_id, quantity, expiry_date, type, timestamp)
-                VALUES (?, ?, ?, 'IN', datetime('now', '+8 hours'))
-            """, (data["barcode"], data["qty"], data["expiry"]))
+            # Insert into inventory - Only if stock management is enabled
+            if not database.is_stock_management_disabled():
+                cursor.execute("""
+                    INSERT INTO inventory (product_id, quantity, expiry_date, type, timestamp)
+                    VALUES (?, ?, ?, 'IN', datetime('now', '+8 hours'))
+                """, (data["barcode"], data["qty"], data["expiry"]))
 
-            # Update stock cache (Issue #1 fix)
-            cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (data["qty"], data["barcode"]))
+                # Update stock cache (Issue #1 fix)
+                cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (data["qty"], data["barcode"]))
             
             # Log action
+            log_msg = f"Received {data['qty']}x of {data['name']} (Barcode: {data['barcode']})" if not database.is_stock_management_disabled() else f"Added/Updated product '{data['name']}' (Barcode: {data['barcode']})"
             cursor.execute(
                 "INSERT INTO audit_logs (action, details, user_id, timestamp) VALUES (?, ?, ?, datetime('now', '+8 hours'))",
-                ("STOCK_IN", f"Received {data['qty']}x of {data['name']} (Barcode: {data['barcode']})", self.user_role)
+                ("STOCK_IN", log_msg, self.user_role)
             )
 
             conn.commit()
@@ -255,7 +277,7 @@ class InventoryModule(QWidget):
         
         conn = database.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT name, category, cost_price, price FROM products WHERE id=?", (barcode,))
+        cursor.execute("SELECT name, category, price FROM products WHERE id=?", (barcode,))
         product = cursor.fetchone()
         conn.close()
         
@@ -268,9 +290,9 @@ class InventoryModule(QWidget):
             conn = database.get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE products SET name=?, category=?, cost_price=?, price=?
+                UPDATE products SET name=?, category=?, price=?
                 WHERE id=?
-            """, (data["name"], data["category"], data["cost_price"], data["sell_price"], barcode))
+            """, (data["name"], data["category"], data["sell_price"], barcode))
             conn.commit()
             conn.close()
             
@@ -292,10 +314,29 @@ class InventoryModule(QWidget):
             
         barcode = self.inventory_table.item(current_row, 0).text()
         product_name = self.inventory_table.item(current_row, 1).text()
+        category = self.inventory_table.item(current_row, 3).text()
         
+        # Get price for confirmation
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT price FROM products WHERE id=?", (barcode,))
+        row = cursor.fetchone()
+        price = row[0] if row else 0.0
+        conn.close()
+
+        confirmation_text = (
+            f"Are you sure you want to completely delete this product?\n\n"
+            f"DETAILS:\n"
+            f"• Name: {product_name}\n"
+            f"• Barcode: {barcode}\n"
+            f"• Price: ₱{price:,.2f}\n"
+            f"• Category: {category}\n\n"
+            f"This will permanently delete the product and ALL its historical inventory tracking data."
+        )
+
         reply = QMessageBox.question(
-            self, "Confirm Delete", 
-            f"Are you sure you want to completely delete '{product_name}'?\nThis will permanently delete its inventory tracking data.",
+            self, "Confirm Deletion", 
+            confirmation_text,
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
                                      
@@ -312,20 +353,64 @@ class InventoryModule(QWidget):
             QMessageBox.information(self, "Success", f"Product '{product_name}' has been deleted from the database.")
             self.load_inventory()
 
-    def force_recalculate(self):
-        if self.user_role != "admin":
-            QMessageBox.warning(self, "Access Denied", "Only Admin can sync cache.")
+    def check_not_found_on_enter(self):
+        barcode = self.search_input.text().strip()
+        if not barcode:
             return
             
-        reply = QMessageBox.question(self, "Confirm Sync", "This will recalculate all stock levels from historical logs. Continue?", QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.Yes:
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM products WHERE id=?", (barcode,))
+        exists = cursor.fetchone()
+        conn.close()
+        
+        if not exists:
+            # If it's a barcode (numbers mostly) or explicitly searched
+            reply = QMessageBox.question(
+                self, "Product Not Found", 
+                f"Barcode '{barcode}' is not in the database.\nWould you like to add it now?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                self.show_stock_in_dialog_with_barcode(barcode)
+
+    def show_stock_in_dialog_with_barcode(self, barcode):
+        if self.user_role != "admin":
+            QMessageBox.warning(self, "Access Denied", "Only Admin can add products.")
+            return
+
+        dialog = StockInDialog(self)
+        dialog.inp_barcode.setText(barcode)
+        if dialog.exec():
+            # Use the existing save logic
+            data = dialog.get_data()
             conn = database.get_connection()
             cursor = conn.cursor()
-            database.recalculate_all_stock_logic(cursor)
+            
+            cursor.execute("SELECT id FROM products WHERE id=?", (data["barcode"],))
+            if cursor.fetchone() is None:
+                cursor.execute("""
+                    INSERT INTO products (id, name, price, category)
+                    VALUES (?, ?, ?, ?)
+                """, (data["barcode"], data["name"], data["sell_price"], data["category"]))
+            else:
+                cursor.execute("""
+                    UPDATE products SET name=?, price=?, category=?
+                    WHERE id=?
+                """, (data["name"], data["sell_price"], data["category"], data["barcode"]))
+
+            if not database.is_stock_management_disabled():
+                cursor.execute("""
+                    INSERT INTO inventory (product_id, quantity, type, timestamp)
+                    VALUES (?, ?, 'IN', datetime('now', '+8 hours'))
+                """, (data["barcode"], data["qty"]))
+                cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (data["qty"], data["barcode"]))
+            
             conn.commit()
             conn.close()
             self.load_inventory()
-            QMessageBox.information(self, "Success", "Stock cache synchronized successfully.")
+
+
 
 
 class StockInDialog(QDialog):
@@ -342,7 +427,6 @@ class StockInDialog(QDialog):
         self.inp_barcode.textChanged.connect(self.check_existing_product)
         self.inp_name = QLineEdit()
         self.inp_qty = QLineEdit()
-        self.inp_cost = QLineEdit()
         self.inp_sell = QLineEdit()
         self.inp_category = QLineEdit()
         self.inp_expiry = QDateEdit()
@@ -353,13 +437,18 @@ class StockInDialog(QDialog):
         form.addRow("Product Name:", self.inp_name)
         form.addRow("Category:", self.inp_category)
         form.addRow("Quantity:", self.inp_qty)
-        form.addRow("Cost Price (₱):", self.inp_cost)
         form.addRow("Selling Price (₱):", self.inp_sell)
+        
+        self.expiry_row_idx = form.rowCount()
         form.addRow("Expiry Date:", self.inp_expiry)
+        
+        if database.is_expiry_tracking_disabled():
+            self.inp_expiry.setVisible(False)
+            form.labelForField(self.inp_expiry).setVisible(False)
 
         layout.addLayout(form)
 
-        btn_save = QPushButton("Save Items")
+        btn_save = QPushButton("Save Items" if not database.is_stock_management_disabled() else "Save Product")
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
 
@@ -369,26 +458,23 @@ class StockInDialog(QDialog):
             # Clear fields if barcode is empty
             self.inp_name.clear()
             self.inp_category.clear()
-            self.inp_cost.clear()
             self.inp_sell.clear()
             return
             
         conn = database.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT name, category, cost_price, price FROM products WHERE id=?", (barcode,))
+        cursor.execute("SELECT name, category, price FROM products WHERE id=?", (barcode,))
         product = cursor.fetchone()
         conn.close()
         
         if product:
             self.inp_name.setText(product[0])
             self.inp_category.setText(product[1] if product[1] else "")
-            self.inp_cost.setText(str(product[2] if product[2] else 0.0))
-            self.inp_sell.setText(str(product[3] if product[3] else 0.0))
+            self.inp_sell.setText(str(product[2] if product[2] else 0.0))
         else:
             # Clear fields if no match is found
             self.inp_name.clear()
             self.inp_category.clear()
-            self.inp_cost.clear()
             self.inp_sell.clear()
 
     def get_data(self):
@@ -397,7 +483,6 @@ class StockInDialog(QDialog):
             "name": self.inp_name.text().strip() or "Unnamed",
             "category": self.inp_category.text().strip() or "General",
             "qty": int(self.inp_qty.text().strip() or 0),
-            "cost_price": float(self.inp_cost.text().strip() or 0.0),
             "sell_price": float(self.inp_sell.text().strip() or 0.0),
             "expiry": self.inp_expiry.date().toString(Qt.ISODate)
         }
@@ -408,24 +493,22 @@ class EditProductDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Edit Product")
         self.barcode = barcode
-        self.product_data = product_data # (name, category, cost_price, price)
+        self.product_data = product_data # (name, category, price)
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
-        name, category, cost_price, sell_price = self.product_data
+        name, category, sell_price = self.product_data
 
         self.inp_name = QLineEdit(name)
         self.inp_category = QLineEdit(category if category else "")
-        self.inp_cost = QLineEdit(str(cost_price if cost_price else 0.0))
         self.inp_sell = QLineEdit(str(sell_price if sell_price else 0.0))
 
         form.addRow("Barcode / ID:", QLabel(self.barcode))
         form.addRow("Product Name:", self.inp_name)
         form.addRow("Category:", self.inp_category)
-        form.addRow("Cost Price (₱):", self.inp_cost)
         form.addRow("Selling Price (₱):", self.inp_sell)
 
         layout.addLayout(form)
@@ -438,6 +521,5 @@ class EditProductDialog(QDialog):
         return {
             "name": self.inp_name.text().strip() or "Unnamed",
             "category": self.inp_category.text().strip() or "General",
-            "cost_price": float(self.inp_cost.text().strip() or 0.0),
             "sell_price": float(self.inp_sell.text().strip() or 0.0),
         }
