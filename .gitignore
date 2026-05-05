@@ -1,6 +1,7 @@
 # Ignore the virtual environment
 archer/
 venv/
+.venv/
 __pycache__/
 *.pyc
 

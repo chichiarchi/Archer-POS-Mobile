@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, 
-    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox
+    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox, QCheckBox
 )
 from PySide6.QtCore import Qt, QStringListModel, QTimer
 import time
@@ -403,6 +403,13 @@ class POSModule(QWidget):
                     INSERT INTO debtors (customer_id, sale_id, balance_amount, created_at)
                     VALUES (?, ?, ?, datetime('now', '+8 hours'))
                 """, (customer_id, sale_id, balance_due))
+            
+            # Save Sale Items
+            for item in self.cart:
+                cursor.execute("""
+                    INSERT INTO sale_items (sale_id, product_id, product_name, quantity, price)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (sale_id, item["barcode"], item["name"], item["qty"], item["price"]))
 
             # Update Inventory (Stock Out) - Only if stock management is enabled
             if not database.is_stock_management_disabled():
@@ -427,24 +434,31 @@ class POSModule(QWidget):
                 
             database.log_action("POS_SALE", log_details, self.user_role)
 
+            # Optional Print Modal after transaction
+            reply = QMessageBox.question(
+                self, "Print Receipt", "Transaction successful! Would you like to print the receipt?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+            )
+
             # Print Receipt
-            receipt_data = {
-                'header': 'ARCHER STORE',
-                'cashier': self.user_role.capitalize(),
-                'sale_id': sale_id,
-                'items': [{'name': i["name"], 'qty': i["qty"], 'price': i["price"]} for i in self.cart],
-                'total': total,
-                'amount_paid': amount_paid,
-                'balance_due': balance_due if balance_due > 0 else 0.0,
-                'footer': 'Thank you! Come again!'
-            }
-            printer = ReceiptPrinter()
-            if printer.is_connected:
-                success = printer.print_receipt(receipt_data)
-                if not success:
-                    QMessageBox.warning(self, "Printer Error", "Failed to print the receipt.")
-            else:
-                QMessageBox.warning(self, "Printer Status", "Printer Not Detected. Receipt was not printed.")
+            if reply == QMessageBox.Yes:
+                receipt_data = {
+                    'header': 'ARCHER STORE',
+                    'cashier': self.user_role.capitalize(),
+                    'sale_id': sale_id,
+                    'items': [{'name': i["name"], 'qty': i["qty"], 'price': i["price"]} for i in self.cart],
+                    'total': total,
+                    'amount_paid': amount_paid,
+                    'balance_due': balance_due if balance_due > 0 else 0.0,
+                    'footer': 'Thank you! Come again!'
+                }
+                printer = ReceiptPrinter()
+                if printer.is_connected:
+                    success = printer.print_receipt(receipt_data)
+                    if not success:
+                        QMessageBox.warning(self, "Printer Error", "Failed to print the receipt.")
+                else:
+                    QMessageBox.warning(self, "Printer Status", "Printer Not Detected. Receipt was not printed.")
 
             change_amount = amount_paid - total if amount_paid > total else 0.0
             msg = f"Transaction Completed!\nChange: ₱{change_amount:,.2f}" if change_amount > 0 else "Transaction Completed!"

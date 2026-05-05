@@ -69,6 +69,19 @@ def init_db():
         )
     """)
 
+    # Create Sale Items Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sale_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            product_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            quantity REAL NOT NULL,
+            price REAL NOT NULL,
+            FOREIGN KEY(sale_id) REFERENCES sales(id)
+        )
+    """)
+
     # Create Debtors Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS debtors (
