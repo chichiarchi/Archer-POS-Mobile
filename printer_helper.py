@@ -94,6 +94,43 @@ class ReceiptPrinter:
             if not self.is_connected:
                 return False
 
+        # Advanced Status Check & Queue Purging
+        try:
+            hprinter = win32print.OpenPrinter(self.printer_name)
+
+            printer_info = win32print.GetPrinter(hprinter, 2)
+            status = printer_info['Status']
+
+            paper_out = (status & win32print.PRINTER_STATUS_PAPER_OUT)
+            offline = (status & win32print.PRINTER_STATUS_OFFLINE) or (status & win32print.PRINTER_STATUS_NOT_AVAILABLE) or (status & win32print.PRINTER_STATUS_ERROR)
+
+            # Manually delete stuck jobs in the spooler to prevent "pile up"
+            # Using EnumJobs and SetJob avoids the "Access Denied" error that SetPrinter(PURGE) causes for non-admins
+            jobs = win32print.EnumJobs(hprinter, 0, -1, 1)
+            if jobs:
+                for job in jobs:
+                    try:
+                        win32print.SetJob(hprinter, job['JobId'], 0, None, win32print.JOB_CONTROL_DELETE)
+                    except Exception as e:
+                        logging.warning(f"Could not delete job {job['JobId']}: {e}")
+                
+                # If there were jobs stuck in the queue, the printer is likely offline or jammed
+                offline = True
+
+            win32print.ClosePrinter(hprinter)
+
+            # Warning: Generic 58mm thermal drivers often do not report status properly to Windows.
+            if paper_out:
+                self.last_error = "Printer is OUT OF PAPER. Please insert a new roll."
+                return False
+            if offline:
+                self.last_error = "Printer is OFFLINE, TURNED OFF, or BUSY. Please power it on before printing."
+                return False
+
+        except Exception as e:
+            self.last_error = f"Failed to verify printer status: {e}"
+            return False
+
         try:
             # Create a Device Context (DC) for the printer
             hdc = win32ui.CreateDC()
@@ -123,6 +160,13 @@ class ReceiptPrinter:
             })
 
             y = 20 # Vertical position
+            
+            # Top Banner
+            hdc.SelectObject(font)
+            hdc.TextOut(0, y, "SALES SUMMARY/CUSTOMER COPY ONLY")
+            y += font_size
+            hdc.TextOut(0, y, "-" * 32)
+            y += font_size
             
             # 1. Header (Centered approx)
             hdc.SelectObject(font_bold)
@@ -172,15 +216,6 @@ class ReceiptPrinter:
             hdc.TextOut(0, y, f"TOTAL:        Php {receipt_data.get('total', 0):>7,.2f}")
             y += int(font_size * 1.2)
             
-            hdc.SelectObject(font)
-            if 'amount_paid' in receipt_data:
-                 hdc.TextOut(0, y, f"PAID:         Php {receipt_data['amount_paid']:>7,.2f}")
-                 y += font_size
-                 if receipt_data['amount_paid'] > receipt_data.get('total', 0):
-                      change = receipt_data['amount_paid'] - receipt_data.get('total', 0)
-                      hdc.TextOut(0, y, f"CHANGE:       Php {change:>7,.2f}")
-                      y += font_size
-            
             y += font_size
 
             # 6. Footer
@@ -188,6 +223,12 @@ class ReceiptPrinter:
             y += font_size
             hdc.TextOut(0, y, "Agyamanak unay!")
             y += font_size
+            
+            # Non-official receipt disclaimer
+            y += int(font_size * 0.5)
+            hdc.TextOut(0, y, "THIS IS NOT AN OFFICIAL RECEIPT")
+            y += font_size
+            
             hdc.TextOut(0, y, "-" * 32)
             y += font_size
             
