@@ -216,9 +216,9 @@ class ArcherPOS(QMainWindow):
         self.logs_tab = LogsModule(self.user_role)
         self.tabs.addTab(self.logs_tab, QIcon(resource_path("archer_logo.png")), "Data Logs (F6)")
 
-        # # Tab 6: Settings
+        # Tab 6: Settings
         # self.settings_tab = SettingsModule(self.user_role)
-        # self.tabs.addTab(self.settings_tab, "Settings (F7)")
+        # self.tabs.addTab(self.settings_tab, QIcon(resource_path("archer_logo.png")), "Settings (F7)")
 
         # Keyboard shortcuts for Tabs
         QShortcut(QKeySequence("F1"), self).activated.connect(lambda: self.tabs.setCurrentIndex(0))
