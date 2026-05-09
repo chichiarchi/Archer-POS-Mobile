@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, 
     QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox, QCheckBox, QComboBox
 )
-from PySide6.QtCore import Qt, QStringListModel, QTimer
+from PySide6.QtCore import Qt, QStringListModel, QTimer, QEvent
 import time
 import json
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -19,6 +19,8 @@ class POSModule(QWidget):
         self.cart = []  # List of dicts {barcode, name, price, qty}
         self._last_add_time = 0
         self.setup_ui()
+        # Install event filter to catch keys globally within this module
+        self.installEventFilter(self)
 
     def get_bold_font(self, size):
         from PySide6.QtGui import QFont
@@ -59,6 +61,7 @@ class POSModule(QWidget):
         self.cart_table.setStyleSheet("font-size: 16px;")
         self.cart_table.horizontalHeader().setStyleSheet("font-size: 16px; font-weight: bold;")
         self.cart_table.verticalHeader().setDefaultSectionSize(40) # Taller rows
+        self.cart_table.installEventFilter(self) # Catch keys when table is focused
         layout.addWidget(self.cart_table)
 
         # Action Buttons Layout
@@ -68,6 +71,7 @@ class POSModule(QWidget):
         self.btn_qty.setMinimumHeight(45)
         self.btn_qty.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_qty.clicked.connect(self.change_qty)
+        self.btn_qty.installEventFilter(self)
         QShortcut(QKeySequence("Ctrl+Q"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.change_qty)
         btn_layout.addWidget(self.btn_qty)
 
@@ -75,6 +79,7 @@ class POSModule(QWidget):
         self.btn_delete.setMinimumHeight(45)
         self.btn_delete.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_delete.clicked.connect(self.delete_item)
+        self.btn_delete.installEventFilter(self)
         QShortcut(QKeySequence("Ctrl+Del"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.delete_item)
         btn_layout.addWidget(self.btn_delete)
 
@@ -82,6 +87,7 @@ class POSModule(QWidget):
         self.btn_discount.setMinimumHeight(45)
         self.btn_discount.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_discount.clicked.connect(self.apply_discount)
+        self.btn_discount.installEventFilter(self)
         QShortcut(QKeySequence("Ctrl+D"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.apply_discount)
         btn_layout.addWidget(self.btn_discount)
 
@@ -123,6 +129,7 @@ class POSModule(QWidget):
             }
         """)
         self.btn_checkout.clicked.connect(self.checkout)
+        self.btn_checkout.installEventFilter(self)
         QShortcut(QKeySequence("Ctrl+Return"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.checkout)
         QShortcut(QKeySequence("F12"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.checkout)
         bottom_layout.addWidget(self.btn_checkout)
@@ -135,12 +142,14 @@ class POSModule(QWidget):
         self.btn_park = QPushButton("Park Sale (Ctrl+P)")
         self.btn_park.setStyleSheet("background-color: #64748B; color: white; font-weight: bold; padding: 10px;")
         self.btn_park.clicked.connect(self.park_sale)
+        self.btn_park.installEventFilter(self)
         QShortcut(QKeySequence("Ctrl+P"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.park_sale)
         adv_layout.addWidget(self.btn_park)
 
         self.btn_recall = QPushButton("Recall Sale (Ctrl+R)")
         self.btn_recall.setStyleSheet("background-color: #64748B; color: white; font-weight: bold; padding: 10px;")
         self.btn_recall.clicked.connect(self.recall_sale)
+        self.btn_recall.installEventFilter(self)
         QShortcut(QKeySequence("Ctrl+R"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.recall_sale)
         adv_layout.addWidget(self.btn_recall)
 
@@ -149,6 +158,7 @@ class POSModule(QWidget):
         self.btn_void_cart = QPushButton("Void Cart (Ctrl+Shift+V)")
         self.btn_void_cart.setStyleSheet("background-color: #EF4444; color: white; font-weight: bold; padding: 10px;")
         self.btn_void_cart.clicked.connect(self.void_current_cart)
+        self.btn_void_cart.installEventFilter(self)
         QShortcut(QKeySequence("Ctrl+Shift+V"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.void_current_cart)
         adv_layout.addWidget(self.btn_void_cart)
 
@@ -157,17 +167,25 @@ class POSModule(QWidget):
         # Global Search Focus
         QShortcut(QKeySequence("Ctrl+F"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.search_input.setFocus)
 
-    def keyPressEvent(self, event):
-        # Global Barcode Catch: If user starts typing/scanning while on POS tab but search isn't focused
-        if not self.search_input.hasFocus():
-            text = event.text()
-            # If it's a printable character and not a shortcut (Ctrl/Alt)
-            if text and text.isprintable() and not (event.modifiers() & (Qt.ControlModifier | Qt.AltModifier)):
-                self.search_input.setFocus()
-                self.search_input.setText(self.search_input.text() + text)
-                return # Event handled
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.KeyPress:
+            # If search input doesn't have focus, redirect printable keys and Return to it
+            if obj != self.search_input and not self.search_input.hasFocus():
+                if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                    if self.search_input.text().strip():
+                        self.add_item_to_cart()
+                        return True # Consume event
+                
+                text = event.text()
+                if text and text.isprintable() and not (event.modifiers() & (Qt.ControlModifier | Qt.AltModifier)):
+                    self.search_input.setFocus()
+                    # Ensure we don't select-all on focus, which would overwrite the first character
+                    self.search_input.deselect()
+                    self.search_input.setCursorPosition(len(self.search_input.text()))
+                    self.search_input.insert(text)
+                    return True # Consume event
         
-        super().keyPressEvent(event)
+        return super().eventFilter(obj, event)
 
     def refresh_completer(self):
         conn = database.get_connection()
@@ -226,28 +244,27 @@ class POSModule(QWidget):
             conn = database.get_connection()
             cursor = conn.cursor()
             product = None
-            current_stock = 0
             try:
-                cursor.execute("SELECT id, name, price, current_stock FROM products WHERE id=?", (barcode,))
+                cursor.execute("SELECT id, name, price FROM products WHERE id=?", (barcode,))
                 product = cursor.fetchone()
                 if product:
-                    p_id, p_name, p_price, current_stock = product
+                    p_id, p_name, p_price = product
             finally:
                 conn.close()
 
             if product:
-                p_id, p_name, p_price, current_stock = product
+                p_id, p_name, p_price = product
                 
                 # RAPID SCAN MODE: 
                 # If quantity is 1 and price is not being overridden via barcode syntax, add immediately.
                 is_manual_multiplier = '*' in text
                 
-                if not is_manual_multiplier and current_stock > 0:
+                if not is_manual_multiplier:
                     final_qty = 1.0
                     final_price = p_price
                 else:
-                    # Popup confirmation dialog with stock warning
-                    dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, int(current_stock), self)
+                    # Popup confirmation dialog
+                    dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, self)
                     if dialog.exec():
                         final_qty, final_price = dialog.get_data()
                     else:
@@ -256,15 +273,6 @@ class POSModule(QWidget):
                 if final_qty <= 0:
                     return
                 
-                # Soft Warning for negative stock - Only if stock management is enabled
-                if not database.is_stock_management_disabled() and current_stock <= 0:
-                    reply = QMessageBox.warning(
-                        self, "Stock Warning", 
-                        f"System shows 0 stock for '{p_name}', but item is available physically. Proceed with sale?",
-                        QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-                    )
-                    if reply == QMessageBox.No:
-                        return
 
                 # If price is changed, require admin
                 if abs(final_price - p_price) > 0.001:
@@ -304,15 +312,9 @@ class POSModule(QWidget):
                         conn = database.get_connection()
                         cursor = conn.cursor()
                         cursor.execute("""
-                            INSERT INTO products (id, name, price, category, current_stock)
-                            VALUES (?, ?, ?, ?, ?)
-                        """, (data["barcode"], data["name"], data["sell_price"], data["category"], data["qty"]))
-                        
-                        if data["qty"] > 0:
-                            cursor.execute("""
-                                INSERT INTO inventory (product_id, quantity, type, timestamp)
-                                VALUES (?, ?, 'IN', datetime('now', '+8 hours'))
-                            """, (data["barcode"], data["qty"]))
+                            INSERT INTO products (id, name, price, category)
+                            VALUES (?, ?, ?, ?)
+                        """, (data["barcode"], data["name"], data["sell_price"], data["category"]))
                         
                         conn.commit()
                         conn.close()
@@ -322,9 +324,8 @@ class POSModule(QWidget):
                         
                         # Automatically trigger Add to Cart workflow
                         p_id, p_name, p_price = data["barcode"], data["name"], data["sell_price"]
-                        current_stock = data["qty"]
                         
-                        dialog_cart = AddToCartDialog(p_name, 1, p_price, int(current_stock), self)
+                        dialog_cart = AddToCartDialog(p_name, 1, p_price, self)
                         if dialog_cart.exec():
                             final_qty, final_price = dialog_cart.get_data()
                             if final_qty > 0:
@@ -551,16 +552,6 @@ class POSModule(QWidget):
                     VALUES (?, ?, ?, ?, ?)
                 """, (sale_id, item["barcode"], item["name"], item["qty"], item["price"]))
 
-            # Update Inventory (Stock Out) - Only if stock management is enabled
-            if not database.is_stock_management_disabled():
-                for item in self.cart:
-                    cursor.execute("""
-                        INSERT INTO inventory (product_id, quantity, type, timestamp)
-                        VALUES (?, ?, 'OUT', datetime('now', '+8 hours'))
-                    """, (item["barcode"], item["qty"]))
-                    
-                    # Update stock cache (Issue #1 fix)
-                    cursor.execute("UPDATE products SET current_stock = current_stock - ? WHERE id = ?", (item["qty"], item["barcode"]))
 
             # Save Split Payments (Always Cash now)
             cursor.execute("""
@@ -740,26 +731,19 @@ class CheckoutDialog(QDialog):
         return paid, customer_info
 
 class AddToCartDialog(QDialog):
-    def __init__(self, product_name, default_qty, default_price, current_stock, parent=None):
+    def __init__(self, product_name, default_qty, default_price, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Add Item")
         self.setMinimumWidth(350)
-        self.setup_ui(product_name, default_qty, default_price, current_stock)
+        self.setup_ui(product_name, default_qty, default_price)
 
-    def setup_ui(self, name, qty, price, stock):
+    def setup_ui(self, name, qty, price):
         layout = QVBoxLayout(self)
         
         lbl = QLabel(f"Adding: {name}")
         lbl.setStyleSheet("font-size: 22px; font-weight: 900; color: #0072FF; margin-bottom: 5px;")
         layout.addWidget(lbl)
         
-        stock_color = "#10b981" if stock > 0 else "#ef4444"
-        stock_lbl = QLabel(f"System Stock: {int(stock):,d} units")
-        stock_lbl.setStyleSheet(f"color: {stock_color}; font-size: 14px; font-weight: bold; margin-bottom: 15px;")
-        layout.addWidget(stock_lbl)
-        
-        if database.is_stock_management_disabled():
-            stock_lbl.setVisible(False)
         
         form = QFormLayout()
         form.setSpacing(15)
@@ -803,11 +787,9 @@ class AddToCartDialog(QDialog):
         layout.addWidget(btn_confirm)
 
     def get_data(self):
-        qty = self.inp_qty.value()
-            
         try:
-            price = float(self.inp_price.text())
-        except ValueError:
-            price = 0.0
-            
-        return qty, price
+            qty = self.inp_qty.value()
+            price = float(self.inp_price.text().replace(',', ''))
+            return qty, price
+        except:
+            return 0, 0.0

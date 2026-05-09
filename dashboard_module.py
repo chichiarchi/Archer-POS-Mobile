@@ -38,14 +38,7 @@ class DashboardModule(QWidget):
 
         self.layout_main.addLayout(stats_layout)
 
-        self.expiry_card = self.create_table_card("Nearly Expired Items (Within 30 Days)", ["Product Name", "Expiry Date", "Stock Remaining"], "#ef4444")
-        self.expiry_table = self.expiry_card["table"]
-        self.layout_main.addWidget(self.expiry_card["frame"])
-
-        # Negative Stock Alerts
-        self.neg_stock_card = self.create_table_card("Negative Stock Alert (Reconciliation Required)", ["Product Name", "Current Level", "Action Required"], "#f97316")
-        self.neg_stock_table = self.neg_stock_card["table"]
-        self.layout_main.addWidget(self.neg_stock_card["frame"])
+        self.layout_main.addStretch()
 
         self.layout_main.addStretch()
 
@@ -121,49 +114,7 @@ class DashboardModule(QWidget):
 
     def load_all(self):
         self.load_stats()
-        
-        if database.is_expiry_tracking_disabled():
-            self.expiry_card["frame"].setVisible(False)
-        else:
-            self.expiry_card["frame"].setVisible(True)
-            self.load_expiry_warnings()
 
-        if database.is_stock_management_disabled():
-            self.neg_stock_card["frame"].setVisible(False)
-        else:
-            self.neg_stock_card["frame"].setVisible(True)
-            self.load_negative_stock()
-
-    def load_negative_stock(self):
-        conn = database.get_connection()
-        cursor = conn.cursor()
-        
-        query = """
-            SELECT name, current_stock
-            FROM products
-            WHERE current_stock < 0
-        """
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        conn.close()
-
-        self.neg_stock_table.setRowCount(0)
-        for i, row in enumerate(rows):
-            name, qty = row
-            self.neg_stock_table.insertRow(i)
-            
-            item_name = QTableWidgetItem(name)
-            item_name.setForeground(QColor("#f97316"))
-            
-            item_qty = QTableWidgetItem(f"{int(qty):,d}")
-            item_qty.setForeground(QColor("#f97316"))
-            
-            item_action = QTableWidgetItem("STOCK RECONCILIATION REQUIRED")
-            item_action.setForeground(QColor("#f97316"))
-            
-            self.neg_stock_table.setItem(i, 0, item_name)
-            self.neg_stock_table.setItem(i, 1, item_qty)
-            self.neg_stock_table.setItem(i, 2, item_action)
 
     def load_stats(self):
         conn = database.get_connection()
@@ -205,39 +156,3 @@ class DashboardModule(QWidget):
         self.inventory_card["val_lbl"].setText(f"{total_products:,}")
         self.balance_card["val_lbl"].setText(f"₱{total_balance:,.2f}")
 
-    def load_expiry_warnings(self):
-        conn = database.get_connection()
-        cursor = conn.cursor()
-
-        query = """
-            SELECT p.name, i.expiry_date, p.current_stock
-            FROM inventory i
-            JOIN products p ON i.product_id = p.id
-            WHERE i.expiry_date IS NOT NULL 
-              AND i.expiry_date <= date('now', '+30 days')
-              AND i.expiry_date >= date('now', '-30 days')
-              AND p.current_stock > 0
-            GROUP BY p.id, i.expiry_date
-            ORDER BY i.expiry_date ASC
-        """
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        conn.close()
-
-        self.expiry_table.setRowCount(0)
-        for i, row in enumerate(rows):
-            name, expiry, qty = row
-            self.expiry_table.insertRow(i)
-            
-            item_name = QTableWidgetItem(name)
-            item_name.setForeground(QColor("#ef4444"))
-            
-            item_expiry = QTableWidgetItem(str(expiry))
-            item_expiry.setForeground(QColor("#ef4444"))
-
-            item_qty = QTableWidgetItem(f"{int(qty):,d}")
-            item_qty.setForeground(QColor("#ef4444"))
-            
-            self.expiry_table.setItem(i, 0, item_name)
-            self.expiry_table.setItem(i, 1, item_expiry)
-            self.expiry_table.setItem(i, 2, item_qty)

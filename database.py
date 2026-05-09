@@ -28,21 +28,7 @@ def init_db():
             id TEXT PRIMARY KEY, -- Using barcode as ID
             name TEXT NOT NULL,
             price REAL NOT NULL,
-            current_stock REAL DEFAULT 0, -- Cached stock for performance
             category TEXT
-        )
-    """)
-    
-    # Create Inventory Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS inventory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            product_id TEXT NOT NULL,
-            quantity REAL NOT NULL,
-            expiry_date TEXT,
-            type TEXT NOT NULL CHECK(type IN ('IN', 'OUT')),
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(product_id) REFERENCES products(id)
         )
     """)
     
@@ -138,14 +124,6 @@ def init_db():
         )
     """)
     
-    # Initialize default settings
-    default_settings = {
-        'disable_stock_management': 'false',
-        'disable_expiry_tracking': 'false'
-    }
-    for key, val in default_settings.items():
-        cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, val))
-    
     # Add an initial admin user if the table is empty
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
@@ -154,22 +132,6 @@ def init_db():
             "INSERT INTO users (username, password_hash, salt, role) VALUES (?, ?, ?, ?)",
             ('admin', password_hash, salt, 'admin')
         )
-
-    # Migrations for new columns
-    pass
-
-    try:
-        cursor.execute("ALTER TABLE sales ADD COLUMN voided INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-    try:
-        cursor.execute("ALTER TABLE products ADD COLUMN current_stock REAL DEFAULT 0")
-        conn.commit()
-        # If we just added the column, recalculate it once
-        recalculate_all_stock_logic(cursor)
-    except sqlite3.OperationalError:
-        pass
 
     conn.commit()
     conn.close()
@@ -252,6 +214,27 @@ def verify_login(username, password):
         return user_id, role
     return None
 
+def update_user_password(username, new_password):
+    conn = get_connection()
+    cursor = conn.cursor()
+    password_hash, salt = hash_password(new_password)
+    cursor.execute(
+        "UPDATE users SET password_hash = ?, salt = ? WHERE username = ?",
+        (password_hash, salt, username)
+    )
+    conn.commit()
+    success = cursor.rowcount > 0
+    conn.close()
+    return success
+
+def get_user_by_username(username):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, role FROM users WHERE username = ?", (username,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
 def log_action(action, details=None, user_id="system"):
     conn = get_connection()
     cursor = conn.cursor()
@@ -259,25 +242,6 @@ def log_action(action, details=None, user_id="system"):
         "INSERT INTO audit_logs (action, details, user_id, timestamp) VALUES (?, ?, ?, datetime('now', '+8 hours'))",
         (action, details, user_id)
     )
-    conn.commit()
-    conn.close()
-
-def recalculate_all_stock_logic(cursor):
-    """Internal helper to sync current_stock with inventory logs"""
-    cursor.execute("""
-        UPDATE products 
-        SET current_stock = (
-            SELECT COALESCE(SUM(CASE WHEN type='IN' THEN quantity ELSE -quantity END), 0)
-            FROM inventory 
-            WHERE inventory.product_id = products.id
-        )
-    """)
-
-def update_stock_cache(product_id, quantity_change):
-    """Efficiently update the cached stock level without recalculating everything"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (quantity_change, product_id))
     conn.commit()
     conn.close()
 

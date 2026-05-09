@@ -1,7 +1,8 @@
 import sys
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
-    QLabel, QLineEdit, QPushButton, QMessageBox, QFrame, QGraphicsDropShadowEffect
+    QLabel, QLineEdit, QPushButton, QMessageBox, QFrame, QGraphicsDropShadowEffect,
+    QInputDialog
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QColor
@@ -91,6 +92,25 @@ class LoginWindow(QWidget):
         self.login_btn.clicked.connect(self.handle_login)
         layout.addWidget(self.login_btn)
         
+        # Forgot Password Button
+        self.forgot_btn = QPushButton("Forgot Password?")
+        self.forgot_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #0072FF;
+                border: none;
+                font-size: 13px;
+                font-weight: 600;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                text-decoration: underline;
+                color: #0055CC;
+            }
+        """)
+        self.forgot_btn.clicked.connect(self.handle_forgot_password)
+        layout.addWidget(self.forgot_btn)
+        
         # Enable Enter key to login
         self.password_input.returnPressed.connect(self.login_btn.click)
 
@@ -107,18 +127,57 @@ class LoginWindow(QWidget):
         if user_data:
             user_id, role = user_data
             QMessageBox.information(self, "Success", f"Logged in as {role.capitalize()}!")
-            self.open_main_window(role)
+            self.open_main_window(role, username)
         else:
             QMessageBox.critical(self, "Error", "Invalid username or password.")
             
-    def open_main_window(self, role):
+    def handle_forgot_password(self):
+        username, ok = QInputDialog.getText(self, "Admin Password Recovery", "Enter Admin username:")
+        if not ok or not username:
+            return
+            
+        # Check if user exists and is an admin
+        user_data = database.get_user_by_username(username)
+        if not user_data:
+            QMessageBox.critical(self, "Error", "User not found.")
+            return
+            
+        user_id, uname, role = user_data
+        if role != 'admin':
+            QMessageBox.warning(self, "Access Denied", "This recovery method is only available for Admin accounts.")
+            return
+            
+        # Ask for secret code
+        code, ok = QInputDialog.getText(self, "Admin Recovery", "Enter the Master Recovery Code (Contact Developer for Code):", QLineEdit.Password)
+        if not ok:
+            return
+            
+        if code != "10152003":
+            QMessageBox.critical(self, "Access Denied", "Incorrect Master Recovery Code.")
+            return
+            
+        # If code is correct, allow password reset
+        new_password, ok = QInputDialog.getText(self, "Reset Admin Password", "Enter new password for Admin:", QLineEdit.Password)
+        if not ok or not new_password:
+            return
+            
+        confirm_password, ok = QInputDialog.getText(self, "Reset Admin Password", "Confirm new password:", QLineEdit.Password)
+        if not ok or confirm_password != new_password:
+            QMessageBox.critical(self, "Error", "Passwords do not match.")
+            return
+            
+        if database.update_user_password(username, new_password):
+            QMessageBox.information(self, "Success", "Admin password updated successfully! You can now login.")
+            database.log_action("ADMIN_PASSWORD_RESET", f"Admin password reset via Master Code for user: {username}", username)
+        else:
+            QMessageBox.critical(self, "Error", "Failed to update password.")
+            
+    def open_main_window(self, role, username):
         # Hide the login window and show the main POS interface
-        # In a real app, we would launch the main window here.
-        # For now, we print role and just close.
-        print(f"Logged in successfully. Role: {role}")
+        print(f"Logged in successfully. User: {username}, Role: {role}")
         
         from app import ArcherPOS
-        self.main_window = ArcherPOS(role)
+        self.main_window = ArcherPOS(role, username)
         self.main_window.show()
         self.close()
 

@@ -8,7 +8,7 @@ from inventory_module import InventoryModule
 from dashboard_module import DashboardModule
 from balance_module import BalanceModule
 from logs_module import LogsModule
-from settings_module import SettingsModule
+from account_module import AccountModule
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -19,9 +19,10 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 class ArcherPOS(QMainWindow):
-    def __init__(self, user_role="staff"):
+    def __init__(self, user_role="staff", username="admin"):
         super().__init__()
         self.user_role = user_role
+        self.username = username
         self.setWindowTitle("Archer POS v2 - Dashboard") 
         self.setWindowIcon(QIcon(resource_path("archer_logo.png")))
         self.showMaximized()
@@ -216,9 +217,9 @@ class ArcherPOS(QMainWindow):
         self.logs_tab = LogsModule(self.user_role)
         self.tabs.addTab(self.logs_tab, QIcon(resource_path("archer_logo.png")), "Data Logs (F6)")
 
-        # Tab 6: Settings
-        # self.settings_tab = SettingsModule(self.user_role)
-        # self.tabs.addTab(self.settings_tab, QIcon(resource_path("archer_logo.png")), "Settings (F7)")
+        # Tab 6: Account Details
+        self.account_tab = AccountModule(self.username)
+        self.tabs.addTab(self.account_tab, QIcon(resource_path("archer_logo.png")), "Account Settings (F7)")
 
         # Keyboard shortcuts for Tabs
         QShortcut(QKeySequence("F1"), self).activated.connect(lambda: self.tabs.setCurrentIndex(0))
