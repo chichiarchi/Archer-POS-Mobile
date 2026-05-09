@@ -155,7 +155,7 @@ class DashboardModule(QWidget):
             item_name = QTableWidgetItem(name)
             item_name.setForeground(QColor("#f97316"))
             
-            item_qty = QTableWidgetItem(str(int(qty)))
+            item_qty = QTableWidgetItem(f"{int(qty):,d}")
             item_qty.setForeground(QColor("#f97316"))
             
             item_action = QTableWidgetItem("STOCK RECONCILIATION REQUIRED")
@@ -235,7 +235,7 @@ class DashboardModule(QWidget):
             item_expiry = QTableWidgetItem(str(expiry))
             item_expiry.setForeground(QColor("#ef4444"))
 
-            item_qty = QTableWidgetItem(f"{int(qty)}")
+            item_qty = QTableWidgetItem(f"{int(qty):,d}")
             item_qty.setForeground(QColor("#ef4444"))
             
             self.expiry_table.setItem(i, 0, item_name)

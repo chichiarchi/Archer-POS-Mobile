@@ -21,14 +21,14 @@ class BalanceModule(QWidget):
         self.btn_resolve.setMinimumHeight(50)
         self.btn_resolve.setStyleSheet("font-size: 18px; font-weight: bold; background-color: #0072FF; color: white; border-radius: 8px; padding: 0 20px;")
         self.btn_resolve.clicked.connect(self.resolve_balance)
-        QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self.resolve_balance)
+        QShortcut(QKeySequence("Ctrl+B"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.resolve_balance)
         top_layout.addWidget(self.btn_resolve)
 
-        self.btn_refresh = QPushButton("Refresh List (F5)")
+        self.btn_refresh = QPushButton("Refresh List (Ctrl+R)")
         self.btn_refresh.setMinimumHeight(50)
         self.btn_refresh.setStyleSheet("font-size: 18px; font-weight: bold; background-color: #64748B; color: white; border-radius: 8px; padding: 0 20px;")
         self.btn_refresh.clicked.connect(self.load_balances)
-        QShortcut(QKeySequence("F5"), self).activated.connect(self.load_balances)
+        QShortcut(QKeySequence("Ctrl+R"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.load_balances)
         top_layout.addWidget(self.btn_refresh)
         
         top_layout.addStretch()

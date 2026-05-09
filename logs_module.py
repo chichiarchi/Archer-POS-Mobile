@@ -51,7 +51,7 @@ class ReceiptPreviewDialog(QDialog):
         
         for i, item in enumerate(self.receipt_data['items']):
             items_table.setItem(i, 0, QTableWidgetItem(item['name']))
-            items_table.setItem(i, 1, QTableWidgetItem(str(int(item['qty']))))
+            items_table.setItem(i, 1, QTableWidgetItem(f"{int(item['qty']):,d}"))
             items_table.setItem(i, 2, QTableWidgetItem(f"₱{item['price']:,.2f}"))
 
         receipt_layout.addWidget(items_table)
@@ -138,12 +138,12 @@ class LogsModule(QWidget):
 
         self.btn_refresh = QPushButton("Refresh Logs (Ctrl+R)")
         self.btn_refresh.clicked.connect(self.load_logs)
-        QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.load_logs)
+        QShortcut(QKeySequence("Ctrl+R"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.load_logs)
         top_layout.addWidget(self.btn_refresh)
         
         self.btn_reprint = QPushButton("Reprint Receipt (Ctrl+P)")
         self.btn_reprint.clicked.connect(self.reprint_receipt)
-        QShortcut(QKeySequence("Ctrl+P"), self).activated.connect(self.reprint_receipt)
+        QShortcut(QKeySequence("Ctrl+P"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.reprint_receipt)
         top_layout.addWidget(self.btn_reprint)
         
         self.btn_void_sale = QPushButton("Void Sale")

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, 
-    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox, QCheckBox
+    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox, QCheckBox, QComboBox
 )
 from PySide6.QtCore import Qt, QStringListModel, QTimer
 import time
@@ -68,21 +68,21 @@ class POSModule(QWidget):
         self.btn_qty.setMinimumHeight(45)
         self.btn_qty.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_qty.clicked.connect(self.change_qty)
-        QShortcut(QKeySequence("Ctrl+Q"), self).activated.connect(self.change_qty)
+        QShortcut(QKeySequence("Ctrl+Q"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.change_qty)
         btn_layout.addWidget(self.btn_qty)
 
-        self.btn_delete = QPushButton("Delete Item (Del)")
+        self.btn_delete = QPushButton("Delete Item (Ctrl+Del)")
         self.btn_delete.setMinimumHeight(45)
         self.btn_delete.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_delete.clicked.connect(self.delete_item)
-        QShortcut(QKeySequence("Del"), self).activated.connect(self.delete_item)
+        QShortcut(QKeySequence("Ctrl+Del"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.delete_item)
         btn_layout.addWidget(self.btn_delete)
 
         self.btn_discount = QPushButton("Discount (Ctrl+D)")
         self.btn_discount.setMinimumHeight(45)
         self.btn_discount.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_discount.clicked.connect(self.apply_discount)
-        QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(self.apply_discount)
+        QShortcut(QKeySequence("Ctrl+D"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.apply_discount)
         btn_layout.addWidget(self.btn_discount)
 
         layout.addLayout(btn_layout)
@@ -123,7 +123,8 @@ class POSModule(QWidget):
             }
         """)
         self.btn_checkout.clicked.connect(self.checkout)
-        QShortcut(QKeySequence("F12"), self).activated.connect(self.checkout)
+        QShortcut(QKeySequence("Ctrl+Return"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.checkout)
+        QShortcut(QKeySequence("F12"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.checkout)
         bottom_layout.addWidget(self.btn_checkout)
 
         layout.addLayout(bottom_layout)
@@ -131,29 +132,42 @@ class POSModule(QWidget):
         # Bottom Bar 2: Advanced Actions
         adv_layout = QHBoxLayout()
         
-        self.btn_park = QPushButton("Park Sale (F6)")
+        self.btn_park = QPushButton("Park Sale (Ctrl+P)")
         self.btn_park.setStyleSheet("background-color: #64748B; color: white; font-weight: bold; padding: 10px;")
         self.btn_park.clicked.connect(self.park_sale)
-        QShortcut(QKeySequence("F6"), self).activated.connect(self.park_sale)
+        QShortcut(QKeySequence("Ctrl+P"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.park_sale)
         adv_layout.addWidget(self.btn_park)
 
-        self.btn_recall = QPushButton("Recall Sale (F7)")
+        self.btn_recall = QPushButton("Recall Sale (Ctrl+R)")
         self.btn_recall.setStyleSheet("background-color: #64748B; color: white; font-weight: bold; padding: 10px;")
         self.btn_recall.clicked.connect(self.recall_sale)
-        QShortcut(QKeySequence("F7"), self).activated.connect(self.recall_sale)
+        QShortcut(QKeySequence("Ctrl+R"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.recall_sale)
         adv_layout.addWidget(self.btn_recall)
 
         adv_layout.addStretch()
 
-        self.btn_void_cart = QPushButton("Void Current Cart")
+        self.btn_void_cart = QPushButton("Void Cart (Ctrl+Shift+V)")
         self.btn_void_cart.setStyleSheet("background-color: #EF4444; color: white; font-weight: bold; padding: 10px;")
         self.btn_void_cart.clicked.connect(self.void_current_cart)
+        QShortcut(QKeySequence("Ctrl+Shift+V"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.void_current_cart)
         adv_layout.addWidget(self.btn_void_cart)
 
         layout.addLayout(adv_layout)
 
         # Global Search Focus
-        QShortcut(QKeySequence("F4"), self).activated.connect(self.search_input.setFocus)
+        QShortcut(QKeySequence("Ctrl+F"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.search_input.setFocus)
+
+    def keyPressEvent(self, event):
+        # Global Barcode Catch: If user starts typing/scanning while on POS tab but search isn't focused
+        if not self.search_input.hasFocus():
+            text = event.text()
+            # If it's a printable character and not a shortcut (Ctrl/Alt)
+            if text and text.isprintable() and not (event.modifiers() & (Qt.ControlModifier | Qt.AltModifier)):
+                self.search_input.setFocus()
+                self.search_input.setText(self.search_input.text() + text)
+                return # Event handled
+        
+        super().keyPressEvent(event)
 
     def refresh_completer(self):
         conn = database.get_connection()
@@ -491,6 +505,11 @@ class POSModule(QWidget):
             database.log_action("POS_DISCOUNT", f"Discounted {self.cart[current_row]['name']} to ₱{discount:,.2f}", self.user_role)
             self.update_cart_display()
 
+            # Clear Cart
+            self.cart.clear()
+            self.update_cart_display()
+            self.search_input.setFocus()
+
     def checkout(self):
         if not self.cart:
             QMessageBox.warning(self, "Empty Cart", "Cannot checkout an empty cart.")
@@ -542,6 +561,12 @@ class POSModule(QWidget):
                     
                     # Update stock cache (Issue #1 fix)
                     cursor.execute("UPDATE products SET current_stock = current_stock - ? WHERE id = ?", (item["qty"], item["barcode"]))
+
+            # Save Split Payments (Always Cash now)
+            cursor.execute("""
+                INSERT INTO sale_payments (sale_id, payment_method, amount)
+                VALUES (?, ?, ?)
+            """, (sale_id, "Cash", amount_paid))
 
             conn.commit()
             conn.close()
@@ -619,7 +644,7 @@ class POSModule(QWidget):
 class CheckoutDialog(QDialog):
     def __init__(self, total, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Checkout")
+        self.setWindowTitle("Checkout (Cash Only)")
         self.setMinimumWidth(400)
         self.total = total
         self.setup_ui()
@@ -635,10 +660,11 @@ class CheckoutDialog(QDialog):
         form.setLabelAlignment(Qt.AlignRight)
         
         self.amount_paid_input = QLineEdit()
+        self.amount_paid_input.setPlaceholderText("Enter Amount Received")
         self.amount_paid_input.setMinimumHeight(60)
         self.amount_paid_input.setStyleSheet("font-size: 28px; font-weight: bold; color: #1E293B;")
         
-        lbl_paid = QLabel("Amount Paid (₱):")
+        lbl_paid = QLabel("Cash Received (₱):")
         lbl_paid.setStyleSheet("font-size: 18px; font-weight: bold;")
         form.addRow(lbl_paid, self.amount_paid_input)
         layout.addLayout(form)
@@ -662,9 +688,9 @@ class CheckoutDialog(QDialog):
         self.customer_widget.setVisible(False)
         layout.addWidget(self.customer_widget)
 
-        self.amount_paid_input.textChanged.connect(self.check_balance)
+        self.amount_paid_input.textChanged.connect(self.calculate_change)
 
-        self.btn_confirm = QPushButton("Confirm Payment")
+        self.btn_confirm = QPushButton("Confirm Payment (Enter)")
         self.btn_confirm.setMinimumHeight(60)
         self.btn_confirm.setStyleSheet("""
             QPushButton {
@@ -677,11 +703,14 @@ class CheckoutDialog(QDialog):
             QPushButton:hover { background-color: #059669; }
         """)
         self.btn_confirm.clicked.connect(self.accept)
+        self.btn_confirm.setDefault(True)
         layout.addWidget(self.btn_confirm)
 
-    def check_balance(self):
+    def calculate_change(self):
         try:
-            paid = float(self.amount_paid_input.text())
+            val_str = self.amount_paid_input.text().replace(',', '')
+            paid = float(val_str)
+            
             if paid < self.total:
                 self.customer_widget.setVisible(True)
                 self.lbl_change.setVisible(False)
@@ -689,14 +718,14 @@ class CheckoutDialog(QDialog):
                 self.customer_widget.setVisible(False)
                 change = paid - self.total
                 self.lbl_change.setText(f"Change: ₱{change:,.2f}")
-                self.lbl_change.setVisible(True)
+                self.lbl_change.setVisible(True if change > 0.001 else False)
         except ValueError:
             self.customer_widget.setVisible(False)
             self.lbl_change.setVisible(False)
 
     def get_data(self):
         try:
-            paid = float(self.amount_paid_input.text())
+            paid = float(self.amount_paid_input.text().replace(',', ''))
         except ValueError:
             paid = 0.0
 
@@ -725,7 +754,7 @@ class AddToCartDialog(QDialog):
         layout.addWidget(lbl)
         
         stock_color = "#10b981" if stock > 0 else "#ef4444"
-        stock_lbl = QLabel(f"System Stock: {int(stock)} units")
+        stock_lbl = QLabel(f"System Stock: {int(stock):,d} units")
         stock_lbl.setStyleSheet(f"color: {stock_color}; font-size: 14px; font-weight: bold; margin-bottom: 15px;")
         layout.addWidget(stock_lbl)
         
@@ -745,7 +774,7 @@ class AddToCartDialog(QDialog):
         lbl_q.setStyleSheet("font-size: 16px; font-weight: bold;")
         form.addRow(lbl_q, self.inp_qty)
         
-        self.inp_price = QLineEdit(f"{price:.2f}")
+        self.inp_price = QLineEdit(f"{price:,.2f}")
         self.inp_price.setMinimumHeight(50)
         self.inp_price.setStyleSheet("font-size: 22px; font-weight: bold;")
         

@@ -24,35 +24,35 @@ class InventoryModule(QWidget):
         self.btn_stock_in.setMinimumHeight(45)
         self.btn_stock_in.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.btn_stock_in.clicked.connect(self.show_stock_in_dialog)
-        QShortcut(QKeySequence("Ctrl+I"), self).activated.connect(self.show_stock_in_dialog)
+        QShortcut(QKeySequence("Ctrl+I"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.show_stock_in_dialog)
         top_layout.addWidget(self.btn_stock_in)
 
         self.btn_stock_out = QPushButton("Stock Out (Ctrl+O)")
         self.btn_stock_out.setMinimumHeight(45)
         self.btn_stock_out.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.btn_stock_out.clicked.connect(self.show_stock_out_dialog)
-        QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self.show_stock_out_dialog)
+        QShortcut(QKeySequence("Ctrl+O"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.show_stock_out_dialog)
         top_layout.addWidget(self.btn_stock_out)
 
         self.btn_edit_product = QPushButton("Edit Product (Ctrl+E)")
         self.btn_edit_product.setMinimumHeight(45)
         self.btn_edit_product.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.btn_edit_product.clicked.connect(self.show_edit_dialog)
-        QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self.show_edit_dialog)
+        QShortcut(QKeySequence("Ctrl+E"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.show_edit_dialog)
         top_layout.addWidget(self.btn_edit_product)
 
         self.btn_stock_adj = QPushButton("Stock Adjustment (Ctrl+A)")
         self.btn_stock_adj.setMinimumHeight(45)
         self.btn_stock_adj.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.btn_stock_adj.clicked.connect(self.show_adjustment_dialog)
-        QShortcut(QKeySequence("Ctrl+A"), self).activated.connect(self.show_adjustment_dialog)
+        QShortcut(QKeySequence("Ctrl+A"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.show_adjustment_dialog)
         top_layout.addWidget(self.btn_stock_adj)
 
         self.btn_delete_product = QPushButton("Delete Product (Del)")
         self.btn_delete_product.setMinimumHeight(45)
         self.btn_delete_product.setStyleSheet("font-size: 14px; font-weight: bold; color: #ef4444;")
         self.btn_delete_product.clicked.connect(self.delete_product)
-        QShortcut(QKeySequence(Qt.Key_Delete), self).activated.connect(self.delete_product)
+        QShortcut(QKeySequence(Qt.Key_Delete), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.delete_product)
         top_layout.addWidget(self.btn_delete_product)
 
         layout.addLayout(top_layout)
@@ -100,7 +100,7 @@ class InventoryModule(QWidget):
 
         self.btn_refresh = QPushButton("Refresh (Ctrl+R)")
         self.btn_refresh.clicked.connect(self.refresh_all)
-        QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.refresh_all)
+        QShortcut(QKeySequence("Ctrl+R"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.refresh_all)
         layout.addWidget(self.btn_refresh)
 
         self.load_inventory()
@@ -144,7 +144,7 @@ class InventoryModule(QWidget):
             self.inventory_table.setItem(i, 0, QTableWidgetItem(str(row[0])))
             self.inventory_table.setItem(i, 1, QTableWidgetItem(str(row[1])))
             self.inventory_table.setItem(i, 2, QTableWidgetItem(f"₱{row[2]:,.2f}"))
-            self.inventory_table.setItem(i, 3, QTableWidgetItem(f"{int(row[3])}"))
+            self.inventory_table.setItem(i, 3, QTableWidgetItem(f"{int(row[3]):,d}"))
             self.inventory_table.setItem(i, 4, QTableWidgetItem(str(row[4]) if row[4] else "N/A"))
 
         # Update Pagination UI
@@ -309,7 +309,7 @@ class InventoryModule(QWidget):
                 conn.commit()
                 conn.close()
                 
-                QMessageBox.information(self, "Success", f"Stock adjusted. New levels set to {int(physical_count)}.")
+                QMessageBox.information(self, "Success", f"Stock adjusted. New levels set to {int(physical_count):,d}.")
         
         conn.close()
         self.load_inventory()
