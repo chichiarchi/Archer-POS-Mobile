@@ -64,6 +64,7 @@ def init_db():
             amount_paid REAL NOT NULL,
             balance_due REAL NOT NULL,
             customer_id INTEGER,
+            voided INTEGER DEFAULT 0, -- 0 = Active, 1 = Voided
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(customer_id) REFERENCES customers(id)
         )
@@ -113,6 +114,29 @@ def init_db():
             value TEXT
         )
     """)
+
+    # Create Parked Sales Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS parked_sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT, -- Customer Reference
+            cart_data TEXT NOT NULL, -- JSON serialized list
+            total REAL NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create Sale Payments Table (for split tenders)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sale_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            payment_method TEXT NOT NULL,
+            amount REAL NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(sale_id) REFERENCES sales(id)
+        )
+    """)
     
     # Initialize default settings
     default_settings = {
@@ -133,6 +157,11 @@ def init_db():
 
     # Migrations for new columns
     pass
+
+    try:
+        cursor.execute("ALTER TABLE sales ADD COLUMN voided INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
 
     try:
         cursor.execute("ALTER TABLE products ADD COLUMN current_stock REAL DEFAULT 0")

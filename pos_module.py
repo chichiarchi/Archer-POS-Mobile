@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QStringListModel, QTimer
 import time
+import json
 from PySide6.QtGui import QKeySequence, QShortcut
 import database
 import printer_helper
@@ -127,6 +128,30 @@ class POSModule(QWidget):
 
         layout.addLayout(bottom_layout)
 
+        # Bottom Bar 2: Advanced Actions
+        adv_layout = QHBoxLayout()
+        
+        self.btn_park = QPushButton("Park Sale (F6)")
+        self.btn_park.setStyleSheet("background-color: #64748B; color: white; font-weight: bold; padding: 10px;")
+        self.btn_park.clicked.connect(self.park_sale)
+        QShortcut(QKeySequence("F6"), self).activated.connect(self.park_sale)
+        adv_layout.addWidget(self.btn_park)
+
+        self.btn_recall = QPushButton("Recall Sale (F7)")
+        self.btn_recall.setStyleSheet("background-color: #64748B; color: white; font-weight: bold; padding: 10px;")
+        self.btn_recall.clicked.connect(self.recall_sale)
+        QShortcut(QKeySequence("F7"), self).activated.connect(self.recall_sale)
+        adv_layout.addWidget(self.btn_recall)
+
+        adv_layout.addStretch()
+
+        self.btn_void_cart = QPushButton("Void Current Cart")
+        self.btn_void_cart.setStyleSheet("background-color: #EF4444; color: white; font-weight: bold; padding: 10px;")
+        self.btn_void_cart.clicked.connect(self.void_current_cart)
+        adv_layout.addWidget(self.btn_void_cart)
+
+        layout.addLayout(adv_layout)
+
         # Global Search Focus
         QShortcut(QKeySequence("F4"), self).activated.connect(self.search_input.setFocus)
 
@@ -199,41 +224,51 @@ class POSModule(QWidget):
             if product:
                 p_id, p_name, p_price, current_stock = product
                 
-                # Popup confirmation dialog with stock warning
-                dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, int(current_stock), self)
-                if dialog.exec():
-                    final_qty, final_price = dialog.get_data()
-                    
-                    if final_qty <= 0:
+                # RAPID SCAN MODE: 
+                # If quantity is 1 and price is not being overridden via barcode syntax, add immediately.
+                is_manual_multiplier = '*' in text
+                
+                if not is_manual_multiplier and current_stock > 0:
+                    final_qty = 1.0
+                    final_price = p_price
+                else:
+                    # Popup confirmation dialog with stock warning
+                    dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, int(current_stock), self)
+                    if dialog.exec():
+                        final_qty, final_price = dialog.get_data()
+                    else:
                         return
-                    
-                    # Soft Warning for negative stock - Only if stock management is enabled
-                    if not database.is_stock_management_disabled() and current_stock <= 0:
-                        reply = QMessageBox.warning(
-                            self, "Stock Warning", 
-                            f"System shows 0 stock for '{p_name}', but item is available physically. Proceed with sale?",
-                            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-                        )
-                        if reply == QMessageBox.No:
-                            return
 
-                    # If price is changed, require admin
-                    if abs(final_price - p_price) > 0.001:
-                        if not self.verify_admin():
-                            return
+                if final_qty <= 0:
+                    return
+                
+                # Soft Warning for negative stock - Only if stock management is enabled
+                if not database.is_stock_management_disabled() and current_stock <= 0:
+                    reply = QMessageBox.warning(
+                        self, "Stock Warning", 
+                        f"System shows 0 stock for '{p_name}', but item is available physically. Proceed with sale?",
+                        QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+                    )
+                    if reply == QMessageBox.No:
+                        return
 
-                    # Check if already in cart with exact same price
-                    merged = False
-                    for item in self.cart:
-                        if item["barcode"] == p_id and abs(item["price"] - final_price) < 0.001:
-                            item["qty"] += final_qty
-                            merged = True
-                            break
+                # If price is changed, require admin
+                if abs(final_price - p_price) > 0.001:
+                    if not self.verify_admin():
+                        return
 
-                    if not merged:
-                        self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
-                    
-                    self.update_cart_display()
+                # Check if already in cart with exact same price
+                merged = False
+                for item in self.cart:
+                    if item["barcode"] == p_id and abs(item["price"] - final_price) < 0.001:
+                        item["qty"] += final_qty
+                        merged = True
+                        break
+
+                if not merged:
+                    self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
+                
+                self.update_cart_display()
             else:
                 # Prompt to add new product
                 reply = QMessageBox.question(
@@ -311,6 +346,92 @@ class POSModule(QWidget):
             total += item["price"] * item["qty"]
 
         self.total_label.setText(f"Total: ₱{total:,.2f}")
+
+    def park_sale(self):
+        if not self.cart:
+            return
+            
+        label, ok = QInputDialog.getText(self, "Park Sale", "Enter Customer Label/Reference (e.g., Table 5, Name):")
+        if not ok:
+            return
+            
+        total = sum(item["price"] * item["qty"] for item in self.cart)
+        cart_json = json.dumps(self.cart)
+        
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO parked_sales (label, cart_data, total) VALUES (?, ?, ?)", (label or "No Label", cart_json, total))
+        conn.commit()
+        conn.close()
+        
+        self.cart.clear()
+        self.update_cart_display()
+        QMessageBox.information(self, "Sale Parked", f"Sale for '{label or 'No Label'}' has been parked.")
+        self.search_input.setFocus()
+
+    def recall_sale(self):
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, label, cart_data, total, timestamp FROM parked_sales ORDER BY timestamp DESC")
+        parked = cursor.fetchall()
+        conn.close()
+        
+        if not parked:
+            QMessageBox.information(self, "No Parked Sales", "There are no parked sales to recall.")
+            return
+            
+        items = [f"Ref: {p[1]} - Total: ₱{p[3]:,.2f} ({p[4]})" for p in parked]
+        item_text, ok = QInputDialog.getItem(self, "Recall Sale", "Select a parked sale to recall:", items, 0, False)
+        
+        if ok and item_text:
+            # Extract label and timestamp to find the exact ID
+            selected_parked = next(p for p in parked if f"Ref: {p[1]} - Total: ₱{p[3]:,.2f} ({p[4]})" == item_text)
+            parked_id = selected_parked[0]
+            
+            # If current cart is not empty, ask to merge
+            if self.cart:
+                reply = QMessageBox.question(
+                    self, "Cart Not Empty", 
+                    "The current cart is not empty. Would you like to merge the recalled sale into the current cart?",
+                    QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel, QMessageBox.Yes
+                )
+                if reply == QMessageBox.Cancel:
+                    return
+                if reply == QMessageBox.No:
+                    self.cart.clear()
+
+            recalled_cart = json.loads(selected_parked[2])
+            self.cart.extend(recalled_cart)
+            
+            # Delete from parked_sales
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM parked_sales WHERE id = ?", (parked_id,))
+            conn.commit()
+            conn.close()
+            
+            self.update_cart_display()
+            self.search_input.setFocus()
+
+    def void_current_cart(self):
+        if not self.cart:
+            return
+            
+        if not self.verify_admin():
+            return
+            
+        reply = QMessageBox.question(
+            self, "Confirm Void", 
+            "Are you sure you want to void the ENTIRE current cart?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            details = f"Voided cart with {len(self.cart)} items, Total: {self.total_label.text()}"
+            database.log_action("POS_VOID_CART", details, self.user_role)
+            self.cart.clear()
+            self.update_cart_display()
+            self.search_input.setFocus()
 
     def verify_admin(self):
         if self.user_role == "admin":

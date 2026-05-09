@@ -146,6 +146,11 @@ class LogsModule(QWidget):
         QShortcut(QKeySequence("Ctrl+P"), self).activated.connect(self.reprint_receipt)
         top_layout.addWidget(self.btn_reprint)
         
+        self.btn_void_sale = QPushButton("Void Sale")
+        self.btn_void_sale.setStyleSheet("background-color: #EF4444; color: white; font-weight: bold;")
+        self.btn_void_sale.clicked.connect(self.void_sale)
+        top_layout.addWidget(self.btn_void_sale)
+        
         top_layout.addStretch()
         layout.addLayout(top_layout)
 
@@ -184,10 +189,11 @@ class LogsModule(QWidget):
         conn = database.get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT timestamp, user_id, action, details 
-            FROM audit_logs 
-            WHERE DATE(timestamp) BETWEEN ? AND ?
-            ORDER BY id DESC 
+            SELECT a.timestamp, a.user_id, a.action, a.details, s.voided
+            FROM audit_logs a
+            LEFT JOIN sales s ON (a.details LIKE 'Sale #' || s.id || ' %')
+            WHERE DATE(a.timestamp) BETWEEN ? AND ?
+            ORDER BY a.id DESC 
             LIMIT 500
         """, (date_from_str, date_to_str))
         rows = cursor.fetchall()
@@ -204,6 +210,14 @@ class LogsModule(QWidget):
             self.logs_table.setItem(i, 2, QTableWidgetItem(action_text))
             
             self.logs_table.setItem(i, 3, QTableWidgetItem(str(row[3]) if row[3] else ""))
+
+            # visual feedback for voided sales
+            if row[4] == 1: # Voided
+                for col in range(4):
+                    self.logs_table.item(i, col).setForeground(Qt.red)
+                    font = self.logs_table.item(i, col).font()
+                    font.setStrikeOut(True)
+                    self.logs_table.item(i, col).setFont(font)
 
     def reprint_receipt(self):
         current_row = self.logs_table.currentRow()
@@ -275,3 +289,82 @@ class LogsModule(QWidget):
                 QMessageBox.information(self, "Success", "Receipt reprinted successfully.")
             else:
                 QMessageBox.warning(self, "Printer Error", "Printer Not Detected or Failed to Print.\nPlease check settings and connections.")
+
+    def void_sale(self):
+        current_row = self.logs_table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "Selection Required", "Please select a sale log entry first.")
+            return
+
+        action = self.logs_table.item(current_row, 2).text()
+        if action != "POS SALE":
+            QMessageBox.warning(self, "Invalid Selection", "Only sales can be voided.")
+            return
+
+        details = self.logs_table.item(current_row, 3).text()
+        try:
+            sale_id = int(details.split("Sale #")[1].split(" ")[0].strip())
+        except:
+            QMessageBox.critical(self, "Error", "Could not determine Sale ID.")
+            return
+
+        # Verification
+        if self.user_role != "admin":
+            from PySide6.QtWidgets import QInputDialog, QLineEdit
+            password, ok = QInputDialog.getText(self, "Admin Required", "Enter Admin Password to Void Sale:", QLineEdit.Password)
+            if not ok or not password:
+                return
+            user_data = database.verify_login("admin", password)
+            if not user_data:
+                QMessageBox.warning(self, "Access Denied", "Invalid Admin Password")
+                return
+
+        reply = QMessageBox.question(
+            self, "Confirm Void Sale", 
+            f"Are you sure you want to VOID Sale #{sale_id}?\nThis will reverse the inventory and mark the sale as inactive.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            
+            # Check if already voided
+            cursor.execute("SELECT voided FROM sales WHERE id = ?", (sale_id,))
+            res = cursor.fetchone()
+            if res and res[0] == 1:
+                conn.close()
+                QMessageBox.warning(self, "Already Voided", "This sale has already been voided.")
+                return
+
+            try:
+                # 1. Mark Sale as voided
+                cursor.execute("UPDATE sales SET voided = 1 WHERE id = ?", (sale_id,))
+                
+                # 2. Get Items to reverse inventory
+                cursor.execute("SELECT product_id, quantity FROM sale_items WHERE sale_id = ?", (sale_id,))
+                items = cursor.fetchall()
+                
+                for p_id, qty in items:
+                    # Insert 'IN' transaction to reverse the 'OUT'
+                    cursor.execute("""
+                        INSERT INTO inventory (product_id, quantity, type, timestamp)
+                        VALUES (?, ?, 'IN', datetime('now', '+8 hours'))
+                    """, (p_id, qty))
+                    
+                    # Update stock cache
+                    cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (qty, p_id))
+                
+                # 3. Handle Debtors if any
+                cursor.execute("DELETE FROM debtors WHERE sale_id = ?", (sale_id,))
+                
+                conn.commit()
+                database.log_action("VOID_SALE", f"Voided Sale #{sale_id} and reversed inventory", self.user_role)
+                QMessageBox.information(self, "Success", f"Sale #{sale_id} has been voided successfully.")
+                self.load_logs()
+                
+            except Exception as e:
+                conn.rollback()
+                QMessageBox.critical(self, "Error", f"Failed to void sale: {e}")
+            finally:
+                conn.close()
