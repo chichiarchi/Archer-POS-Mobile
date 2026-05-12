@@ -124,11 +124,11 @@ class DashboardModule(QWidget):
         today = datetime.now().strftime('%Y-%m-%d')
 
         # 1. Today's Sales (Total amount sold today in local time)
-        # Assuming CURRENT_TIMESTAMP is UTC, we offset by +8 hours for PH time
+        # Note: timestamp is already stored in local time (+8 hours)
         cursor.execute("""
             SELECT SUM(total_amount) 
             FROM sales 
-            WHERE date(timestamp, '+8 hours') = ?
+            WHERE date(timestamp) = ? AND voided = 0
         """, (today,))
         sales_today = cursor.fetchone()[0] or 0.0
         
@@ -136,7 +136,7 @@ class DashboardModule(QWidget):
         cursor.execute("""
             SELECT COUNT(*) 
             FROM sales 
-            WHERE date(timestamp, '+8 hours') = ?
+            WHERE date(timestamp) = ? AND voided = 0
         """, (today,))
         trans_today = cursor.fetchone()[0] or 0
         
