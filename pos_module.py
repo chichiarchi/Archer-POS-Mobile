@@ -75,12 +75,12 @@ class POSModule(QWidget):
         QShortcut(QKeySequence("Ctrl+Q"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.change_qty)
         btn_layout.addWidget(self.btn_qty)
 
-        self.btn_delete = QPushButton("Delete Item (Ctrl+Del)")
+        self.btn_delete = QPushButton("Delete Item (Del)")
         self.btn_delete.setMinimumHeight(45)
         self.btn_delete.setStyleSheet("font-size: 15px; font-weight: bold;")
         self.btn_delete.clicked.connect(self.delete_item)
         self.btn_delete.installEventFilter(self)
-        QShortcut(QKeySequence("Ctrl+Del"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.delete_item)
+        QShortcut(QKeySequence(Qt.Key_Delete), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.delete_item)
         btn_layout.addWidget(self.btn_delete)
 
         self.btn_discount = QPushButton("Discount (Ctrl+D)")
@@ -500,14 +500,11 @@ class POSModule(QWidget):
         if not self.verify_admin():
             return
 
-        discount, ok = QInputDialog.getDouble(self, "Discount", "Enter New Price:", 0.0, 0, 100000)
-        if ok:
-            self.cart[current_row]["price"] = discount
-            database.log_action("POS_DISCOUNT", f"Discounted {self.cart[current_row]['name']} to ₱{discount:,.2f}", self.user_role)
-            self.update_cart_display()
-
-            # Clear Cart
-            self.cart.clear()
+        dialog = DiscountDialog(self.cart[current_row]["name"], self.cart[current_row]["price"], self)
+        if dialog.exec():
+            new_price = dialog.get_price()
+            self.cart[current_row]["price"] = new_price
+            database.log_action("POS_DISCOUNT", f"Discounted {self.cart[current_row]['name']} to ₱{new_price:,.2f}", self.user_role)
             self.update_cart_display()
             self.search_input.setFocus()
 
@@ -680,6 +677,7 @@ class CheckoutDialog(QDialog):
         layout.addWidget(self.customer_widget)
 
         self.amount_paid_input.textChanged.connect(self.calculate_change)
+        self.amount_paid_input.textEdited.connect(self.format_cash_input)
 
         self.btn_confirm = QPushButton("Confirm Payment (Enter)")
         self.btn_confirm.setMinimumHeight(60)
@@ -713,6 +711,42 @@ class CheckoutDialog(QDialog):
         except ValueError:
             self.customer_widget.setVisible(False)
             self.lbl_change.setVisible(False)
+
+    def format_cash_input(self, text):
+        # Save cursor position and text
+        line_edit = self.sender()
+        if not isinstance(line_edit, QLineEdit):
+            return
+            
+        pos = line_edit.cursorPosition()
+        old_text = line_edit.text()
+        
+        # Remove commas for processing
+        raw_val = text.replace(',', '')
+        if not raw_val:
+            return
+
+        try:
+            # Handle decimal parts
+            if '.' in raw_val:
+                parts = raw_val.split('.')
+                whole = parts[0]
+                decimal = ".".join(parts[1:]) # Handle multiple dots just in case
+                if whole:
+                    formatted = f"{int(whole):,}" + "." + decimal
+                else:
+                    formatted = "0." + decimal
+            else:
+                formatted = f"{int(raw_val):,}"
+            
+            # Update text only if changed to avoid recursion/jitter
+            if formatted != old_text:
+                line_edit.setText(formatted)
+                # Adjust cursor position
+                new_pos = pos + (len(formatted) - len(old_text))
+                line_edit.setCursorPosition(max(0, new_pos))
+        except ValueError:
+            pass
 
     def get_data(self):
         try:
@@ -761,6 +795,7 @@ class AddToCartDialog(QDialog):
         self.inp_price = QLineEdit(f"{price:,.2f}")
         self.inp_price.setMinimumHeight(50)
         self.inp_price.setStyleSheet("font-size: 22px; font-weight: bold;")
+        self.inp_price.textEdited.connect(self.format_cash_input)
         
         lbl_p = QLabel("Custom Price (₱):")
         lbl_p.setStyleSheet("font-size: 16px; font-weight: bold;")
@@ -786,6 +821,28 @@ class AddToCartDialog(QDialog):
         btn_confirm.setDefault(True)
         layout.addWidget(btn_confirm)
 
+    def format_cash_input(self, text):
+        line_edit = self.sender()
+        if not isinstance(line_edit, QLineEdit):
+            return
+        pos = line_edit.cursorPosition()
+        old_text = line_edit.text()
+        raw_val = text.replace(',', '')
+        if not raw_val: return
+        try:
+            if '.' in raw_val:
+                parts = raw_val.split('.')
+                whole = parts[0]
+                decimal = ".".join(parts[1:])
+                formatted = (f"{int(whole):,}" if whole else "0") + "." + decimal
+            else:
+                formatted = f"{int(raw_val):,}"
+            if formatted != old_text:
+                line_edit.setText(formatted)
+                new_pos = pos + (len(formatted) - len(old_text))
+                line_edit.setCursorPosition(max(0, new_pos))
+        except ValueError: pass
+
     def get_data(self):
         try:
             qty = self.inp_qty.value()
@@ -793,3 +850,69 @@ class AddToCartDialog(QDialog):
             return qty, price
         except:
             return 0, 0.0
+
+class DiscountDialog(QDialog):
+    def __init__(self, product_name, current_price, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Apply Discount")
+        self.setMinimumWidth(350)
+        self.setup_ui(product_name, current_price)
+
+    def setup_ui(self, name, price):
+        layout = QVBoxLayout(self)
+        
+        lbl = QLabel(f"Item: {name}")
+        lbl.setStyleSheet("font-size: 18px; font-weight: bold; color: #1E293B;")
+        layout.addWidget(lbl)
+        
+        form = QFormLayout()
+        self.inp_price = QLineEdit(f"{price:,.2f}")
+        self.inp_price.setMinimumHeight(50)
+        self.inp_price.setStyleSheet("font-size: 22px; font-weight: bold;")
+        self.inp_price.textEdited.connect(self.format_cash_input)
+        
+        lbl_p = QLabel("New Price (₱):")
+        lbl_p.setStyleSheet("font-size: 16px; font-weight: bold;")
+        form.addRow(lbl_p, self.inp_price)
+        layout.addLayout(form)
+        
+        btn_confirm = QPushButton("Apply Discount (Enter)")
+        btn_confirm.setMinimumHeight(50)
+        btn_confirm.setStyleSheet("""
+            QPushButton {
+                background-color: #0072FF;
+                color: white;
+                font-weight: bold;
+                border-radius: 6px;
+            }
+            QPushButton:hover { background-color: #005F99; }
+        """)
+        btn_confirm.clicked.connect(self.accept)
+        btn_confirm.setDefault(True)
+        layout.addWidget(btn_confirm)
+
+    def format_cash_input(self, text):
+        line_edit = self.sender()
+        if not isinstance(line_edit, QLineEdit): return
+        pos = line_edit.cursorPosition()
+        old_text = line_edit.text()
+        raw_val = text.replace(',', '')
+        if not raw_val: return
+        try:
+            if '.' in raw_val:
+                parts = raw_val.split('.')
+                whole, decimal = parts[0], ".".join(parts[1:])
+                formatted = (f"{int(whole):,}" if whole else "0") + "." + decimal
+            else:
+                formatted = f"{int(raw_val):,}"
+            if formatted != old_text:
+                line_edit.setText(formatted)
+                new_pos = pos + (len(formatted) - len(old_text))
+                line_edit.setCursorPosition(max(0, new_pos))
+        except ValueError: pass
+
+    def get_price(self):
+        try:
+            return float(self.inp_price.text().replace(',', ''))
+        except:
+            return 0.0

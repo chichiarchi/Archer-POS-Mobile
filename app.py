@@ -1,6 +1,8 @@
 import sys
 import os
+# pyrefly: ignore [missing-import]
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
+# pyrefly: ignore [missing-import]
 from PySide6.QtGui import QShortcut, QKeySequence, QIcon
 import database
 from pos_module import POSModule

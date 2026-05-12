@@ -1,9 +1,12 @@
+# pyrefly: ignore [missing-import]
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView, 
     QPushButton, QHBoxLayout, QMessageBox, QInputDialog, QLabel,
     QDialog, QFormLayout, QLineEdit
 )
+# pyrefly: ignore [missing-import]
 from PySide6.QtGui import QShortcut, QKeySequence, QFont
+# pyrefly: ignore [missing-import]
 from PySide6.QtCore import Qt
 import database
 
@@ -111,7 +114,8 @@ class BalanceModule(QWidget):
         if dialog.exec():
             amount = dialog.get_amount()
             if amount > 0:
-                new_bal = current_bal - amount
+                new_bal = max(0, current_bal - amount)
+                change = max(0, amount - current_bal)
 
                 conn = database.get_connection()
                 cursor = conn.cursor()
@@ -119,11 +123,13 @@ class BalanceModule(QWidget):
                 # Update debtors table
                 cursor.execute("UPDATE debtors SET balance_amount = ? WHERE id = ?", (new_bal, debtor_id))
 
-                # Update sales table directly linking to this sale
+                # Update sales table
                 cursor.execute("SELECT amount_paid FROM sales WHERE id=?", (sale_id,))
                 sale = cursor.fetchone()
                 if sale:
-                    new_paid = sale[0] + amount
+                    # Only add what was actually owed to the paid amount, or handle change
+                    actual_payment = min(amount, current_bal)
+                    new_paid = sale[0] + actual_payment
                     cursor.execute("""
                         UPDATE sales SET amount_paid = ?, balance_due = ? WHERE id = ?
                     """, (new_paid, new_bal, sale_id))
@@ -132,10 +138,18 @@ class BalanceModule(QWidget):
                 conn.close()
 
                 # Logging
-                database.log_action("BALANCE_RESOLVE", f"Collected ₱{amount:,.2f} from {cust_name} (Debt ID: {debtor_id}). Remaining: ₱{new_bal:,.2f}", self.user_role)
+                log_msg = f"Collected ₱{amount:,.2f} from {cust_name} (Debt ID: {debtor_id})."
+                if change > 0:
+                    log_msg += f" Overpayment: ₱{change:,.2f} returned as change."
+                log_msg += f" Remaining Balance: ₱{new_bal:,.2f}"
+                database.log_action("BALANCE_RESOLVE", log_msg, self.user_role)
 
                 # BIG SUCCESS MESSAGE
-                msg = f"Payment Successful!\nRemaining Balance: ₱{new_bal:,.2f}"
+                msg = f"Payment Successful!\n"
+                if change > 0:
+                    msg += f"Change: ₱{change:,.2f}\n"
+                msg += f"Remaining Balance: ₱{new_bal:,.2f}"
+                
                 success_box = QMessageBox(self)
                 success_box.setWindowTitle("Success")
                 success_box.setText(msg)
@@ -182,8 +196,9 @@ class ResolveBalanceDialog(QDialog):
         form = QFormLayout()
         form.setSpacing(15)
         
-        self.amount_input = QLineEdit(f"{balance:.2f}")
+        self.amount_input = QLineEdit(f"{balance:,.2f}")
         self.amount_input.setMinimumHeight(70)
+        self.amount_input.textEdited.connect(self.format_cash_input)
         self.amount_input.setStyleSheet("""
             font-size: 36px; 
             font-weight: bold; 
@@ -197,6 +212,14 @@ class ResolveBalanceDialog(QDialog):
         lbl_pay.setStyleSheet("font-size: 20px; font-weight: bold; color: #475569;")
         form.addRow(lbl_pay, self.amount_input)
         layout.addLayout(form)
+
+        # Reactive Change Label
+        self.lbl_change = QLabel("Change: ₱0.00")
+        self.lbl_change.setStyleSheet("font-size: 24px; font-weight: 900; color: #10B981; background-color: #F0FDF4; padding: 10px; border-radius: 8px;")
+        self.lbl_change.setVisible(False)
+        layout.addWidget(self.lbl_change)
+
+        self.amount_input.textChanged.connect(self.update_change_label)
         
         self.btn_confirm = QPushButton("Confirm Payment (Enter)")
         self.btn_confirm.setMinimumHeight(70)
@@ -215,8 +238,37 @@ class ResolveBalanceDialog(QDialog):
         self.btn_confirm.setDefault(True)
         layout.addWidget(self.btn_confirm)
 
+    def format_cash_input(self, text):
+        line_edit = self.sender()
+        if not isinstance(line_edit, QLineEdit): return
+        pos = line_edit.cursorPosition()
+        old_text = line_edit.text()
+        raw_val = text.replace(',', '')
+        if not raw_val: return
+        try:
+            if '.' in raw_val:
+                parts = raw_val.split('.')
+                whole, decimal = parts[0], ".".join(parts[1:])
+                formatted = (f"{int(whole):,}" if whole else "0") + "." + decimal
+            else:
+                formatted = f"{int(raw_val):,}"
+            if formatted != old_text:
+                line_edit.setText(formatted)
+                new_pos = pos + (len(formatted) - len(old_text))
+                line_edit.setCursorPosition(max(0, new_pos))
+        except ValueError: pass
+
+    def update_change_label(self):
+        amount = self.get_amount()
+        if amount > self.current_bal:
+            change = amount - self.current_bal
+            self.lbl_change.setText(f"Change: ₱{change:,.2f}")
+            self.lbl_change.setVisible(True)
+        else:
+            self.lbl_change.setVisible(False)
+
     def get_amount(self):
         try:
-            return float(self.amount_input.text())
+            return float(self.amount_input.text().replace(',', ''))
         except ValueError:
             return 0.0

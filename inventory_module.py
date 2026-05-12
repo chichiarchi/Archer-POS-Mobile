@@ -318,6 +318,7 @@ class StockInDialog(QDialog):
         self.inp_barcode.textChanged.connect(self.check_existing_product)
         self.inp_name = QLineEdit()
         self.inp_sell = QLineEdit()
+        self.inp_sell.textEdited.connect(self.format_cash_input)
         self.inp_category = QLineEdit()
 
         form.addRow("Barcode / ID:", self.inp_barcode)
@@ -330,6 +331,26 @@ class StockInDialog(QDialog):
         btn_save = QPushButton("Save Product")
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
+
+    def format_cash_input(self, text):
+        line_edit = self.sender()
+        if not isinstance(line_edit, QLineEdit): return
+        pos = line_edit.cursorPosition()
+        old_text = line_edit.text()
+        raw_val = text.replace(',', '')
+        if not raw_val: return
+        try:
+            if '.' in raw_val:
+                parts = raw_val.split('.')
+                whole, decimal = parts[0], ".".join(parts[1:])
+                formatted = (f"{int(whole):,}" if whole else "0") + "." + decimal
+            else:
+                formatted = f"{int(raw_val):,}"
+            if formatted != old_text:
+                line_edit.setText(formatted)
+                new_pos = pos + (len(formatted) - len(old_text))
+                line_edit.setCursorPosition(max(0, new_pos))
+        except ValueError: pass
 
     def check_existing_product(self, barcode):
         barcode = barcode.strip()
@@ -355,7 +376,7 @@ class StockInDialog(QDialog):
             "barcode": self.inp_barcode.text().strip(),
             "name": self.inp_name.text().strip() or "Unnamed",
             "category": self.inp_category.text().strip() or "General",
-            "sell_price": float(self.inp_sell.text().strip() or 0.0)
+            "sell_price": float(self.inp_sell.text().replace(',', '').strip() or 0.0)
         }
 
 
@@ -375,7 +396,8 @@ class EditProductDialog(QDialog):
 
         self.inp_name = QLineEdit(name)
         self.inp_category = QLineEdit(category if category else "")
-        self.inp_sell = QLineEdit(str(sell_price if sell_price else 0.0))
+        self.inp_sell = QLineEdit(f"{sell_price:,.2f}")
+        self.inp_sell.textEdited.connect(self.format_cash_input)
 
         form.addRow("Barcode / ID:", QLabel(self.barcode))
         form.addRow("Product Name:", self.inp_name)
@@ -388,9 +410,29 @@ class EditProductDialog(QDialog):
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
 
+    def format_cash_input(self, text):
+        line_edit = self.sender()
+        if not isinstance(line_edit, QLineEdit): return
+        pos = line_edit.cursorPosition()
+        old_text = line_edit.text()
+        raw_val = text.replace(',', '')
+        if not raw_val: return
+        try:
+            if '.' in raw_val:
+                parts = raw_val.split('.')
+                whole, decimal = parts[0], ".".join(parts[1:])
+                formatted = (f"{int(whole):,}" if whole else "0") + "." + decimal
+            else:
+                formatted = f"{int(raw_val):,}"
+            if formatted != old_text:
+                line_edit.setText(formatted)
+                new_pos = pos + (len(formatted) - len(old_text))
+                line_edit.setCursorPosition(max(0, new_pos))
+        except ValueError: pass
+
     def get_data(self):
         return {
             "name": self.inp_name.text().strip() or "Unnamed",
             "category": self.inp_category.text().strip() or "General",
-            "sell_price": float(self.inp_sell.text().strip() or 0.0),
+            "sell_price": float(self.inp_sell.text().replace(',', '').strip() or 0.0),
         }
