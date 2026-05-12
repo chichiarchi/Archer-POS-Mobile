@@ -2,11 +2,13 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QLabel, QMessageBox, QLineEdit, QFrame, QScrollArea
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon
 import database
 
 class AccountModule(QWidget):
+    logout_requested = Signal()
+
     def __init__(self, username):
         super().__init__()
         self.username = username
@@ -86,6 +88,29 @@ class AccountModule(QWidget):
         profile_layout.addLayout(user_info_layout)
         
         content_container.addWidget(profile_card)
+
+        # Logout Button Section
+        logout_btn = QPushButton("Logout from System")
+        logout_btn.setCursor(Qt.PointingHandCursor)
+        logout_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #EF4444;
+                color: white;
+                font-size: 15px;
+                font-weight: 700;
+                padding: 14px;
+                border: none;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #DC2626;
+            }
+            QPushButton:pressed {
+                background-color: #B91C1C;
+            }
+        """)
+        logout_btn.clicked.connect(self.logout_requested.emit)
+        content_container.addWidget(logout_btn)
 
         # Password Change Section
         pwd_container = QFrame()
@@ -189,6 +214,10 @@ class AccountModule(QWidget):
 
         if new_pwd != confirm_pwd:
             QMessageBox.warning(self, "Validation Error", "The new passwords do not match. Please try again.")
+            return
+
+        if len(new_pwd) < 6:
+            QMessageBox.warning(self, "Validation Error", "The new password must be at least 6 characters long.")
             return
 
         # Verify current password

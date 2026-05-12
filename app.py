@@ -1,7 +1,7 @@
 import sys
 import os
 # pyrefly: ignore [missing-import]
-from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget, QMessageBox
 # pyrefly: ignore [missing-import]
 from PySide6.QtGui import QShortcut, QKeySequence, QIcon
 import database
@@ -221,6 +221,7 @@ class ArcherPOS(QMainWindow):
 
         # Tab 6: Account Details
         self.account_tab = AccountModule(self.username)
+        self.account_tab.logout_requested.connect(self.handle_logout)
         self.tabs.addTab(self.account_tab, QIcon(resource_path("archer_logo.png")), "Account Settings (F7)")
 
         # Keyboard shortcuts for Tabs
@@ -250,6 +251,26 @@ class ArcherPOS(QMainWindow):
         elif index == 4:
             self.logs_tab.reset_dates()
             self.logs_tab.load_logs()
+
+    def handle_logout(self):
+        reply = QMessageBox.question(
+            self, "Confirm Logout", "Are you sure you want to logout and return to the login screen?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            try:
+                # Import here to avoid circular import at the top
+                from login import LoginWindow
+                
+                # Create the login window. 
+                # We don't set a parent so it stays open when this window closes.
+                self.login_window = LoginWindow()
+                self.login_window.show()
+                
+                # Close the current window
+                self.close()
+            except Exception as e:
+                QMessageBox.critical(self, "Logout Error", f"An error occurred during logout: {e}")
 
 if __name__ == "__main__":
     database.init_db()

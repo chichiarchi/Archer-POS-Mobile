@@ -176,6 +176,10 @@ class LoginWindow(QWidget):
         if not ok or confirm_password != new_password:
             QMessageBox.critical(self, "Error", "Passwords do not match.")
             return
+
+        if len(new_password) < 6:
+            QMessageBox.warning(self, "Validation Error", "The new password must be at least 6 characters long.")
+            return
             
         if database.update_user_password(username, new_password):
             QMessageBox.information(self, "Success", "Admin password updated successfully! You can now login.")
