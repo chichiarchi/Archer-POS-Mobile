@@ -8,12 +8,23 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QColor
 
 import database
+import os
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Archer POS v2 - Login")
         self.setFixedSize(400, 500)
+        from PySide6.QtGui import QIcon
+        self.setWindowIcon(QIcon(resource_path("archer_logo.png")))
         self.setup_ui()
         
     def setup_ui(self):

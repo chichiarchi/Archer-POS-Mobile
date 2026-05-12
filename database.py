@@ -1,8 +1,17 @@
 import sqlite3
 import hashlib
 import os
+import sys
 
-DB_NAME = "archer_pos.db"
+# Determine the correct path for the database file
+if getattr(sys, 'frozen', False):
+    # If running as a bundled executable, use the folder containing the .exe
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # If running in development, use the current directory
+    BASE_DIR = os.path.abspath(".")
+
+DB_NAME = os.path.join(BASE_DIR, "archer_pos.db")
 
 def get_connection():
     # Added timeout to prevent "Database is locked" errors in the long run
