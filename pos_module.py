@@ -1,10 +1,13 @@
+# pyrefly: ignore [missing-import]
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, 
     QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox, QCheckBox, QComboBox
 )
+# pyrefly: ignore [missing-import]
 from PySide6.QtCore import Qt, QStringListModel, QTimer, QEvent
 import time
 import json
+# pyrefly: ignore [missing-import]
 from PySide6.QtGui import QKeySequence, QShortcut
 import database
 import printer_helper
@@ -23,6 +26,7 @@ class POSModule(QWidget):
         self.installEventFilter(self)
 
     def get_bold_font(self, size):
+        # pyrefly: ignore [missing-import]
         from PySide6.QtGui import QFont
         font = QFont()
         font.setPointSize(size)
@@ -217,12 +221,11 @@ class POSModule(QWidget):
         if not text:
             return
 
-        # self._last_add_time moved to finally block to prevent immediate re-trigger
         self.search_input.setEnabled(False) # BLOCK FURTHER INPUT
         self.search_input.clear()
         
+        is_deferred = False
         try:
-
             qty_to_add = 1.0
             barcode_raw = text.split(" - ")[0].strip()
 
@@ -247,98 +250,116 @@ class POSModule(QWidget):
             try:
                 cursor.execute("SELECT id, name, price FROM products WHERE id=?", (barcode,))
                 product = cursor.fetchone()
-                if product:
-                    p_id, p_name, p_price = product
             finally:
                 conn.close()
 
             if product:
                 p_id, p_name, p_price = product
-                
-                # RAPID SCAN MODE: 
-                # If quantity is 1 and price is not being overridden via barcode syntax, add immediately.
                 is_manual_multiplier = '*' in text
                 
                 if not is_manual_multiplier:
                     final_qty = 1.0
                     final_price = p_price
+                    self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price)
                 else:
-                    # Popup confirmation dialog
-                    dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, self)
-                    if dialog.exec():
-                        final_qty, final_price = dialog.get_data()
-                    else:
-                        return
+                    is_deferred = True
+                    # Defer showing the AddToCartDialog to let key buffers clear
+                    QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add))
+            else:
+                is_deferred = True
+                # Defer prompting the add new product workflow after a 150ms delay.
+                # This delay allows any buffered keys or carriage returns from the barcode scanner
+                # to be fully processed and discarded by the OS before any modal dialogs are presented.
+                QTimer.singleShot(150, lambda: self.prompt_add_new_product(barcode))
 
-                if final_qty <= 0:
+        finally:
+            if not is_deferred:
+                self._last_add_time = time.time() # Update debounce AFTER processing
+                self.search_input.setEnabled(True) # UNBLOCK
+                self.search_input.setFocus()
+                # Ensure input is cleared (handles completer re-fill race condition)
+                QTimer.singleShot(50, self.search_input.clear)
+
+    def prompt_add_new_product(self, barcode):
+        self.search_input.setEnabled(False)
+        try:
+            # Prompt to add new product
+            reply = QMessageBox.question(
+                self, "Product Not Found", 
+                f"Barcode '{barcode}' was not found in the database.\nWould you like to add this as a new product?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                if not self.verify_admin():
                     return
                 
-
-                # If price is changed, require admin
-                if abs(final_price - p_price) > 0.001:
-                    if not self.verify_admin():
-                        return
-
-                # Check if already in cart with exact same price
-                merged = False
-                for item in self.cart:
-                    if item["barcode"] == p_id and abs(item["price"] - final_price) < 0.001:
-                        item["qty"] += final_qty
-                        merged = True
-                        break
-
-                if not merged:
-                    self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
-                
-                self.update_cart_display()
-            else:
-                # Prompt to add new product
-                reply = QMessageBox.question(
-                    self, "Product Not Found", 
-                    f"Barcode '{barcode}' was not found in the database.\nWould you like to add this as a new product?",
-                    QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-                )
-                if reply == QMessageBox.Yes:
-                    if not self.verify_admin():
-                        return
-                    
-                    dialog = StockInDialog(self)
-                    dialog.inp_barcode.setText(barcode)
-                    if dialog.exec():
-                        # The actual saving logic is in InventoryModule, but we can replicate it here 
-                        # or better, just perform the save and refresh.
-                        # Since we want to keep it simple, we'll do the save here.
-                        data = dialog.get_data()
-                        conn = database.get_connection()
+                dialog = StockInDialog(self)
+                dialog.inp_barcode.setText(barcode)
+                if dialog.exec():
+                    data = dialog.get_data()
+                    conn = database.get_connection()
+                    try:
                         cursor = conn.cursor()
                         cursor.execute("""
                             INSERT INTO products (id, name, price, category)
                             VALUES (?, ?, ?, ?)
                         """, (data["barcode"], data["name"], data["sell_price"], data["category"]))
-                        
                         conn.commit()
-                        conn.close()
-                        
-                        database.log_action("PRODUCT_ADDED", f"Quick-added product '{data['name']}' from POS", self.user_role)
-                        self.refresh_completer()
-                        
-                        # Automatically trigger Add to Cart workflow
-                        p_id, p_name, p_price = data["barcode"], data["name"], data["sell_price"]
-                        
-                        dialog_cart = AddToCartDialog(p_name, 1, p_price, self)
-                        if dialog_cart.exec():
-                            final_qty, final_price = dialog_cart.get_data()
-                            if final_qty > 0:
-                                self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
-                                self.update_cart_display()
+                    except Exception as e:
+                        conn.rollback()
+                        QMessageBox.critical(self, "Database Error", f"Failed to save product: {e}")
                         return
-
+                    finally:
+                        conn.close()
+                    
+                    database.log_action("PRODUCT_ADDED", f"Quick-added product '{data['name']}' from POS", self.user_role)
+                    self.refresh_completer()
+                    
+                    # Automatically trigger Add to Cart workflow
+                    p_id, p_name, p_price = data["barcode"], data["name"], data["sell_price"]
+                    
+                    dialog_cart = AddToCartDialog(p_name, 1, p_price, self)
+                    if dialog_cart.exec():
+                        final_qty, final_price = dialog_cart.get_data()
+                        if final_qty > 0:
+                            self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price)
         finally:
-            self._last_add_time = time.time() # Update debounce AFTER processing
-            self.search_input.setEnabled(True) # UNBLOCK
+            self._last_add_time = time.time()
+            self.search_input.setEnabled(True)
             self.search_input.setFocus()
-            # Ensure input is cleared (handles completer re-fill race condition)
             QTimer.singleShot(50, self.search_input.clear)
+
+    def prompt_add_to_cart_multiplier(self, p_id, p_name, p_price, qty_to_add):
+        self.search_input.setEnabled(False)
+        try:
+            dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, self)
+            if dialog.exec():
+                final_qty, final_price = dialog.get_data()
+                if final_qty > 0:
+                    # If price is changed, require admin
+                    if abs(final_price - p_price) > 0.001:
+                        if not self.verify_admin():
+                            return
+                    self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price)
+        finally:
+            self._last_add_time = time.time()
+            self.search_input.setEnabled(True)
+            self.search_input.setFocus()
+            QTimer.singleShot(50, self.search_input.clear)
+
+    def add_product_to_cart_record(self, p_id, p_name, p_price, final_qty, final_price):
+        # Check if already in cart with exact same price
+        merged = False
+        for item in self.cart:
+            if item["barcode"] == p_id and abs(item["price"] - final_price) < 0.001:
+                item["qty"] += final_qty
+                merged = True
+                break
+
+        if not merged:
+            self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
+        
+        self.update_cart_display()
 
     def update_cart_display(self):
         self.cart_table.setRowCount(0)
@@ -690,15 +711,26 @@ class CheckoutDialog(QDialog):
                 border-radius: 10px;
             }
             QPushButton:hover { background-color: #059669; }
+            QPushButton:disabled { background-color: #E2E8F0; color: #94A3B8; }
         """)
         self.btn_confirm.clicked.connect(self.accept)
         self.btn_confirm.setDefault(True)
+        self.btn_confirm.setEnabled(False) # Disabled by default
         layout.addWidget(self.btn_confirm)
+
+
 
     def calculate_change(self):
         try:
-            val_str = self.amount_paid_input.text().replace(',', '')
+            val_str = self.amount_paid_input.text().replace(',', '').strip()
+            if not val_str:
+                self.btn_confirm.setEnabled(False)
+                self.customer_widget.setVisible(False)
+                self.lbl_change.setVisible(False)
+                return
+
             paid = float(val_str)
+            self.btn_confirm.setEnabled(True) # Enable confirm when input is valid
             
             if paid < self.total:
                 self.customer_widget.setVisible(True)
@@ -709,6 +741,7 @@ class CheckoutDialog(QDialog):
                 self.lbl_change.setText(f"Change: ₱{change:,.2f}")
                 self.lbl_change.setVisible(True if change > 0.001 else False)
         except ValueError:
+            self.btn_confirm.setEnabled(False)
             self.customer_widget.setVisible(False)
             self.lbl_change.setVisible(False)
 
@@ -821,6 +854,8 @@ class AddToCartDialog(QDialog):
         btn_confirm.setDefault(True)
         layout.addWidget(btn_confirm)
 
+
+
     def format_cash_input(self, text):
         line_edit = self.sender()
         if not isinstance(line_edit, QLineEdit):
@@ -890,6 +925,8 @@ class DiscountDialog(QDialog):
         btn_confirm.clicked.connect(self.accept)
         btn_confirm.setDefault(True)
         layout.addWidget(btn_confirm)
+
+
 
     def format_cash_input(self, text):
         line_edit = self.sender()

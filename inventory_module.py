@@ -158,32 +158,37 @@ class InventoryModule(QWidget):
         if dialog.exec():
             data = dialog.get_data()
             conn = database.get_connection()
-            cursor = conn.cursor()
+            try:
+                cursor = conn.cursor()
+                
+                # Check if product exists
+                cursor.execute("SELECT id FROM products WHERE id=?", (data["barcode"],))
+                if cursor.fetchone() is None:
+                    # Insert product
+                    cursor.execute("""
+                        INSERT INTO products (id, name, price, category)
+                        VALUES (?, ?, ?, ?)
+                    """, (data["barcode"], data["name"], data["sell_price"], data["category"]))
+                    action = "PRODUCT_ADDED"
+                    log_msg = f"Added product '{data['name']}' (Barcode: {data['barcode']})"
+                else:
+                    # Update product details
+                    cursor.execute("""
+                        UPDATE products SET name=?, price=?, category=?
+                        WHERE id=?
+                    """, (data["name"], data["sell_price"], data["category"], data["barcode"]))
+                    action = "PRODUCT_UPDATED"
+                    log_msg = f"Updated product details for '{data['name']}' (Barcode: {data['barcode']})"
+
+                conn.commit()
+                # Log action AFTER successful commit
+                database.log_action(action, log_msg, self.user_role)
+            except Exception as e:
+                conn.rollback()
+                QMessageBox.critical(self, "Database Error", f"Failed to save product: {e}")
+            finally:
+                conn.close()
             
-            # Check if product exists
-            cursor.execute("SELECT id FROM products WHERE id=?", (data["barcode"],))
-            if cursor.fetchone() is None:
-                # Insert product
-                cursor.execute("""
-                    INSERT INTO products (id, name, price, category)
-                    VALUES (?, ?, ?, ?)
-                """, (data["barcode"], data["name"], data["sell_price"], data["category"]))
-                action = "PRODUCT_ADDED"
-                log_msg = f"Added product '{data['name']}' (Barcode: {data['barcode']})"
-            else:
-                # Update product details
-                cursor.execute("""
-                    UPDATE products SET name=?, price=?, category=?
-                    WHERE id=?
-                """, (data["name"], data["sell_price"], data["category"], data["barcode"]))
-                action = "PRODUCT_UPDATED"
-                log_msg = f"Updated product details for '{data['name']}' (Barcode: {data['barcode']})"
-
-            # Log action
-            database.log_action(action, log_msg, self.user_role)
-
-            conn.commit()
-            conn.close()
             self.load_inventory()
 
     def show_edit_dialog(self):
@@ -200,9 +205,14 @@ class InventoryModule(QWidget):
         
         conn = database.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT name, category, price FROM products WHERE id=?", (barcode,))
-        product = cursor.fetchone()
-        conn.close()
+        product = None
+        try:
+            cursor.execute("SELECT name, category, price FROM products WHERE id=?", (barcode,))
+            product = cursor.fetchone()
+        except Exception as e:
+            QMessageBox.critical(self, "Database Error", f"Failed to fetch product details: {e}")
+        finally:
+            conn.close()
         
         if not product:
             return
@@ -211,19 +221,23 @@ class InventoryModule(QWidget):
         if dialog.exec():
             data = dialog.get_data()
             conn = database.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE products SET name=?, category=?, price=?
-                WHERE id=?
-            """, (data["name"], data["category"], data["sell_price"], barcode))
-            conn.commit()
-            conn.close()
-            
-            # Log action
-            database.log_action("PRODUCT_EDIT", f"Updated product '{data['name']}' (Barcode: {barcode}) details", self.user_role)
+            try:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE products SET name=?, category=?, price=?
+                    WHERE id=?
+                """, (data["name"], data["category"], data["sell_price"], barcode))
+                conn.commit()
+                # Log action
+                database.log_action("PRODUCT_EDIT", f"Updated product '{data['name']}' (Barcode: {barcode}) details", self.user_role)
+                QMessageBox.information(self, "Success", "Product updated successfully.")
+            except Exception as e:
+                conn.rollback()
+                QMessageBox.critical(self, "Database Error", f"Failed to update product details: {e}")
+            finally:
+                conn.close()
             
             self.load_inventory()
-            QMessageBox.information(self, "Success", "Product updated successfully.")
 
     def delete_product(self):
         if self.user_role != "admin":
@@ -254,14 +268,19 @@ class InventoryModule(QWidget):
                                      
         if reply == QMessageBox.Yes:
             conn = database.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM products WHERE id=?", (barcode,))
-            conn.commit()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM products WHERE id=?", (barcode,))
+                conn.commit()
+                # Log action
+                database.log_action("PRODUCT_DELETED", f"Deleted product: {product_name} (Barcode: {barcode})", self.user_role)
+                QMessageBox.information(self, "Success", f"Product '{product_name}' has been deleted.")
+            except Exception as e:
+                conn.rollback()
+                QMessageBox.critical(self, "Database Error", f"Failed to delete product: {e}")
+            finally:
+                conn.close()
             
-            database.log_action("PRODUCT_DELETED", f"Deleted product: {product_name} (Barcode: {barcode})", self.user_role)
-            
-            QMessageBox.information(self, "Success", f"Product '{product_name}' has been deleted.")
             self.load_inventory()
 
     def check_not_found_on_enter(self):
@@ -271,9 +290,14 @@ class InventoryModule(QWidget):
             
         conn = database.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM products WHERE id=?", (barcode,))
-        exists = cursor.fetchone()
-        conn.close()
+        exists = None
+        try:
+            cursor.execute("SELECT id FROM products WHERE id=?", (barcode,))
+            exists = cursor.fetchone()
+        except Exception as e:
+            QMessageBox.critical(self, "Database Error", f"Failed to search barcode: {e}")
+        finally:
+            conn.close()
         
         if not exists:
             reply = QMessageBox.question(
@@ -294,13 +318,16 @@ class InventoryModule(QWidget):
         if dialog.exec():
             data = dialog.get_data()
             conn = database.get_connection()
-            cursor = conn.cursor()
-            
-            cursor.execute("INSERT INTO products (id, name, price, category) VALUES (?, ?, ?, ?)", 
-                           (data["barcode"], data["name"], data["sell_price"], data["category"]))
-            
-            conn.commit()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO products (id, name, price, category) VALUES (?, ?, ?, ?)", 
+                               (data["barcode"], data["name"], data["sell_price"], data["category"]))
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                QMessageBox.critical(self, "Database Error", f"Failed to save product: {e}")
+            finally:
+                conn.close()
             self.load_inventory()
 
 
@@ -329,8 +356,16 @@ class StockInDialog(QDialog):
         layout.addLayout(form)
 
         btn_save = QPushButton("Save Product")
+        btn_save.setAutoDefault(False)
+        btn_save.setDefault(False)
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            event.ignore()
+            return
+        super().keyPressEvent(event)
 
     def format_cash_input(self, text):
         line_edit = self.sender()
@@ -407,8 +442,16 @@ class EditProductDialog(QDialog):
         layout.addLayout(form)
 
         btn_save = QPushButton("Save Changes")
+        btn_save.setAutoDefault(False)
+        btn_save.setDefault(False)
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            event.ignore()
+            return
+        super().keyPressEvent(event)
 
     def format_cash_input(self, text):
         line_edit = self.sender()

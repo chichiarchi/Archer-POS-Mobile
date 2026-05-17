@@ -238,6 +238,15 @@ class ResolveBalanceDialog(QDialog):
         self.btn_confirm.setDefault(True)
         layout.addWidget(self.btn_confirm)
 
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            from PySide6.QtWidgets import QLineEdit, QSpinBox, QDoubleSpinBox
+            focused = self.focusWidget()
+            if isinstance(focused, (QLineEdit, QSpinBox, QDoubleSpinBox)):
+                event.ignore()
+                return
+        super().keyPressEvent(event)
+
     def format_cash_input(self, text):
         line_edit = self.sender()
         if not isinstance(line_edit, QLineEdit): return
