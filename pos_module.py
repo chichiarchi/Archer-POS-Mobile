@@ -1,7 +1,8 @@
 # pyrefly: ignore [missing-import]
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, 
-    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox, QCheckBox, QComboBox
+    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QInputDialog, QHeaderView, QCompleter, QDoubleSpinBox, QSpinBox, QCheckBox, QComboBox,
+    QListWidget, QListWidgetItem
 )
 # pyrefly: ignore [missing-import]
 from PySide6.QtCore import Qt, QStringListModel, QTimer, QEvent
@@ -247,9 +248,13 @@ class POSModule(QWidget):
             conn = database.get_connection()
             cursor = conn.cursor()
             product = None
+            bundles = []
             try:
                 cursor.execute("SELECT id, name, price FROM products WHERE id=?", (barcode,))
                 product = cursor.fetchone()
+                if product:
+                    cursor.execute("SELECT bundle_name, quantity, price FROM product_bundles WHERE product_id=?", (barcode,))
+                    bundles = cursor.fetchall()
             finally:
                 conn.close()
 
@@ -257,14 +262,20 @@ class POSModule(QWidget):
                 p_id, p_name, p_price = product
                 is_manual_multiplier = '*' in text
                 
-                if not is_manual_multiplier:
-                    final_qty = 1.0
-                    final_price = p_price
-                    self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price)
+                if not bundles:
+                    # No bundles: proceed normally
+                    if not is_manual_multiplier:
+                        final_qty = 1.0
+                        final_price = p_price
+                        self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price)
+                    else:
+                        is_deferred = True
+                        # Defer showing the AddToCartDialog to let key buffers clear
+                        QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add))
                 else:
+                    # Bundles exist! Show package selection popup
                     is_deferred = True
-                    # Defer showing the AddToCartDialog to let key buffers clear
-                    QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add))
+                    QTimer.singleShot(150, lambda: self.prompt_package_selection(p_id, p_name, p_price, bundles, qty_to_add, is_manual_multiplier))
             else:
                 is_deferred = True
                 # Defer prompting the add new product workflow after a 150ms delay.
@@ -279,6 +290,30 @@ class POSModule(QWidget):
                 self.search_input.setFocus()
                 # Ensure input is cleared (handles completer re-fill race condition)
                 QTimer.singleShot(50, self.search_input.clear)
+
+    def prompt_package_selection(self, p_id, p_name, p_price, bundles, qty_to_add, is_manual_multiplier):
+        self.search_input.setEnabled(False)
+        try:
+            dialog = PackageSelectionDialog(p_name, p_price, bundles, self)
+            if dialog.exec():
+                choice = dialog.selected_choice
+                if choice is None:
+                    # Single item chosen
+                    if not is_manual_multiplier:
+                        self.add_product_to_cart_record(p_id, p_name, p_price, 1.0, p_price)
+                    else:
+                        self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add)
+                else:
+                    # Bundle chosen: choice is (bundle_name, qty, price)
+                    b_name, b_qty, b_price = choice
+                    # Use multiplier if keyed in
+                    final_qty = qty_to_add if is_manual_multiplier else 1.0
+                    self.add_product_to_cart_record(p_id, f"{p_name} ({b_name})", b_price, final_qty, b_price)
+        finally:
+            self._last_add_time = time.time()
+            self.search_input.setEnabled(True)
+            self.search_input.setFocus()
+            QTimer.singleShot(50, self.search_input.clear)
 
     def prompt_add_new_product(self, barcode):
         self.search_input.setEnabled(False)
@@ -953,3 +988,74 @@ class DiscountDialog(QDialog):
             return float(self.inp_price.text().replace(',', ''))
         except:
             return 0.0
+
+
+class PackageSelectionDialog(QDialog):
+    def __init__(self, product_name, single_price, bundles, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Package / Bundle")
+        self.setMinimumWidth(380)
+        self.selected_choice = None # Will store None (single) or bundle tuple (bundle_name, qty, price)
+        self.product_name = product_name
+        self.single_price = single_price
+        self.bundles = bundles
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        lbl_title = QLabel(f"Select Package for:\n{self.product_name}")
+        lbl_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #1E293B; margin-bottom: 10px;")
+        lbl_title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(lbl_title)
+        
+        self.list_widget = QListWidget()
+        self.list_widget.setStyleSheet("font-size: 16px; padding: 5px;")
+        
+        # Option 1: Single
+        item_single = QListWidgetItem(f"1. Single (1 pc) - ₱{self.single_price:,.2f}")
+        item_single.setData(Qt.UserRole, None)
+        self.list_widget.addItem(item_single)
+        
+        # Bundle options
+        for idx, b in enumerate(self.bundles, start=2):
+            b_name, b_qty, b_price = b
+            item = QListWidgetItem(f"{idx}. {b_name} ({int(b_qty)} pcs) - ₱{b_price:,.2f}")
+            item.setData(Qt.UserRole, b)
+            self.list_widget.addItem(item)
+            
+        self.list_widget.setCurrentRow(0)
+        layout.addWidget(self.list_widget)
+        
+        lbl_hint = QLabel("Use Arrow Keys + Enter or press [1, 2...] key to select")
+        lbl_hint.setStyleSheet("font-size: 12px; color: #64748B; font-style: italic;")
+        lbl_hint.setAlignment(Qt.AlignCenter)
+        layout.addWidget(lbl_hint)
+        
+        btn_confirm = QPushButton("Confirm")
+        btn_confirm.setMinimumHeight(40)
+        btn_confirm.clicked.connect(self.confirm_selection)
+        layout.addWidget(btn_confirm)
+        
+        # Double click to confirm
+        self.list_widget.itemDoubleClicked.connect(self.confirm_selection)
+        
+    def keyPressEvent(self, event):
+        key = event.key()
+        # Direct key mappings for 1, 2, 3...
+        if Qt.Key_1 <= key <= Qt.Key_9:
+            idx = key - Qt.Key_1
+            if idx < self.list_widget.count():
+                self.list_widget.setCurrentRow(idx)
+                self.confirm_selection()
+                return
+        elif key in (Qt.Key_Return, Qt.Key_Enter):
+            self.confirm_selection()
+            return
+        super().keyPressEvent(event)
+        
+    def confirm_selection(self):
+        current_item = self.list_widget.currentItem()
+        if current_item:
+            self.selected_choice = current_item.data(Qt.UserRole)
+            self.accept()

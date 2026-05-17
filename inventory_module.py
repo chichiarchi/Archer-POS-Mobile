@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, 
-    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QDateEdit, QHeaderView, QInputDialog
+    QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QDateEdit, QHeaderView, QInputDialog,
+    QDoubleSpinBox
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -40,6 +41,13 @@ class InventoryModule(QWidget):
         self.btn_delete_product.clicked.connect(self.delete_product)
         QShortcut(QKeySequence(Qt.Key_Delete), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.delete_product)
         top_layout.addWidget(self.btn_delete_product)
+
+        self.btn_manage_bundles = QPushButton("Manage Bundles (Ctrl+B)")
+        self.btn_manage_bundles.setMinimumHeight(45)
+        self.btn_manage_bundles.setStyleSheet("font-size: 14px; font-weight: bold; color: #0f766e;")
+        self.btn_manage_bundles.clicked.connect(self.show_manage_bundles_dialog)
+        QShortcut(QKeySequence("Ctrl+B"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.show_manage_bundles_dialog)
+        top_layout.addWidget(self.btn_manage_bundles)
 
         layout.addLayout(top_layout)
 
@@ -330,6 +338,22 @@ class InventoryModule(QWidget):
                 conn.close()
             self.load_inventory()
 
+    def show_manage_bundles_dialog(self):
+        if self.user_role != "admin":
+            QMessageBox.warning(self, "Access Denied", "Only Admin can manage product bundles.")
+            return
+            
+        current_row = self.inventory_table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "Selection Required", "Please select a product from the table first.")
+            return
+            
+        barcode = self.inventory_table.item(current_row, 0).text()
+        product_name = self.inventory_table.item(current_row, 1).text()
+        
+        dialog = ManageBundlesDialog(barcode, product_name, self)
+        dialog.exec()
+
 
 class StockInDialog(QDialog):
     def __init__(self, parent=None):
@@ -479,3 +503,166 @@ class EditProductDialog(QDialog):
             "category": self.inp_category.text().strip() or "General",
             "sell_price": float(self.inp_sell.text().replace(',', '').strip() or 0.0),
         }
+
+
+class ManageBundlesDialog(QDialog):
+    def __init__(self, product_id, product_name, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Manage Bundles for: {product_name}")
+        self.setMinimumSize(500, 400)
+        self.product_id = product_id
+        self.product_name = product_name
+        self.setup_ui()
+        self.load_bundles()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        lbl_header = QLabel(f"Configure packaging options/bundles for barcode:\n{self.product_id}")
+        lbl_header.setStyleSheet("font-weight: bold; font-size: 14px; color: #1E293B; margin-bottom: 10px;")
+        layout.addWidget(lbl_header)
+        
+        # Table of existing bundles
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["ID", "Bundle Name", "Quantity (pcs)", "Price (₱)"])
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        layout.addWidget(self.table)
+        
+        # Add new bundle form
+        form_layout = QHBoxLayout()
+        
+        self.inp_name = QLineEdit()
+        self.inp_name.setPlaceholderText("e.g. 15pcs Bundle")
+        
+        self.inp_qty = QDoubleSpinBox()
+        self.inp_qty.setRange(1.0, 9999.0)
+        self.inp_qty.setValue(15.0)
+        self.inp_qty.setDecimals(1)
+        
+        self.inp_price = QLineEdit()
+        self.inp_price.setPlaceholderText("Price ₱")
+        self.inp_price.textEdited.connect(self.format_cash_input)
+        
+        btn_add = QPushButton("Add Bundle")
+        btn_add.setStyleSheet("background-color: #0f766e; color: white; font-weight: bold; padding: 8px 12px;")
+        btn_add.clicked.connect(self.add_bundle)
+        
+        form_layout.addWidget(QLabel("Name:"))
+        form_layout.addWidget(self.inp_name)
+        form_layout.addWidget(QLabel("Qty:"))
+        form_layout.addWidget(self.inp_qty)
+        form_layout.addWidget(QLabel("Price:"))
+        form_layout.addWidget(self.inp_price)
+        form_layout.addWidget(btn_add)
+        layout.addLayout(form_layout)
+        
+        # Actions layout
+        actions_layout = QHBoxLayout()
+        btn_delete = QPushButton("Delete Selected")
+        btn_delete.setStyleSheet("background-color: #ef4444; color: white; font-weight: bold; padding: 8px 12px;")
+        btn_delete.clicked.connect(self.delete_bundle)
+        actions_layout.addWidget(btn_delete)
+        
+        actions_layout.addStretch()
+        
+        btn_close = QPushButton("Close")
+        btn_close.clicked.connect(self.accept)
+        actions_layout.addWidget(btn_close)
+        
+        layout.addLayout(actions_layout)
+
+    def format_cash_input(self, text):
+        line_edit = self.sender()
+        if not isinstance(line_edit, QLineEdit): return
+        pos = line_edit.cursorPosition()
+        old_text = line_edit.text()
+        raw_val = text.replace(',', '')
+        if not raw_val: return
+        try:
+            if '.' in raw_val:
+                parts = raw_val.split('.')
+                whole = parts[0]
+                decimal = ".".join(parts[1:])
+                formatted = (f"{int(whole):,}" if whole else "0") + "." + decimal
+            else:
+                formatted = f"{int(raw_val):,}"
+            if formatted != old_text:
+                line_edit.setText(formatted)
+                new_pos = pos + (len(formatted) - len(old_text))
+                line_edit.setCursorPosition(max(0, new_pos))
+        except ValueError:
+            pass
+
+    def load_bundles(self):
+        self.table.setRowCount(0)
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT id, bundle_name, quantity, price FROM product_bundles WHERE product_id=?", (self.product_id,))
+            rows = cursor.fetchall()
+            for i, row in enumerate(rows):
+                self.table.insertRow(i)
+                self.table.setItem(i, 0, QTableWidgetItem(str(row[0])))
+                self.table.setItem(i, 1, QTableWidgetItem(str(row[1])))
+                self.table.setItem(i, 2, QTableWidgetItem(f"{row[2]:g}"))
+                self.table.setItem(i, 3, QTableWidgetItem(f"₱{row[3]:,.2f}"))
+        finally:
+            conn.close()
+
+    def add_bundle(self):
+        name = self.inp_name.text().strip()
+        qty = self.inp_qty.value()
+        price_str = self.inp_price.text().replace(',', '').strip()
+        
+        if not name:
+            QMessageBox.warning(self, "Input Error", "Please enter a bundle name.")
+            return
+        try:
+            price = float(price_str)
+        except ValueError:
+            QMessageBox.warning(self, "Input Error", "Please enter a valid price.")
+            return
+            
+        conn = database.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO product_bundles (product_id, bundle_name, quantity, price)
+                VALUES (?, ?, ?, ?)
+            """, (self.product_id, name, qty, price))
+            conn.commit()
+            database.log_action("BUNDLE_ADDED", f"Added bundle '{name}' ({qty} pcs at ₱{price:,.2f}) for product '{self.product_name}'", "admin")
+            self.inp_name.clear()
+            self.inp_price.clear()
+            self.load_bundles()
+        except Exception as e:
+            conn.rollback()
+            QMessageBox.critical(self, "Database Error", f"Failed to save bundle: {e}")
+        finally:
+            conn.close()
+
+    def delete_bundle(self):
+        row = self.table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Selection Required", "Please select a bundle to delete.")
+            return
+        bundle_id = self.table.item(row, 0).text()
+        bundle_name = self.table.item(row, 1).text()
+        
+        reply = QMessageBox.question(self, "Confirm Delete", f"Delete bundle '{bundle_name}'?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            conn = database.get_connection()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM product_bundles WHERE id=?", (bundle_id,))
+                conn.commit()
+                database.log_action("BUNDLE_DELETED", f"Deleted bundle '{bundle_name}' for product '{self.product_name}'", "admin")
+                self.load_bundles()
+            except Exception as e:
+                conn.rollback()
+                QMessageBox.critical(self, "Database Error", f"Failed to delete bundle: {e}")
+            finally:
+                conn.close()

@@ -40,6 +40,18 @@ def init_db():
             category TEXT
         )
     """)
+
+    # Create Product Bundles Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS product_bundles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id TEXT NOT NULL,
+            bundle_name TEXT NOT NULL,
+            quantity REAL NOT NULL,
+            price REAL NOT NULL,
+            FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+    """)
     
     # Create Customers Table
     cursor.execute("""
