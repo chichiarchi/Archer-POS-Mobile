@@ -56,9 +56,16 @@ def init_db():
             bundle_name TEXT NOT NULL,
             quantity REAL NOT NULL,
             price REAL NOT NULL,
+            wholesale_price REAL DEFAULT 0.0,
             FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
         )
     """)
+    
+    # Migration for existing databases that don't have wholesale_price column in product_bundles yet
+    try:
+        cursor.execute("ALTER TABLE product_bundles ADD COLUMN wholesale_price REAL DEFAULT 0.0")
+    except sqlite3.OperationalError:
+        pass
     
     # Create Customers Table
     cursor.execute("""

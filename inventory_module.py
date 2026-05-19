@@ -520,7 +520,7 @@ class ManageBundlesDialog(QDialog):
     def __init__(self, product_id, product_name, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Manage Bundles for: {product_name}")
-        self.setMinimumSize(500, 400)
+        self.setMinimumSize(650, 400)
         self.product_id = product_id
         self.product_name = product_name
         self.setup_ui()
@@ -534,8 +534,8 @@ class ManageBundlesDialog(QDialog):
         layout.addWidget(lbl_header)
         
         # Table of existing bundles
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["ID", "Bundle Name", "Quantity (pcs)", "Price (₱)"])
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["ID", "Bundle Name", "Quantity (pcs)", "Retail Price (₱)", "Wholesale Price (₱)"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -554,8 +554,12 @@ class ManageBundlesDialog(QDialog):
         self.inp_qty.setDecimals(1)
         
         self.inp_price = QLineEdit()
-        self.inp_price.setPlaceholderText("Price ₱")
+        self.inp_price.setPlaceholderText("Retail ₱")
         self.inp_price.textEdited.connect(self.format_cash_input)
+
+        self.inp_wholesale_price = QLineEdit()
+        self.inp_wholesale_price.setPlaceholderText("Wholesale ₱")
+        self.inp_wholesale_price.textEdited.connect(self.format_cash_input)
         
         btn_add = QPushButton("Add Bundle")
         btn_add.setStyleSheet("background-color: #0f766e; color: white; font-weight: bold; padding: 8px 12px;")
@@ -565,8 +569,10 @@ class ManageBundlesDialog(QDialog):
         form_layout.addWidget(self.inp_name)
         form_layout.addWidget(QLabel("Qty:"))
         form_layout.addWidget(self.inp_qty)
-        form_layout.addWidget(QLabel("Price:"))
+        form_layout.addWidget(QLabel("Retail:"))
         form_layout.addWidget(self.inp_price)
+        form_layout.addWidget(QLabel("Wholesale:"))
+        form_layout.addWidget(self.inp_wholesale_price)
         form_layout.addWidget(btn_add)
         layout.addLayout(form_layout)
         
@@ -612,7 +618,7 @@ class ManageBundlesDialog(QDialog):
         conn = database.get_connection()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT id, bundle_name, quantity, price FROM product_bundles WHERE product_id=?", (self.product_id,))
+            cursor.execute("SELECT id, bundle_name, quantity, price, wholesale_price FROM product_bundles WHERE product_id=?", (self.product_id,))
             rows = cursor.fetchall()
             for i, row in enumerate(rows):
                 self.table.insertRow(i)
@@ -620,6 +626,8 @@ class ManageBundlesDialog(QDialog):
                 self.table.setItem(i, 1, QTableWidgetItem(str(row[1])))
                 self.table.setItem(i, 2, QTableWidgetItem(f"{row[2]:g}"))
                 self.table.setItem(i, 3, QTableWidgetItem(f"₱{row[3]:,.2f}"))
+                wholesale_val = row[4] if row[4] is not None else 0.0
+                self.table.setItem(i, 4, QTableWidgetItem(f"₱{wholesale_val:,.2f}"))
         finally:
             conn.close()
 
@@ -627,6 +635,7 @@ class ManageBundlesDialog(QDialog):
         name = self.inp_name.text().strip()
         qty = self.inp_qty.value()
         price_str = self.inp_price.text().replace(',', '').strip()
+        price_wholesale_str = self.inp_wholesale_price.text().replace(',', '').strip()
         
         if not name:
             QMessageBox.warning(self, "Input Error", "Please enter a bundle name.")
@@ -634,20 +643,27 @@ class ManageBundlesDialog(QDialog):
         try:
             price = float(price_str)
         except ValueError:
-            QMessageBox.warning(self, "Input Error", "Please enter a valid price.")
+            QMessageBox.warning(self, "Input Error", "Please enter a valid retail price.")
+            return
+
+        try:
+            wholesale_price = float(price_wholesale_str) if price_wholesale_str else 0.0
+        except ValueError:
+            QMessageBox.warning(self, "Input Error", "Please enter a valid wholesale price.")
             return
             
         conn = database.get_connection()
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO product_bundles (product_id, bundle_name, quantity, price)
-                VALUES (?, ?, ?, ?)
-            """, (self.product_id, name, qty, price))
+                INSERT INTO product_bundles (product_id, bundle_name, quantity, price, wholesale_price)
+                VALUES (?, ?, ?, ?, ?)
+            """, (self.product_id, name, qty, price, wholesale_price))
             conn.commit()
-            database.log_action("BUNDLE_ADDED", f"Added bundle '{name}' ({qty} pcs at ₱{price:,.2f}) for product '{self.product_name}'", "admin")
+            database.log_action("BUNDLE_ADDED", f"Added bundle '{name}' ({qty} pcs at Retail: ₱{price:,.2f} | Wholesale: ₱{wholesale_price:,.2f}) for product '{self.product_name}'", "admin")
             self.inp_name.clear()
             self.inp_price.clear()
+            self.inp_wholesale_price.clear()
             self.load_bundles()
         except Exception as e:
             conn.rollback()

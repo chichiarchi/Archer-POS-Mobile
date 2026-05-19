@@ -251,18 +251,23 @@ class POSModule(QWidget):
             # Toggle specific item in cart!
             item = self.cart[current_row]
             pricing_type = item.get("pricing_type", "retail")
+            is_bundle = item.get("is_bundle", False)
+            bundle_name = item.get("bundle_name")
             
             # Fetch prices from database to know wholesale and retail prices
             conn = database.get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (item["barcode"],))
+            if is_bundle:
+                cursor.execute("SELECT price, wholesale_price FROM product_bundles WHERE product_id=? AND bundle_name=?", (item["barcode"], bundle_name))
+            else:
+                cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (item["barcode"],))
             prod = cursor.fetchone()
             conn.close()
             
             if prod:
                 retail_p, wholesale_p = prod
                 if wholesale_p is None or wholesale_p <= 0:
-                    QMessageBox.warning(self, "No Wholesale Price", f"Product '{item['name']}' does not have a defined wholesale price.")
+                    QMessageBox.warning(self, "No Wholesale Price", f"Product/Bundle '{item['name']}' does not have a defined wholesale price.")
                     return
                 
                 # Check if current item price matches retail or wholesale
@@ -373,7 +378,7 @@ class POSModule(QWidget):
                 cursor.execute("SELECT id, name, price, wholesale_price FROM products WHERE id=?", (barcode,))
                 product = cursor.fetchone()
                 if product:
-                    cursor.execute("SELECT bundle_name, quantity, price FROM product_bundles WHERE product_id=?", (barcode,))
+                    cursor.execute("SELECT bundle_name, quantity, price, wholesale_price FROM product_bundles WHERE product_id=?", (barcode,))
                     bundles = cursor.fetchall()
             finally:
                 conn.close()
@@ -405,7 +410,7 @@ class POSModule(QWidget):
                 else:
                     # Bundles exist! Show package selection popup
                     is_deferred = True
-                    QTimer.singleShot(150, lambda: self.prompt_package_selection(p_id, p_name, p_price, bundles, qty_to_add, is_manual_multiplier, p_type))
+                    QTimer.singleShot(150, lambda: self.prompt_package_selection(p_id, p_name, retail_p, wholesale_p, bundles, qty_to_add, is_manual_multiplier, p_type))
             else:
                 is_deferred = True
                 # Defer prompting the add new product workflow after a 150ms delay.
@@ -421,24 +426,38 @@ class POSModule(QWidget):
                 # Ensure input is cleared (handles completer re-fill race condition)
                 QTimer.singleShot(50, self.search_input.clear)
 
-    def prompt_package_selection(self, p_id, p_name, p_price, bundles, qty_to_add, is_manual_multiplier, pricing_type="retail"):
+    def prompt_package_selection(self, p_id, p_name, retail_p, wholesale_p, bundles, qty_to_add, is_manual_multiplier, pricing_type="retail"):
         self.search_input.setEnabled(False)
         try:
-            dialog = PackageSelectionDialog(p_name, p_price, bundles, self)
+            dialog = PackageSelectionDialog(p_name, retail_p, wholesale_p, bundles, self)
             if dialog.exec():
                 choice = dialog.selected_choice
                 if choice is None:
                     # Single item chosen
+                    single_price = wholesale_p if (pricing_type == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
+                    p_price_name = p_name
+                    if pricing_type == "wholesale" and wholesale_p and wholesale_p > 0:
+                        if " (Wholesale)" not in p_price_name:
+                            p_price_name += " (Wholesale)"
+                    
                     if not is_manual_multiplier:
-                        self.add_product_to_cart_record(p_id, p_name, p_price, 1.0, p_price, pricing_type)
+                        self.add_product_to_cart_record(p_id, p_price_name, single_price, 1.0, single_price, pricing_type)
                     else:
-                        self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add, pricing_type)
+                        self.prompt_add_to_cart_multiplier(p_id, p_price_name, single_price, qty_to_add, pricing_type)
                 else:
-                    # Bundle chosen: choice is (bundle_name, qty, price)
-                    b_name, b_qty, b_price = choice
+                    # Bundle chosen: choice is (bundle_name, qty, price, wholesale_price)
+                    b_name, b_qty, b_retail_price, b_wholesale_price = choice
+                    
+                    # Determine bundle price based on pricing_type
+                    bundle_price = b_wholesale_price if (pricing_type == "wholesale" and b_wholesale_price and b_wholesale_price > 0) else b_retail_price
+                    bundle_display_name = f"{p_name} ({b_name})"
+                    if pricing_type == "wholesale" and b_wholesale_price and b_wholesale_price > 0:
+                        if " (Wholesale)" not in bundle_display_name:
+                            bundle_display_name += " (Wholesale)"
+                    
                     # Use multiplier if keyed in
                     final_qty = qty_to_add if is_manual_multiplier else 1.0
-                    self.add_product_to_cart_record(p_id, f"{p_name} ({b_name})", b_price, final_qty, b_price, "retail")
+                    self.add_product_to_cart_record(p_id, bundle_display_name, bundle_price, final_qty, bundle_price, pricing_type, is_bundle=True, bundle_name=b_name)
         finally:
             self._last_add_time = time.time()
             self.search_input.setEnabled(True)
@@ -520,11 +539,15 @@ class POSModule(QWidget):
             self.search_input.setFocus()
             QTimer.singleShot(50, self.search_input.clear)
 
-    def add_product_to_cart_record(self, p_id, p_name, p_price, final_qty, final_price, pricing_type="retail"):
-        # Check if already in cart with exact same barcode, price, and pricing_type
+    def add_product_to_cart_record(self, p_id, p_name, p_price, final_qty, final_price, pricing_type="retail", is_bundle=False, bundle_name=None):
+        # Check if already in cart with exact same barcode, price, pricing_type, bundle status and name
         merged = False
         for item in self.cart:
-            if item["barcode"] == p_id and item.get("pricing_type", "retail") == pricing_type and abs(item["price"] - final_price) < 0.001:
+            if (item["barcode"] == p_id and 
+                item.get("pricing_type", "retail") == pricing_type and 
+                item.get("is_bundle", False) == is_bundle and 
+                item.get("bundle_name") == bundle_name and 
+                abs(item["price"] - final_price) < 0.001):
                 item["qty"] += final_qty
                 merged = True
                 break
@@ -535,7 +558,9 @@ class POSModule(QWidget):
                 "name": p_name, 
                 "price": final_price, 
                 "qty": final_qty,
-                "pricing_type": pricing_type
+                "pricing_type": pricing_type,
+                "is_bundle": is_bundle,
+                "bundle_name": bundle_name
             })
         
         self.update_cart_display()
@@ -1145,13 +1170,14 @@ class DiscountDialog(QDialog):
 
 
 class PackageSelectionDialog(QDialog):
-    def __init__(self, product_name, single_price, bundles, parent=None):
+    def __init__(self, product_name, single_retail_price, single_wholesale_price, bundles, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Package / Bundle")
-        self.setMinimumWidth(380)
-        self.selected_choice = None # Will store None (single) or bundle tuple (bundle_name, qty, price)
+        self.setMinimumWidth(450)
+        self.selected_choice = None # Will store None (single) or bundle tuple (bundle_name, qty, price, wholesale_price)
         self.product_name = product_name
-        self.single_price = single_price
+        self.single_retail_price = single_retail_price
+        self.single_wholesale_price = single_wholesale_price
         self.bundles = bundles
         self.setup_ui()
 
@@ -1167,14 +1193,16 @@ class PackageSelectionDialog(QDialog):
         self.list_widget.setStyleSheet("font-size: 16px; padding: 5px;")
         
         # Option 1: Single
-        item_single = QListWidgetItem(f"1. Single (1 pc) - ₱{self.single_price:,.2f}")
+        single_wh = self.single_wholesale_price if (self.single_wholesale_price and self.single_wholesale_price > 0) else self.single_retail_price
+        item_single = QListWidgetItem(f"1. Single (1 pc) - Retail: ₱{self.single_retail_price:,.2f} | Wholesale: ₱{single_wh:,.2f}")
         item_single.setData(Qt.UserRole, None)
         self.list_widget.addItem(item_single)
         
         # Bundle options
         for idx, b in enumerate(self.bundles, start=2):
-            b_name, b_qty, b_price = b
-            item = QListWidgetItem(f"{idx}. {b_name} ({int(b_qty)} pcs) - ₱{b_price:,.2f}")
+            b_name, b_qty, b_price, b_wholesale_price = b
+            b_wh = b_wholesale_price if (b_wholesale_price and b_wholesale_price > 0) else b_price
+            item = QListWidgetItem(f"{idx}. {b_name} ({int(b_qty)} pcs) - Retail: ₱{b_price:,.2f} | Wholesale: ₱{b_wh:,.2f}")
             item.setData(Qt.UserRole, b)
             self.list_widget.addItem(item)
             
