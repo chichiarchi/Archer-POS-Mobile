@@ -37,9 +37,16 @@ def init_db():
             id TEXT PRIMARY KEY, -- Using barcode as ID
             name TEXT NOT NULL,
             price REAL NOT NULL,
+            wholesale_price REAL DEFAULT 0.0,
             category TEXT
         )
     """)
+    
+    # Migration for existing databases that don't have wholesale_price column yet
+    try:
+        cursor.execute("ALTER TABLE products ADD COLUMN wholesale_price REAL DEFAULT 0.0")
+    except sqlite3.OperationalError:
+        pass
 
     # Create Product Bundles Table
     cursor.execute("""

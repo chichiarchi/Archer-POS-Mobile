@@ -64,8 +64,8 @@ class InventoryModule(QWidget):
         layout.addLayout(search_layout)
 
         # Product Table
-        self.inventory_table = QTableWidget(0, 4)
-        self.inventory_table.setHorizontalHeaderLabels(["Barcode", "Name", "Price", "Category"])
+        self.inventory_table = QTableWidget(0, 5)
+        self.inventory_table.setHorizontalHeaderLabels(["Barcode", "Name", "Retail Price", "Wholesale Price", "Category"])
         self.inventory_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.inventory_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.inventory_table.setStyleSheet("font-size: 15px;")
@@ -106,7 +106,7 @@ class InventoryModule(QWidget):
         cursor = conn.cursor()
         
         query = """
-            SELECT id, name, price, category
+            SELECT id, name, price, wholesale_price, category
             FROM products
         """
         
@@ -133,7 +133,8 @@ class InventoryModule(QWidget):
             self.inventory_table.setItem(i, 0, QTableWidgetItem(str(row[0])))
             self.inventory_table.setItem(i, 1, QTableWidgetItem(str(row[1])))
             self.inventory_table.setItem(i, 2, QTableWidgetItem(f"₱{row[2]:,.2f}"))
-            self.inventory_table.setItem(i, 3, QTableWidgetItem(str(row[3]) if row[3] else "N/A"))
+            self.inventory_table.setItem(i, 3, QTableWidgetItem(f"₱{row[3]:,.2f}"))
+            self.inventory_table.setItem(i, 4, QTableWidgetItem(str(row[4]) if row[4] else "N/A"))
 
         # Update Pagination UI
         self.page_label.setText(f"Page {self.current_page + 1} (Showing {len(rows)} of {total_count} items)")
@@ -174,17 +175,17 @@ class InventoryModule(QWidget):
                 if cursor.fetchone() is None:
                     # Insert product
                     cursor.execute("""
-                        INSERT INTO products (id, name, price, category)
-                        VALUES (?, ?, ?, ?)
-                    """, (data["barcode"], data["name"], data["sell_price"], data["category"]))
+                        INSERT INTO products (id, name, price, wholesale_price, category)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (data["barcode"], data["name"], data["sell_price"], data["wholesale_price"], data["category"]))
                     action = "PRODUCT_ADDED"
                     log_msg = f"Added product '{data['name']}' (Barcode: {data['barcode']})"
                 else:
                     # Update product details
                     cursor.execute("""
-                        UPDATE products SET name=?, price=?, category=?
+                        UPDATE products SET name=?, price=?, wholesale_price=?, category=?
                         WHERE id=?
-                    """, (data["name"], data["sell_price"], data["category"], data["barcode"]))
+                    """, (data["name"], data["sell_price"], data["wholesale_price"], data["category"], data["barcode"]))
                     action = "PRODUCT_UPDATED"
                     log_msg = f"Updated product details for '{data['name']}' (Barcode: {data['barcode']})"
 
@@ -215,7 +216,7 @@ class InventoryModule(QWidget):
         cursor = conn.cursor()
         product = None
         try:
-            cursor.execute("SELECT name, category, price FROM products WHERE id=?", (barcode,))
+            cursor.execute("SELECT name, category, price, wholesale_price FROM products WHERE id=?", (barcode,))
             product = cursor.fetchone()
         except Exception as e:
             QMessageBox.critical(self, "Database Error", f"Failed to fetch product details: {e}")
@@ -232,9 +233,9 @@ class InventoryModule(QWidget):
             try:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    UPDATE products SET name=?, category=?, price=?
+                    UPDATE products SET name=?, category=?, price=?, wholesale_price=?
                     WHERE id=?
-                """, (data["name"], data["category"], data["sell_price"], barcode))
+                """, (data["name"], data["category"], data["sell_price"], data["wholesale_price"], barcode))
                 conn.commit()
                 # Log action
                 database.log_action("PRODUCT_EDIT", f"Updated product '{data['name']}' (Barcode: {barcode}) details", self.user_role)
@@ -328,8 +329,8 @@ class InventoryModule(QWidget):
             conn = database.get_connection()
             try:
                 cursor = conn.cursor()
-                cursor.execute("INSERT INTO products (id, name, price, category) VALUES (?, ?, ?, ?)", 
-                               (data["barcode"], data["name"], data["sell_price"], data["category"]))
+                cursor.execute("INSERT INTO products (id, name, price, wholesale_price, category) VALUES (?, ?, ?, ?, ?)", 
+                               (data["barcode"], data["name"], data["sell_price"], data["wholesale_price"], data["category"]))
                 conn.commit()
             except Exception as e:
                 conn.rollback()
@@ -370,12 +371,15 @@ class StockInDialog(QDialog):
         self.inp_name = QLineEdit()
         self.inp_sell = QLineEdit()
         self.inp_sell.textEdited.connect(self.format_cash_input)
+        self.inp_wholesale = QLineEdit()
+        self.inp_wholesale.textEdited.connect(self.format_cash_input)
         self.inp_category = QLineEdit()
 
         form.addRow("Barcode / ID:", self.inp_barcode)
         form.addRow("Product Name:", self.inp_name)
         form.addRow("Category:", self.inp_category)
-        form.addRow("Selling Price (₱):", self.inp_sell)
+        form.addRow("Retail Price (₱):", self.inp_sell)
+        form.addRow("Wholesale Price (₱):", self.inp_wholesale)
 
         layout.addLayout(form)
 
@@ -417,25 +421,28 @@ class StockInDialog(QDialog):
             self.inp_name.clear()
             self.inp_category.clear()
             self.inp_sell.clear()
+            self.inp_wholesale.clear()
             return
             
         conn = database.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT name, category, price FROM products WHERE id=?", (barcode,))
+        cursor.execute("SELECT name, category, price, wholesale_price FROM products WHERE id=?", (barcode,))
         product = cursor.fetchone()
         conn.close()
         
         if product:
             self.inp_name.setText(product[0])
             self.inp_category.setText(product[1] if product[1] else "")
-            self.inp_sell.setText(str(product[2] if product[2] else 0.0))
+            self.inp_sell.setText(f"{product[2]:,.2f}" if product[2] else "0.00")
+            self.inp_wholesale.setText(f"{product[3]:,.2f}" if product[3] else "0.00")
 
     def get_data(self):
         return {
             "barcode": self.inp_barcode.text().strip(),
             "name": self.inp_name.text().strip() or "Unnamed",
             "category": self.inp_category.text().strip() or "General",
-            "sell_price": float(self.inp_sell.text().replace(',', '').strip() or 0.0)
+            "sell_price": float(self.inp_sell.text().replace(',', '').strip() or 0.0),
+            "wholesale_price": float(self.inp_wholesale.text().replace(',', '').strip() or 0.0)
         }
 
 
@@ -444,24 +451,27 @@ class EditProductDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Edit Product")
         self.barcode = barcode
-        self.product_data = product_data # (name, category, price)
+        self.product_data = product_data # (name, category, price, wholesale_price)
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
-        name, category, sell_price = self.product_data
+        name, category, sell_price, wholesale_price = self.product_data
 
         self.inp_name = QLineEdit(name)
         self.inp_category = QLineEdit(category if category else "")
         self.inp_sell = QLineEdit(f"{sell_price:,.2f}")
         self.inp_sell.textEdited.connect(self.format_cash_input)
+        self.inp_wholesale = QLineEdit(f"{wholesale_price:,.2f}")
+        self.inp_wholesale.textEdited.connect(self.format_cash_input)
 
         form.addRow("Barcode / ID:", QLabel(self.barcode))
         form.addRow("Product Name:", self.inp_name)
         form.addRow("Category:", self.inp_category)
-        form.addRow("Selling Price (₱):", self.inp_sell)
+        form.addRow("Retail Price (₱):", self.inp_sell)
+        form.addRow("Wholesale Price (₱):", self.inp_wholesale)
 
         layout.addLayout(form)
 
@@ -502,6 +512,7 @@ class EditProductDialog(QDialog):
             "name": self.inp_name.text().strip() or "Unnamed",
             "category": self.inp_category.text().strip() or "General",
             "sell_price": float(self.inp_sell.text().replace(',', '').strip() or 0.0),
+            "wholesale_price": float(self.inp_wholesale.text().replace(',', '').strip() or 0.0),
         }
 
 

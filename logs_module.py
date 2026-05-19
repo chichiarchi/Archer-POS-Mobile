@@ -321,7 +321,7 @@ class LogsModule(QWidget):
 
         reply = QMessageBox.question(
             self, "Confirm Void Sale", 
-            f"Are you sure you want to VOID Sale #{sale_id}?\nThis will reverse the inventory and mark the sale as inactive.",
+            f"Are you sure you want to VOID Sale #{sale_id}?\nThis will mark the sale as inactive.",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         
@@ -341,25 +341,11 @@ class LogsModule(QWidget):
                 # 1. Mark Sale as voided
                 cursor.execute("UPDATE sales SET voided = 1 WHERE id = ?", (sale_id,))
                 
-                # 2. Get Items to reverse inventory
-                cursor.execute("SELECT product_id, quantity FROM sale_items WHERE sale_id = ?", (sale_id,))
-                items = cursor.fetchall()
-                
-                for p_id, qty in items:
-                    # Insert 'IN' transaction to reverse the 'OUT'
-                    cursor.execute("""
-                        INSERT INTO inventory (product_id, quantity, type, timestamp)
-                        VALUES (?, ?, 'IN', datetime('now', '+8 hours'))
-                    """, (p_id, qty))
-                    
-                    # Update stock cache
-                    cursor.execute("UPDATE products SET current_stock = current_stock + ? WHERE id = ?", (qty, p_id))
-                
-                # 3. Handle Debtors if any
+                # 2. Handle Debtors if any
                 cursor.execute("DELETE FROM debtors WHERE sale_id = ?", (sale_id,))
                 
                 conn.commit()
-                database.log_action("VOID_SALE", f"Voided Sale #{sale_id} and reversed inventory", self.user_role)
+                database.log_action("VOID_SALE", f"Voided Sale #{sale_id}", self.user_role)
                 QMessageBox.information(self, "Success", f"Sale #{sale_id} has been voided successfully.")
                 self.load_logs()
                 

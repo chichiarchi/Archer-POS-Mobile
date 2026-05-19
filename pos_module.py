@@ -20,6 +20,7 @@ class POSModule(QWidget):
     def __init__(self, user_role="staff"):
         super().__init__()
         self.user_role = user_role
+        self.pricing_mode = "retail"  # Default: 'retail' or 'wholesale'
         self.cart = []  # List of dicts {barcode, name, price, qty}
         self._last_add_time = 0
         self.setup_ui()
@@ -56,11 +57,32 @@ class POSModule(QWidget):
         
         top_layout.addWidget(self.search_input)
 
+        # Global Pricing Mode Toggle Button
+        self.btn_pricing_mode = QPushButton("Pricing: RETAIL (Ctrl+W)")
+        self.btn_pricing_mode.setMinimumHeight(50)
+        self.btn_pricing_mode.setMinimumWidth(240)
+        self.btn_pricing_mode.setStyleSheet("""
+            QPushButton {
+                background-color: #0284c7; 
+                color: #FFFFFF; 
+                font-weight: bold; 
+                font-size: 16px;
+                border-radius: 8px;
+                padding: 10px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #38bdf8; 
+            }
+        """)
+        self.btn_pricing_mode.clicked.connect(self.toggle_global_pricing_mode)
+        top_layout.addWidget(self.btn_pricing_mode)
+
         layout.addLayout(top_layout)
 
         # Cart Table
-        self.cart_table = QTableWidget(0, 4)
-        self.cart_table.setHorizontalHeaderLabels(["Barcode", "Product Name", "Price", "Qty"])
+        self.cart_table = QTableWidget(0, 5)
+        self.cart_table.setHorizontalHeaderLabels(["Barcode", "Product Name", "Pricing", "Price", "Qty"])
         self.cart_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.cart_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.cart_table.setStyleSheet("font-size: 16px;")
@@ -95,6 +117,13 @@ class POSModule(QWidget):
         self.btn_discount.installEventFilter(self)
         QShortcut(QKeySequence("Ctrl+D"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.apply_discount)
         btn_layout.addWidget(self.btn_discount)
+
+        self.btn_toggle_pricing = QPushButton("Wholesale/Retail (Ctrl+W)")
+        self.btn_toggle_pricing.setMinimumHeight(45)
+        self.btn_toggle_pricing.setStyleSheet("font-size: 15px; font-weight: bold; background-color: #0f766e; color: white;")
+        self.btn_toggle_pricing.clicked.connect(self.toggle_wholesale_shortcut)
+        self.btn_toggle_pricing.installEventFilter(self)
+        btn_layout.addWidget(self.btn_toggle_pricing)
 
         layout.addLayout(btn_layout)
 
@@ -171,6 +200,90 @@ class POSModule(QWidget):
 
         # Global Search Focus
         QShortcut(QKeySequence("Ctrl+F"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.search_input.setFocus)
+        
+        # Toggle Wholesale / Retail Mode Shortcut
+        QShortcut(QKeySequence("Ctrl+W"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.toggle_wholesale_shortcut)
+
+    def toggle_global_pricing_mode(self):
+        if self.pricing_mode == "retail":
+            self.pricing_mode = "wholesale"
+        else:
+            self.pricing_mode = "retail"
+        self.update_pricing_mode_ui()
+
+    def update_pricing_mode_ui(self):
+        if self.pricing_mode == "retail":
+            self.btn_pricing_mode.setText("Pricing: RETAIL (Ctrl+W)")
+            self.btn_pricing_mode.setStyleSheet("""
+                QPushButton {
+                    background-color: #0284c7; 
+                    color: #FFFFFF; 
+                    font-weight: bold; 
+                    font-size: 16px;
+                    border-radius: 8px;
+                    padding: 10px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background-color: #38bdf8; 
+                }
+            """)
+        else:
+            self.btn_pricing_mode.setText("Pricing: WHOLESALE (Ctrl+W)")
+            self.btn_pricing_mode.setStyleSheet("""
+                QPushButton {
+                    background-color: #ea580c; 
+                    color: #FFFFFF; 
+                    font-weight: bold; 
+                    font-size: 16px;
+                    border-radius: 8px;
+                    padding: 10px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background-color: #f97316; 
+                }
+            """)
+
+    def toggle_wholesale_shortcut(self):
+        current_row = self.cart_table.currentRow()
+        if current_row >= 0 and current_row < len(self.cart):
+            # Toggle specific item in cart!
+            item = self.cart[current_row]
+            pricing_type = item.get("pricing_type", "retail")
+            
+            # Fetch prices from database to know wholesale and retail prices
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (item["barcode"],))
+            prod = cursor.fetchone()
+            conn.close()
+            
+            if prod:
+                retail_p, wholesale_p = prod
+                if wholesale_p is None or wholesale_p <= 0:
+                    QMessageBox.warning(self, "No Wholesale Price", f"Product '{item['name']}' does not have a defined wholesale price.")
+                    return
+                
+                # Check if current item price matches retail or wholesale
+                if pricing_type == "wholesale":
+                    # Toggle to retail
+                    item["pricing_type"] = "retail"
+                    item["price"] = retail_p
+                    item["name"] = item["name"].replace(" (Wholesale)", "")
+                    database.log_action("POS_ITEM_PRICE_TOGGLE", f"Marked {item['name']} price as Retail: ₱{retail_p:,.2f}", self.user_role)
+                else:
+                    # Toggle to wholesale
+                    item["pricing_type"] = "wholesale"
+                    item["price"] = wholesale_p
+                    if " (Wholesale)" not in item["name"]:
+                        item["name"] += " (Wholesale)"
+                    database.log_action("POS_ITEM_PRICE_TOGGLE", f"Marked {item['name']} price as Wholesale: ₱{wholesale_p:,.2f}", self.user_role)
+                
+                self.update_cart_display()
+        else:
+            # Toggle global mode
+            self.toggle_global_pricing_mode()
 
     def eventFilter(self, obj, event):
         if event.type() == QEvent.KeyPress:
@@ -195,11 +308,18 @@ class POSModule(QWidget):
     def refresh_completer(self):
         conn = database.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, price FROM products")
+        cursor.execute("SELECT id, name, price, wholesale_price FROM products")
         products = cursor.fetchall()
         conn.close()
         
-        self.product_list = [f"{p[0]} - {p[1]} - ₱{p[2]:,.2f}" for p in products]
+        self.product_list = []
+        for p in products:
+            barcode, name, retail_p, wholesale_p = p
+            if wholesale_p and wholesale_p > 0:
+                self.product_list.append(f"{barcode} - {name} - Retail: ₱{retail_p:,.2f} | Wholesale: ₱{wholesale_p:,.2f}")
+            else:
+                self.product_list.append(f"{barcode} - {name} - ₱{retail_p:,.2f}")
+                
         model = QStringListModel(self.product_list)
         self.completer.setModel(model)
 
@@ -250,7 +370,7 @@ class POSModule(QWidget):
             product = None
             bundles = []
             try:
-                cursor.execute("SELECT id, name, price FROM products WHERE id=?", (barcode,))
+                cursor.execute("SELECT id, name, price, wholesale_price FROM products WHERE id=?", (barcode,))
                 product = cursor.fetchone()
                 if product:
                     cursor.execute("SELECT bundle_name, quantity, price FROM product_bundles WHERE product_id=?", (barcode,))
@@ -259,23 +379,33 @@ class POSModule(QWidget):
                 conn.close()
 
             if product:
-                p_id, p_name, p_price = product
+                p_id, p_name, retail_p, wholesale_p = product
+                
+                # Check active pricing mode
+                if self.pricing_mode == "wholesale" and wholesale_p and wholesale_p > 0:
+                    p_price = wholesale_p
+                    p_type = "wholesale"
+                    if " (Wholesale)" not in p_name:
+                        p_name += " (Wholesale)"
+                else:
+                    p_price = retail_p
+                    p_type = "retail"
+                    
                 is_manual_multiplier = '*' in text
                 
                 if not bundles:
                     # No bundles: proceed normally
                     if not is_manual_multiplier:
                         final_qty = 1.0
-                        final_price = p_price
-                        self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price)
+                        self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, p_price, p_type)
                     else:
                         is_deferred = True
                         # Defer showing the AddToCartDialog to let key buffers clear
-                        QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add))
+                        QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add, p_type))
                 else:
                     # Bundles exist! Show package selection popup
                     is_deferred = True
-                    QTimer.singleShot(150, lambda: self.prompt_package_selection(p_id, p_name, p_price, bundles, qty_to_add, is_manual_multiplier))
+                    QTimer.singleShot(150, lambda: self.prompt_package_selection(p_id, p_name, p_price, bundles, qty_to_add, is_manual_multiplier, p_type))
             else:
                 is_deferred = True
                 # Defer prompting the add new product workflow after a 150ms delay.
@@ -291,7 +421,7 @@ class POSModule(QWidget):
                 # Ensure input is cleared (handles completer re-fill race condition)
                 QTimer.singleShot(50, self.search_input.clear)
 
-    def prompt_package_selection(self, p_id, p_name, p_price, bundles, qty_to_add, is_manual_multiplier):
+    def prompt_package_selection(self, p_id, p_name, p_price, bundles, qty_to_add, is_manual_multiplier, pricing_type="retail"):
         self.search_input.setEnabled(False)
         try:
             dialog = PackageSelectionDialog(p_name, p_price, bundles, self)
@@ -300,15 +430,15 @@ class POSModule(QWidget):
                 if choice is None:
                     # Single item chosen
                     if not is_manual_multiplier:
-                        self.add_product_to_cart_record(p_id, p_name, p_price, 1.0, p_price)
+                        self.add_product_to_cart_record(p_id, p_name, p_price, 1.0, p_price, pricing_type)
                     else:
-                        self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add)
+                        self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add, pricing_type)
                 else:
                     # Bundle chosen: choice is (bundle_name, qty, price)
                     b_name, b_qty, b_price = choice
                     # Use multiplier if keyed in
                     final_qty = qty_to_add if is_manual_multiplier else 1.0
-                    self.add_product_to_cart_record(p_id, f"{p_name} ({b_name})", b_price, final_qty, b_price)
+                    self.add_product_to_cart_record(p_id, f"{p_name} ({b_name})", b_price, final_qty, b_price, "retail")
         finally:
             self._last_add_time = time.time()
             self.search_input.setEnabled(True)
@@ -336,9 +466,9 @@ class POSModule(QWidget):
                     try:
                         cursor = conn.cursor()
                         cursor.execute("""
-                            INSERT INTO products (id, name, price, category)
-                            VALUES (?, ?, ?, ?)
-                        """, (data["barcode"], data["name"], data["sell_price"], data["category"]))
+                            INSERT INTO products (id, name, price, wholesale_price, category)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (data["barcode"], data["name"], data["sell_price"], data["wholesale_price"], data["category"]))
                         conn.commit()
                     except Exception as e:
                         conn.rollback()
@@ -351,20 +481,28 @@ class POSModule(QWidget):
                     self.refresh_completer()
                     
                     # Automatically trigger Add to Cart workflow
-                    p_id, p_name, p_price = data["barcode"], data["name"], data["sell_price"]
+                    p_id, p_name, retail_p, wholesale_p = data["barcode"], data["name"], data["sell_price"], data["wholesale_price"]
+                    if self.pricing_mode == "wholesale" and wholesale_p and wholesale_p > 0:
+                        p_price = wholesale_p
+                        p_type = "wholesale"
+                        if " (Wholesale)" not in p_name:
+                            p_name += " (Wholesale)"
+                    else:
+                        p_price = retail_p
+                        p_type = "retail"
                     
                     dialog_cart = AddToCartDialog(p_name, 1, p_price, self)
                     if dialog_cart.exec():
                         final_qty, final_price = dialog_cart.get_data()
                         if final_qty > 0:
-                            self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price)
+                            self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price, p_type)
         finally:
             self._last_add_time = time.time()
             self.search_input.setEnabled(True)
             self.search_input.setFocus()
             QTimer.singleShot(50, self.search_input.clear)
 
-    def prompt_add_to_cart_multiplier(self, p_id, p_name, p_price, qty_to_add):
+    def prompt_add_to_cart_multiplier(self, p_id, p_name, p_price, qty_to_add, pricing_type="retail"):
         self.search_input.setEnabled(False)
         try:
             dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, self)
@@ -375,24 +513,30 @@ class POSModule(QWidget):
                     if abs(final_price - p_price) > 0.001:
                         if not self.verify_admin():
                             return
-                    self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price)
+                    self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price, pricing_type)
         finally:
             self._last_add_time = time.time()
             self.search_input.setEnabled(True)
             self.search_input.setFocus()
             QTimer.singleShot(50, self.search_input.clear)
 
-    def add_product_to_cart_record(self, p_id, p_name, p_price, final_qty, final_price):
-        # Check if already in cart with exact same price
+    def add_product_to_cart_record(self, p_id, p_name, p_price, final_qty, final_price, pricing_type="retail"):
+        # Check if already in cart with exact same barcode, price, and pricing_type
         merged = False
         for item in self.cart:
-            if item["barcode"] == p_id and abs(item["price"] - final_price) < 0.001:
+            if item["barcode"] == p_id and item.get("pricing_type", "retail") == pricing_type and abs(item["price"] - final_price) < 0.001:
                 item["qty"] += final_qty
                 merged = True
                 break
 
         if not merged:
-            self.cart.append({"barcode": p_id, "name": p_name, "price": final_price, "qty": final_qty})
+            self.cart.append({
+                "barcode": p_id, 
+                "name": p_name, 
+                "price": final_price, 
+                "qty": final_qty,
+                "pricing_type": pricing_type
+            })
         
         self.update_cart_display()
 
@@ -404,6 +548,15 @@ class POSModule(QWidget):
             item_barcode = QTableWidgetItem(item["barcode"])
             item_name = QTableWidgetItem(item["name"])
             
+            p_type = item.get("pricing_type", "retail")
+            pricing_text = "WHOLESALE" if p_type == "wholesale" else "RETAIL"
+            item_pricing = QTableWidgetItem(pricing_text)
+            item_pricing.setFont(self.get_bold_font(14))
+            if p_type == "wholesale":
+                item_pricing.setForeground(Qt.darkYellow)
+            else:
+                item_pricing.setForeground(Qt.darkGreen)
+            
             item_price = QTableWidgetItem(f"₱{item['price']:,.2f}")
             item_price.setFont(self.get_bold_font(16)) # Bold and bigger price
             
@@ -412,8 +565,9 @@ class POSModule(QWidget):
             
             self.cart_table.setItem(i, 0, item_barcode)
             self.cart_table.setItem(i, 1, item_name)
-            self.cart_table.setItem(i, 2, item_price)
-            self.cart_table.setItem(i, 3, item_qty)
+            self.cart_table.setItem(i, 2, item_pricing)
+            self.cart_table.setItem(i, 3, item_price)
+            self.cart_table.setItem(i, 4, item_qty)
             total += item["price"] * item["qty"]
 
         self.total_label.setText(f"Total: ₱{total:,.2f}")
