@@ -195,8 +195,13 @@ class ReceiptPrinter:
             # 4. Items
             for item in receipt_data.get('items', []):
                 full_name = item['name']
-                qty = str(int(item['qty']))
-                price = f"{item['price']:,.2f}"
+                for term in [" (Wholesale)", " (Retail)", " (Wholesales)", " (Retails)", " (wholesale)", " (retail)", " (wholesales)", " (retails)", "(Wholesale)", "(Retail)"]:
+                    full_name = full_name.replace(term, "")
+                full_name = full_name.strip()
+                qty_val = item['qty']
+                qty = str(int(qty_val))
+                total_item_price = item['price'] * qty_val
+                price = f"{total_item_price:,.2f}"
                 
                 # Split the name into 16-character chunks for wrapping
                 chunks = [full_name[i:i+16] for i in range(0, len(full_name), 16)]

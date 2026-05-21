@@ -50,9 +50,15 @@ class ReceiptPreviewDialog(QDialog):
         items_table.setStyleSheet("border: none; background-color: transparent;")
         
         for i, item in enumerate(self.receipt_data['items']):
-            items_table.setItem(i, 0, QTableWidgetItem(item['name']))
+            clean_name = item['name']
+            for term in [" (Wholesale)", " (Retail)", " (Wholesales)", " (Retails)", " (wholesale)", " (retail)", " (wholesales)", " (retails)", "(Wholesale)", "(Retail)"]:
+                clean_name = clean_name.replace(term, "")
+            clean_name = clean_name.strip()
+            
+            items_table.setItem(i, 0, QTableWidgetItem(clean_name))
             items_table.setItem(i, 1, QTableWidgetItem(f"{int(item['qty']):,d}"))
-            items_table.setItem(i, 2, QTableWidgetItem(f"₱{item['price']:,.2f}"))
+            total_item_price = item['price'] * item['qty']
+            items_table.setItem(i, 2, QTableWidgetItem(f"₱{total_item_price:,.2f}"))
 
         receipt_layout.addWidget(items_table)
 
