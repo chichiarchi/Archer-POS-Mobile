@@ -187,35 +187,45 @@ class ReceiptPrinter:
             y += font_size
             
             # 3. Items Header
-            hdc.TextOut(0, y, "Item             Qty      Price")
+            # Layout (32 chars): Q(2) space Name(11) space UnitPrc(7) space Total(8)
+            # e.g: "Qt Name        Unit Px   Total"
+            hdc.TextOut(0, y, "Qt Name        Unit Px   Total")
             y += font_size
             hdc.TextOut(0, y, "-" * 32)
             y += font_size
-                
+
             # 4. Items
+            # Columns: qty(2) | name(11) | unit_price(7) | total(8)  = 30 + 2 spaces = 32
             for item in receipt_data.get('items', []):
                 full_name = item['name']
-                for term in [" (Wholesale)", " (Retail)", " (Wholesales)", " (Retails)", " (wholesale)", " (retail)", " (wholesales)", " (retails)", "(Wholesale)", "(Retail)"]:
+                for term in [" (Wholesale)", " (Retail)", " (Wholesales)", " (Retails)",
+                             " (wholesale)", " (retail)", " (wholesales)", " (retails)",
+                             "(Wholesale)", "(Retail)"]:
                     full_name = full_name.replace(term, "")
                 full_name = full_name.strip()
+
                 qty_val = item['qty']
-                qty = str(int(qty_val))
-                total_item_price = item['price'] * qty_val
-                price = f"{total_item_price:,.2f}"
-                
-                # Split the name into 16-character chunks for wrapping
-                chunks = [full_name[i:i+16] for i in range(0, len(full_name), 16)]
+                qty = int(qty_val)
+                unit_price = item['price']          # price per piece
+                total_item_price = unit_price * qty_val
+
+                qty_str   = f"{qty:>2}"             # 2 chars
+                unit_str  = f"{unit_price:>7.2f}"  # 7 chars  e.g " 123.50"
+                total_str = f"{total_item_price:>8.2f}"  # 8 chars e.g "  246.00"
+
+                # Split name into 11-char chunks for wrapping
+                chunks = [full_name[i:i+11] for i in range(0, len(full_name), 11)]
                 if not chunks:
                     chunks = [""]
-                
-                # First line includes the first chunk of the name, qty, and price
-                first_line = f"{chunks[0]:<16} {qty:>3} {price:>10}"
+
+                # First line: Qt Name(11) UnitPx(7) Total(8)
+                first_line = f"{qty_str} {chunks[0]:<11}{unit_str} {total_str}"
                 hdc.TextOut(0, y, first_line)
                 y += font_size
-                
-                # Subsequent lines print remaining chunks under the name column
+
+                # Remaining name chunks (indented under name column)
                 for chunk in chunks[1:]:
-                    hdc.TextOut(0, y, chunk)
+                    hdc.TextOut(0, y, f"   {chunk:<11}")
                     y += font_size
 
             hdc.TextOut(0, y, "-" * 32)
