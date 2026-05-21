@@ -17,6 +17,7 @@ dist/
 .venv/
 venv/
 ENV/
+archer/
 
 # OS generated files
 .DS_Store
