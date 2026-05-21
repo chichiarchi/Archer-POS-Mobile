@@ -48,6 +48,12 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # Migration: add cost column to products
+    try:
+        cursor.execute("ALTER TABLE products ADD COLUMN cost REAL DEFAULT 0.0")
+    except sqlite3.OperationalError:
+        pass
+
     # Create Product Bundles Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS product_bundles (
@@ -64,6 +70,12 @@ def init_db():
     # Migration for existing databases that don't have wholesale_price column in product_bundles yet
     try:
         cursor.execute("ALTER TABLE product_bundles ADD COLUMN wholesale_price REAL DEFAULT 0.0")
+    except sqlite3.OperationalError:
+        pass
+
+    # Migration: add cost column to product_bundles
+    try:
+        cursor.execute("ALTER TABLE product_bundles ADD COLUMN cost REAL DEFAULT 0.0")
     except sqlite3.OperationalError:
         pass
     

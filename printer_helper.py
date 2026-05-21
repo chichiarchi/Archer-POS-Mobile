@@ -194,13 +194,24 @@ class ReceiptPrinter:
                 
             # 4. Items
             for item in receipt_data.get('items', []):
-                name = item['name'][:16]
+                full_name = item['name']
                 qty = str(int(item['qty']))
                 price = f"{item['price']:,.2f}"
                 
-                line = f"{name:<16} {qty:>3} {price:>10}"
-                hdc.TextOut(0, y, line)
+                # Split the name into 16-character chunks for wrapping
+                chunks = [full_name[i:i+16] for i in range(0, len(full_name), 16)]
+                if not chunks:
+                    chunks = [""]
+                
+                # First line includes the first chunk of the name, qty, and price
+                first_line = f"{chunks[0]:<16} {qty:>3} {price:>10}"
+                hdc.TextOut(0, y, first_line)
                 y += font_size
+                
+                # Subsequent lines print remaining chunks under the name column
+                for chunk in chunks[1:]:
+                    hdc.TextOut(0, y, chunk)
+                    y += font_size
 
             hdc.TextOut(0, y, "-" * 32)
             y += font_size

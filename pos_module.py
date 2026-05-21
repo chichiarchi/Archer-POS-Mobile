@@ -89,6 +89,8 @@ class POSModule(QWidget):
         self.cart_table.horizontalHeader().setStyleSheet("font-size: 16px; font-weight: bold;")
         self.cart_table.verticalHeader().setDefaultSectionSize(40) # Taller rows
         self.cart_table.installEventFilter(self) # Catch keys when table is focused
+        self.cart_table.cellDoubleClicked.connect(self.on_cell_double_clicked)
+        self._qty_editor_row = -1  # Track which row has an active inline qty editor
         layout.addWidget(self.cart_table)
 
         # Action Buttons Layout
@@ -124,6 +126,14 @@ class POSModule(QWidget):
         self.btn_toggle_pricing.clicked.connect(self.toggle_wholesale_shortcut)
         self.btn_toggle_pricing.installEventFilter(self)
         btn_layout.addWidget(self.btn_toggle_pricing)
+
+        self.btn_quick_add = QPushButton("Quick Add (Ctrl+Shift+A)")
+        self.btn_quick_add.setMinimumHeight(45)
+        self.btn_quick_add.setStyleSheet("font-size: 15px; font-weight: bold; background-color: #0f766e; color: white;")
+        self.btn_quick_add.clicked.connect(self.quick_add_item)
+        self.btn_quick_add.installEventFilter(self)
+        QShortcut(QKeySequence("Ctrl+Shift+A"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.quick_add_item)
+        btn_layout.addWidget(self.btn_quick_add)
 
         layout.addLayout(btn_layout)
 
@@ -291,9 +301,40 @@ class POSModule(QWidget):
             self.toggle_global_pricing_mode()
 
     def eventFilter(self, obj, event):
+        # Commit inline qty editor when its spinbox loses focus, or handle Escape/Enter
+        if self._qty_editor_row >= 0:
+            widget = self.cart_table.cellWidget(self._qty_editor_row, 4)
+            if obj is widget:
+                if event.type() == QEvent.FocusOut:
+                    self._commit_qty_editor()
+                    return False  # Don't consume focus event
+                if event.type() == QEvent.KeyPress:
+                    if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                        self._commit_qty_editor()
+                        return True
+                    if event.key() == Qt.Key_Escape:
+                        # Cancel: discard editor without committing
+                        self._qty_editor_row = -1
+                        self.update_cart_display()
+                        self.cart_table.setFocus()
+                        return True
+
         if event.type() == QEvent.KeyPress:
+            # Arrow Up/Down on the cart table → increment/decrement qty (only when no inline editor is open)
+            if obj == self.cart_table and self._qty_editor_row < 0:
+                if event.key() == Qt.Key_Up and not event.modifiers():
+                    self._arrow_adjust_qty(+1)
+                    return True
+                if event.key() == Qt.Key_Down and not event.modifiers():
+                    self._arrow_adjust_qty(-1)
+                    return True
+
             # If search input doesn't have focus, redirect printable keys and Return to it
             if obj != self.search_input and not self.search_input.hasFocus():
+                # Don't steal keys when qty inline editor is active
+                if self._qty_editor_row >= 0:
+                    return super().eventFilter(obj, event)
+
                 if event.key() in (Qt.Key_Return, Qt.Key_Enter):
                     if self.search_input.text().strip():
                         self.add_item_to_cart()
@@ -309,6 +350,75 @@ class POSModule(QWidget):
                     return True # Consume event
         
         return super().eventFilter(obj, event)
+
+    def _arrow_adjust_qty(self, delta):
+        """Increment or decrement the qty of the currently selected cart row by delta."""
+        current_row = self.cart_table.currentRow()
+        if current_row < 0 or current_row >= len(self.cart):
+            return
+        new_qty = max(1, self.cart[current_row]["qty"] + delta)
+        self.cart[current_row]["qty"] = new_qty
+        database.log_action(
+            "POS_QTY_UPDATE",
+            f"Arrow-adjusted qty of {self.cart[current_row]['name']} to {new_qty}",
+            self.user_role
+        )
+        self.update_cart_display()
+        # Re-select the same row after refresh
+        self.cart_table.setCurrentCell(current_row, 4)
+
+    def on_cell_double_clicked(self, row, col):
+        """Open an inline QSpinBox editor in the Qty cell on double-click."""
+        if col != 4:  # Only allow editing the Qty column
+            return
+        if row < 0 or row >= len(self.cart):
+            return
+
+        # Commit any existing editor first
+        self._commit_qty_editor()
+
+        self._qty_editor_row = row
+        current_qty = int(self.cart[row]["qty"])
+
+        editor = QSpinBox()
+        editor.setRange(1, 100000)
+        editor.setValue(current_qty)
+        editor.setStyleSheet(
+            "font-size: 16px; font-weight: bold; "
+            "background-color: #FFF9C4; border: 2px solid #F59E0B; border-radius: 4px;"
+        )
+        editor.setAlignment(Qt.AlignCenter)
+
+        # Commit on Enter/Return
+        editor.editingFinished.connect(lambda: self._commit_qty_editor())
+        # Also commit if focus leaves the spinbox
+        editor.installEventFilter(self)
+
+        self.cart_table.setCellWidget(row, 4, editor)
+        editor.setFocus()
+        editor.selectAll()
+
+    def _commit_qty_editor(self):
+        """Read the inline QSpinBox value and apply it to the cart."""
+        row = self._qty_editor_row
+        if row < 0 or row >= len(self.cart):
+            self._qty_editor_row = -1
+            return
+
+        widget = self.cart_table.cellWidget(row, 4)
+        if isinstance(widget, QSpinBox):
+            new_qty = widget.value()
+            if new_qty > 0:
+                self.cart[row]["qty"] = new_qty
+                database.log_action(
+                    "POS_QTY_UPDATE",
+                    f"Inline-edited qty of {self.cart[row]['name']} to {new_qty}",
+                    self.user_role
+                )
+
+        self._qty_editor_row = -1
+        self.update_cart_display()
+        self.cart_table.setFocus()
 
     def refresh_completer(self):
         conn = database.get_connection()
@@ -864,6 +974,26 @@ class POSModule(QWidget):
             self.update_cart_display()
             self.search_input.setFocus()
 
+    def quick_add_item(self):
+        dialog = QuickAddItemDialog(self)
+        if dialog.exec():
+            data = dialog.get_data()
+            custom_barcode = f"CUSTOM-{int(time.time() * 1000)}"
+            
+            # Add to cart
+            self.add_product_to_cart_record(
+                p_id=custom_barcode,
+                p_name=data["name"],
+                p_price=data["price"],
+                final_qty=data["quantity"],
+                final_price=data["price"],
+                pricing_type="retail"
+            )
+            
+            # Log action
+            database.log_action("POS_QUICK_ADD", f"Quick added custom item '{data['name']}' x{data['quantity']} @ ₱{data['price']:,.2f} to cart", self.user_role)
+
+
 class CheckoutDialog(QDialog):
     def __init__(self, total, parent=None):
         super().__init__(parent)
@@ -1241,3 +1371,103 @@ class PackageSelectionDialog(QDialog):
         if current_item:
             self.selected_choice = current_item.data(Qt.UserRole)
             self.accept()
+
+
+class QuickAddItemDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Quick Add Custom Item")
+        self.setMinimumWidth(380)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        lbl = QLabel("Quick Add Custom Item")
+        lbl.setStyleSheet("font-size: 20px; font-weight: 900; color: #0072FF; margin-bottom: 5px;")
+        layout.addWidget(lbl)
+        
+        form = QFormLayout()
+        form.setSpacing(15)
+        
+        self.inp_name = QLineEdit()
+        self.inp_name.setPlaceholderText("e.g. Custom Item / Box / Service")
+        self.inp_name.setMinimumHeight(45)
+        self.inp_name.setStyleSheet("font-size: 18px;")
+        
+        lbl_n = QLabel("Item Name:")
+        lbl_n.setStyleSheet("font-size: 14px; font-weight: bold;")
+        form.addRow(lbl_n, self.inp_name)
+        
+        self.inp_qty = QDoubleSpinBox()
+        self.inp_qty.setMinimumHeight(45)
+        self.inp_qty.setRange(0.1, 10000.0)
+        self.inp_qty.setValue(1.0)
+        self.inp_qty.setDecimals(1)
+        self.inp_qty.setStyleSheet("font-size: 18px; font-weight: bold;")
+        
+        lbl_q = QLabel("Quantity:")
+        lbl_q.setStyleSheet("font-size: 14px; font-weight: bold;")
+        form.addRow(lbl_q, self.inp_qty)
+        
+        self.inp_price = QLineEdit("0.00")
+        self.inp_price.setMinimumHeight(45)
+        self.inp_price.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.inp_price.textEdited.connect(self.format_cash_input)
+        
+        lbl_p = QLabel("Price (₱):")
+        lbl_p.setStyleSheet("font-size: 14px; font-weight: bold;")
+        form.addRow(lbl_p, self.inp_price)
+        
+        layout.addLayout(form)
+        
+        btn_confirm = QPushButton("Add to Cart (Enter)")
+        btn_confirm.setStyleSheet("""
+            QPushButton {
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00C6FF, stop:1 #0072FF); 
+                color: #FFFFFF; 
+                font-weight: bold;
+                border-radius: 6px;
+                padding: 10px;
+                border: none;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #00E5FF, stop:1 #0088FF); 
+            }
+        """)
+        btn_confirm.clicked.connect(self.accept_validation)
+        layout.addWidget(btn_confirm)
+
+    def format_cash_input(self, text):
+        line_edit = self.sender()
+        if not isinstance(line_edit, QLineEdit): return
+        pos = line_edit.cursorPosition()
+        old_text = line_edit.text()
+        raw_val = text.replace(',', '')
+        if not raw_val: return
+        try:
+            if '.' in raw_val:
+                parts = raw_val.split('.')
+                whole, decimal = parts[0], ".".join(parts[1:])
+                formatted = (f"{int(whole):,}" if whole else "0") + "." + decimal
+            else:
+                formatted = f"{int(raw_val):,}"
+            if formatted != old_text:
+                line_edit.setText(formatted)
+                new_pos = pos + (len(formatted) - len(old_text))
+                line_edit.setCursorPosition(max(0, new_pos))
+        except ValueError: pass
+
+    def accept_validation(self):
+        if not self.inp_name.text().strip():
+            QMessageBox.warning(self, "Input Required", "Please enter an item name.")
+            return
+        self.accept()
+
+    def get_data(self):
+        return {
+            "name": self.inp_name.text().strip(),
+            "quantity": self.inp_qty.value(),
+            "price": float(self.inp_price.text().replace(',', '').strip() or 0.0)
+        }

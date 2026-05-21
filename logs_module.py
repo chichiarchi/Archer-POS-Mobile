@@ -106,9 +106,14 @@ class ReceiptPreviewDialog(QDialog):
         layout.addLayout(btn_layout)
 
 class LogsModule(QWidget):
+    PAGE_SIZE = 100  # rows per page
+
     def __init__(self, user_role="staff"):
         super().__init__()
         self.user_role = user_role
+        self._current_page = 1
+        self._total_count = 0
+        self._log_rows = []  # Cache of current page's raw DB rows
         self.setup_ui()
 
     def setup_ui(self):
@@ -159,7 +164,55 @@ class LogsModule(QWidget):
         self.logs_table.setHorizontalHeaderLabels(["Timestamp", "User Role", "Action", "Details"])
         self.logs_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         self.logs_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.logs_table.setStyleSheet("font-size: 14px;")
         layout.addWidget(self.logs_table)
+
+        # ── Pagination Bar ──────────────────────────────────────────────────
+        pag_layout = QHBoxLayout()
+        pag_layout.setContentsMargins(0, 4, 0, 4)
+
+        btn_style = """
+            QPushButton {
+                background-color: #1E40AF;
+                color: white;
+                font-weight: bold;
+                font-size: 13px;
+                border-radius: 6px;
+                padding: 6px 14px;
+                border: none;
+            }
+            QPushButton:hover { background-color: #2563EB; }
+            QPushButton:disabled { background-color: #CBD5E1; color: #94A3B8; }
+        """
+
+        self.btn_first = QPushButton("\u23EE First")
+        self.btn_first.setStyleSheet(btn_style)
+        self.btn_first.clicked.connect(self.go_first)
+        pag_layout.addWidget(self.btn_first)
+
+        self.btn_prev = QPushButton("\u2039 Prev")
+        self.btn_prev.setStyleSheet(btn_style)
+        self.btn_prev.clicked.connect(self.go_prev)
+        pag_layout.addWidget(self.btn_prev)
+
+        self.lbl_page = QLabel("Page 1 of 1  (0 records)")
+        self.lbl_page.setStyleSheet("font-size: 13px; font-weight: bold; color: #334155; padding: 0 12px;")
+        self.lbl_page.setAlignment(Qt.AlignCenter)
+        pag_layout.addWidget(self.lbl_page)
+
+        self.btn_next = QPushButton("Next \u203A")
+        self.btn_next.setStyleSheet(btn_style)
+        self.btn_next.clicked.connect(self.go_next)
+        pag_layout.addWidget(self.btn_next)
+
+        self.btn_last = QPushButton("Last \u23ED")
+        self.btn_last.setStyleSheet(btn_style)
+        self.btn_last.clicked.connect(self.go_last)
+        pag_layout.addWidget(self.btn_last)
+
+        pag_layout.addStretch()
+        layout.addLayout(pag_layout)
+        # ───────────────────────────────────────────────────────────────────
 
         self.load_logs()
 
@@ -179,64 +232,114 @@ class LogsModule(QWidget):
         # Mutual constraints
         self.date_to.setMinimumDate(self.date_from.date())
         self.date_from.setMaximumDate(self.date_to.date())
-        # Re-fetch logs based on new range
+        # Date range changed → reset to page 1 then reload
+        self._current_page = 1
         self.load_logs()
+
+    # ── Pagination helpers ────────────────────────────────────────────────
+    def _total_pages(self):
+        return max(1, -(-self._total_count // self.PAGE_SIZE))  # ceiling div
+
+    def go_first(self):
+        if self._current_page != 1:
+            self._current_page = 1
+            self.load_logs()
+
+    def go_prev(self):
+        if self._current_page > 1:
+            self._current_page -= 1
+            self.load_logs()
+
+    def go_next(self):
+        if self._current_page < self._total_pages():
+            self._current_page += 1
+            self.load_logs()
+
+    def go_last(self):
+        last = self._total_pages()
+        if self._current_page != last:
+            self._current_page = last
+            self.load_logs()
+
+    def _update_pagination_controls(self):
+        total_pages = self._total_pages()
+        self.lbl_page.setText(
+            f"Page {self._current_page} of {total_pages}  ({self._total_count:,} records)"
+        )
+        self.btn_first.setEnabled(self._current_page > 1)
+        self.btn_prev.setEnabled(self._current_page > 1)
+        self.btn_next.setEnabled(self._current_page < total_pages)
+        self.btn_last.setEnabled(self._current_page < total_pages)
+    # ─────────────────────────────────────────────────────────────────────
 
     def load_logs(self):
         date_from_str = self.date_from.date().toString("yyyy-MM-dd")
         date_to_str = self.date_to.date().toString("yyyy-MM-dd")
+        offset = (self._current_page - 1) * self.PAGE_SIZE
 
         conn = database.get_connection()
         cursor = conn.cursor()
+
+        # 1. Total count for pagination
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM audit_logs a
+            WHERE DATE(a.timestamp) BETWEEN ? AND ?
+        """, (date_from_str, date_to_str))
+        self._total_count = cursor.fetchone()[0]
+
+        # 2. Page slice
         cursor.execute("""
             SELECT a.timestamp, a.user_id, a.action, a.details, s.voided
             FROM audit_logs a
             LEFT JOIN sales s ON (a.details LIKE 'Sale #' || s.id || ' %')
             WHERE DATE(a.timestamp) BETWEEN ? AND ?
-            ORDER BY a.id DESC 
-            LIMIT 500
-        """, (date_from_str, date_to_str))
+            ORDER BY a.id DESC
+            LIMIT ? OFFSET ?
+        """, (date_from_str, date_to_str, self.PAGE_SIZE, offset))
         rows = cursor.fetchall()
         conn.close()
+
+        # Cache for reprint/void to avoid re-reading table widget items
+        self._log_rows = rows
 
         self.logs_table.setRowCount(0)
         for i, row in enumerate(rows):
             self.logs_table.insertRow(i)
             self.logs_table.setItem(i, 0, QTableWidgetItem(str(row[0])))
             self.logs_table.setItem(i, 1, QTableWidgetItem(str(row[1])))
-            
-            # Format action name (replace underscores with spaces)
+
             action_text = str(row[2]).replace('_', ' ') if row[2] else ""
             self.logs_table.setItem(i, 2, QTableWidgetItem(action_text))
-            
+
             self.logs_table.setItem(i, 3, QTableWidgetItem(str(row[3]) if row[3] else ""))
 
-            # visual feedback for voided sales
-            if row[4] == 1: # Voided
+            # Visual feedback for voided sales
+            if row[4] == 1:
                 for col in range(4):
                     self.logs_table.item(i, col).setForeground(Qt.red)
                     font = self.logs_table.item(i, col).font()
                     font.setStrikeOut(True)
                     self.logs_table.item(i, col).setFont(font)
 
+        self._update_pagination_controls()
+
     def reprint_receipt(self):
         current_row = self.logs_table.currentRow()
-        if current_row < 0:
+        if current_row < 0 or current_row >= len(self._log_rows):
             QMessageBox.warning(self, "Selection Required", "Please select a sale log entry first.")
             return
 
-        # Check if it's a POS_SALE
-        action = self.logs_table.item(current_row, 2).text()
-        if action != "POS SALE":
+        row_data = self._log_rows[current_row]
+        action = str(row_data[2])
+        if action != "POS_SALE":
             QMessageBox.warning(self, "Invalid Selection", "Reprinting is only available for Sales.")
             return
 
-        details = self.logs_table.item(current_row, 3).text()
-        # Parse Sale ID from "Sale #123 - ..."
+        details = str(row_data[3]) if row_data[3] else ""
         try:
             if "Sale #" in details:
-                sale_id_str = details.split("Sale #")[1].split(" ")[0].strip()
-                sale_id = int(sale_id_str)
+                sale_id = int(details.split("Sale #")[1].split(" ")[0].strip())
             else:
                 raise ValueError("Sale ID not found in details")
         except Exception as e:
@@ -292,16 +395,17 @@ class LogsModule(QWidget):
 
     def void_sale(self):
         current_row = self.logs_table.currentRow()
-        if current_row < 0:
+        if current_row < 0 or current_row >= len(self._log_rows):
             QMessageBox.warning(self, "Selection Required", "Please select a sale log entry first.")
             return
 
-        action = self.logs_table.item(current_row, 2).text()
-        if action != "POS SALE":
+        row_data = self._log_rows[current_row]
+        action = str(row_data[2])
+        if action != "POS_SALE":
             QMessageBox.warning(self, "Invalid Selection", "Only sales can be voided.")
             return
 
-        details = self.logs_table.item(current_row, 3).text()
+        details = str(row_data[3]) if row_data[3] else ""
         try:
             sale_id = int(details.split("Sale #")[1].split(" ")[0].strip())
         except:
