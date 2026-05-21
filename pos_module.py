@@ -651,19 +651,24 @@ class POSModule(QWidget):
 
     def add_product_to_cart_record(self, p_id, p_name, p_price, final_qty, final_price, pricing_type="retail", is_bundle=False, bundle_name=None):
         # Check if already in cart with exact same barcode, price, pricing_type, bundle status and name
-        merged = False
+        found_item = None
         for item in self.cart:
             if (item["barcode"] == p_id and 
                 item.get("pricing_type", "retail") == pricing_type and 
                 item.get("is_bundle", False) == is_bundle and 
                 item.get("bundle_name") == bundle_name and 
                 abs(item["price"] - final_price) < 0.001):
-                item["qty"] += final_qty
-                merged = True
+                found_item = item
                 break
 
-        if not merged:
-            self.cart.append({
+        if found_item:
+            found_item["qty"] += final_qty
+            # Move to the front (top) of the cart list
+            self.cart.remove(found_item)
+            self.cart.insert(0, found_item)
+        else:
+            # Insert at the beginning of self.cart
+            self.cart.insert(0, {
                 "barcode": p_id, 
                 "name": p_name, 
                 "price": final_price, 
@@ -674,6 +679,8 @@ class POSModule(QWidget):
             })
         
         self.update_cart_display()
+        if self.cart_table.rowCount() > 0:
+            self.cart_table.setCurrentCell(0, 4)
 
     def update_cart_display(self):
         self.cart_table.setRowCount(0)
