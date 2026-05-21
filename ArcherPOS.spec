@@ -1,14 +1,36 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
 block_cipher = None
+
+# Dynamically discover python-escpos capabilities.json location
+escpos_cap_path = None
+try:
+    import escpos
+    escpos_cap_path = os.path.join(os.path.dirname(escpos.__file__), 'capabilities.json')
+except ImportError:
+    pass
 
 added_files = [
     ('archer_logo.png', '.'),
     ('archer_logo.ico', '.'),
     ('up_arrow.svg', '.'),
     ('down_arrow.svg', '.'),
-    ('.venv/Lib/site-packages/escpos/capabilities.json', 'escpos')
 ]
+
+if escpos_cap_path and os.path.exists(escpos_cap_path):
+    added_files.append((escpos_cap_path, 'escpos'))
+else:
+    # Fallback to common virtualenv locations
+    possible_paths = [
+        '.venv/Lib/site-packages/escpos/capabilities.json',
+        'archer/lib/python3.12/site-packages/escpos/capabilities.json',
+        'archer/lib/site-packages/escpos/capabilities.json',
+    ]
+    for p in possible_paths:
+        if os.path.exists(p):
+            added_files.append((p, 'escpos'))
+            break
 
 a = Analysis(
     ['app.py'],
