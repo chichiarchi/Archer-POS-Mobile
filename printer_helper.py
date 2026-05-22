@@ -33,6 +33,119 @@ def clean_receipt_item_name(barcode, name):
             
     return name.strip()
 
+def get_formatted_bundle_qty(barcode, qty_val, name=""):
+    if not barcode:
+        return ""
+    try:
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT bundle_name, quantity FROM product_bundles WHERE product_id=?", (barcode,))
+        bundles = cursor.fetchall()
+        conn.close()
+        if not bundles:
+            return ""
+        
+        # If the name already contains one of the bundle names in parentheses, 
+        # then it is an explicitly scanned bundle package. We do not double-format it.
+        if name:
+            for b_name, b_qty in bundles:
+                if f"({b_name})" in name or f" ({b_name})" in name:
+                    return ""
+        
+        # Sort descending by quantity
+        sorted_bundles = sorted([(b[0], b[1]) for b in bundles], key=lambda x: x[1], reverse=True)
+        
+        remaining = qty_val
+        parts = []
+        has_bundle_matched = False
+        for b_name, b_qty in sorted_bundles:
+            b_qty_float = float(b_qty)
+            if b_qty_float <= 0:
+                continue
+            if remaining >= b_qty_float:
+                b_count = int(remaining // b_qty_float)
+                remaining = remaining % b_qty_float
+                parts.append(f"{b_count}{b_name}")
+                has_bundle_matched = True
+        
+        if has_bundle_matched:
+            if remaining > 0:
+                pcs_str = str(int(remaining)) if remaining.is_integer() else str(remaining)
+                parts.append(f"{pcs_str}pcs")
+            return " ".join(parts)
+    except Exception as e:
+        logging.error(f"Error formatting receipt bundle qty: {e}")
+    return ""
+
+def split_item_for_receipt(item):
+    barcode = item.get('barcode')
+    qty_val = item['qty']
+    item_price = item['price']
+    raw_name = item['name']
+    
+    clean_name = clean_receipt_item_name(barcode, raw_name)
+    
+    if not barcode:
+        qty_int = int(qty_val) if qty_val.is_integer() else qty_val
+        return [{'qty': qty_int, 'unit_name': 'pcs', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
+        
+    try:
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT bundle_name, quantity FROM product_bundles WHERE product_id=?", (barcode,))
+        bundles = cursor.fetchall()
+        conn.close()
+        
+        if not bundles:
+            qty_int = int(qty_val) if qty_val.is_integer() else qty_val
+            return [{'qty': qty_int, 'unit_name': 'pcs', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
+            
+        # If the name already contains one of the bundle names in parentheses, 
+        # then it is an explicitly scanned bundle package. We do not split it.
+        for b_name, b_qty in bundles:
+            if f"({b_name})" in raw_name or f" ({b_name})" in raw_name:
+                qty_int = int(qty_val) if qty_val.is_integer() else qty_val
+                return [{'qty': qty_int, 'unit_name': b_name, 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
+                
+        # Sort bundles descending by quantity size
+        sorted_bundles = sorted([(b[0], b[1]) for b in bundles], key=lambda x: x[1], reverse=True)
+        
+        remaining = qty_val
+        rows = []
+        for b_name, b_qty in sorted_bundles:
+            b_qty_float = float(b_qty)
+            if b_qty_float <= 0:
+                continue
+            if remaining >= b_qty_float:
+                b_count = int(remaining // b_qty_float)
+                remaining = remaining % b_qty_float
+                
+                bundle_unit_price = b_qty_float * item_price
+                rows.append({
+                    'qty': b_count,
+                    'unit_name': b_name,
+                    'name': clean_name,
+                    'price': bundle_unit_price,
+                    'total': b_count * bundle_unit_price
+                })
+                
+        if remaining > 0:
+            pcs_qty = int(remaining) if remaining.is_integer() else remaining
+            rows.append({
+                'qty': pcs_qty,
+                'unit_name': 'pcs',
+                'name': clean_name,
+                'price': item_price,
+                'total': remaining * item_price
+            })
+            
+        return rows if rows else [{'qty': int(qty_val) if qty_val.is_integer() else qty_val, 'unit_name': 'pcs', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
+        
+    except Exception as e:
+        logging.error(f"Error splitting receipt item: {e}")
+        qty_int = int(qty_val) if qty_val.is_integer() else qty_val
+        return [{'qty': qty_int, 'unit_name': 'pcs', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
+
 def get_bundle_qty(barcode, name):
     # If the product name contains a bundle name in parentheses, return its multiplier, else 1.0.
     if not barcode or not name:
@@ -178,122 +291,207 @@ class ReceiptPrinter:
             hdc.StartDoc("Archer POS Receipt")
             hdc.StartPage()
             
-            # Use a monospaced font for alignment
-            font_size = 28 # Height for legibility
-            char_width = 11 # 32 chars * 11 width = 352 dots (fits 384 dot 58mm paper)
-            font = win32ui.CreateFont({
+            # Dynamically determine the physical printable width of the printer in pixels
+            try:
+                printable_width = hdc.GetDeviceCaps(win32con.HORZRES)
+                if printable_width <= 0 or printable_width > 1200:
+                    printable_width = 384
+            except Exception:
+                printable_width = 384
+
+            # Use monospaced fonts with explicit narrow widths to prevent clipping on standard 58mm POS thermal printers
+            font_regular = win32ui.CreateFont({
                 "name": "Consolas",
-                "height": font_size,
-                "width": char_width,
+                "height": 26,
+                "width": 11,
                 "weight": 400,
             })
-            hdc.SelectObject(font)
             
-            # Use a bold font for the header
             font_bold = win32ui.CreateFont({
                 "name": "Consolas",
-                "height": int(font_size * 1.5),
-                "width": int(char_width * 1.5),
-                "weight": 800,
-            })
-
-            y = 20 # Vertical position
-            
-            # Top Banner
-            hdc.SelectObject(font)
-            hdc.TextOut(0, y, "SALES SUMMARY/CUSTOMER COPY ONLY")
-            y += font_size
-            hdc.TextOut(0, y, "-" * 32)
-            y += font_size
-            
-            # 1. Header (Centered approx)
-            hdc.SelectObject(font_bold)
-            hdc.TextOut(20, y, receipt_data.get('header', 'ARCHER STORE'))
-            y += int(font_size * 1.8)
-            
-            hdc.SelectObject(font)
-            hdc.TextOut(10, y, " Narvacan, Ilocos Sur ")
-            y += font_size
-            hdc.TextOut(0, y, "-" * 32)
-            y += font_size
-            
-            # 2. Sub-header
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            hdc.TextOut(0, y, f"Date: {current_time}")
-            y += font_size
-            hdc.TextOut(0, y, "-" * 32)
-            y += font_size
-            
-            # 3. Items Header
-            # Layout (32 chars): Qt(2) + sp(1) + Name(13) + UnitPx(7) + sp(1) + Total(8) = 32
-            hdc.TextOut(0, y, "Qt Name         Unit Px    Total")
-            y += font_size
-            hdc.TextOut(0, y, "-" * 32)
-            y += font_size
-
-            # 4. Items
-            # Columns: qty(2) | sp(1) | name(13) | unit_price(7) | sp(1) | total(8) = 32
-            for item in receipt_data.get('items', []):
-                full_name = clean_receipt_item_name(item.get('barcode'), item['name'])
-
-                qty_val = item['qty']
-                qty = int(qty_val) if qty_val.is_integer() else qty_val
-                unit_price = item['price']
-                total_item_price = item['price'] * item['qty']
-
-                qty_str   = f"{qty:>2}"              # 2 chars
-                unit_str  = f"{unit_price:>7.2f}"   # 7 chars  e.g " 123.50"
-                total_str = f"{total_item_price:>8.2f}"  # 8 chars e.g "  246.00"
-
-                # Split name into 13-char chunks for wrapping
-                chunks = [full_name[i:i+13] for i in range(0, len(full_name), 13)]
-                if not chunks:
-                    chunks = [""]
-
-                # First line: qty(2) sp(1) name(13) unit(7) sp(1) total(8) = 32
-                first_line = f"{qty_str} {chunks[0]:<13}{unit_str} {total_str}"
-                hdc.TextOut(0, y, first_line)
-                y += font_size
-
-                # Remaining name chunks (indented under name column)
-                for chunk in chunks[1:]:
-                    hdc.TextOut(0, y, f"   {chunk:<13}")
-                    y += font_size
-
-            hdc.TextOut(0, y, "-" * 32)
-            y += font_size
-
-            # 5. Totals
-            font_total = win32ui.CreateFont({
-                "name": "Consolas",
-                "height": int(font_size * 1.2),
-                "width": int(char_width * 1.2),
+                "height": 26,
+                "width": 11,
                 "weight": 700,
             })
-            hdc.SelectObject(font_total)
-            hdc.TextOut(0, y, f"TOTAL:        Php {receipt_data.get('total', 0):>7,.2f}")
-            y += int(font_size * 1.2)
             
-            y += font_size
+            font_header = win32ui.CreateFont({
+                "name": "Consolas",
+                "height": 48,
+                "width": 20,
+                "weight": 900, # Bolder/larger brand
+            })
+            
+            font_small = win32ui.CreateFont({
+                "name": "Consolas",
+                "height": 20,
+                "width": 8,
+                "weight": 400,
+            })
 
-            # 6. Footer
-            hdc.TextOut(0, y, receipt_data.get('footer', 'Thank you! Come again!'))
-            y += font_size
-            hdc.TextOut(0, y, "Agyamanak unay!")
-            y += font_size
+            y = 20 # Start Y
+            x_left = 4 # Shift left slightly to prevent right-edge clipping
             
-            # Non-official receipt disclaimer
-            y += int(font_size * 0.5)
-            hdc.TextOut(0, y, "THIS IS NOT AN OFFICIAL RECEIPT")
-            y += font_size
+            def draw_centered_text(text, y_pos, font_obj):
+                hdc.SelectObject(font_obj)
+                text_w, text_h = hdc.GetTextExtent(text)
+                # Centered exactly between printable margin x_left and the dynamic printable width
+                x_c = max(x_left, x_left + (printable_width - 8 - text_w) // 2)
+                hdc.TextOut(x_c, y_pos, text)
+                return text_h
+                
+            def draw_separator(y_pos):
+                pen = win32ui.CreatePen(win32con.PS_SOLID, 2, 0) # Solid 2px line
+                old_pen = hdc.SelectObject(pen)
+                hdc.MoveTo(x_left, y_pos)
+                hdc.LineTo(printable_width - 4, y_pos)
+                hdc.SelectObject(old_pen)
+                return 4 # Spacing height
+                
+            # Top Banner (Small, clean)
+            y += draw_centered_text("CUSTOMER COPY / SALES SUMMARY", y, font_small)
+            y += 8
             
-            hdc.TextOut(0, y, "-" * 32)
-            y += font_size
+            # Clean separator
+            draw_separator(y)
+            y += 12
+            
+            # Store Name (Big, Bold, Centered)
+            header_txt = receipt_data.get('header', 'ARCHERMART')
+            y += draw_centered_text(header_txt, y, font_header)
+            y += 6
+            
+            # Sub-header details
+            y += draw_centered_text("Narvacan, Ilocos Sur", y, font_regular)
+            y += 10
+            
+            draw_separator(y)
+            y += 12
+            
+            # Transaction Metadata in smaller font
+            hdc.SelectObject(font_small)
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            sale_id = receipt_data.get('sale_id', 'N/A')
+            cashier_name = receipt_data.get('cashier', 'Staff')
+            
+            hdc.TextOut(x_left, y, f"Receipt ID: #{sale_id}")
+            y += 22
+            hdc.TextOut(x_left, y, f"Date: {current_time}")
+            y += 22
+            hdc.TextOut(x_left, y, f"Cashier: {cashier_name}")
+            y += 22
+            
+            y += 4
+            draw_separator(y)
+            y += 12
+            
+            # Items Header
+            hdc.SelectObject(font_bold)
+            # Layout budget: 34 chars
+            header_line = f"{'Qty':<4} {'Name':<13}{'Unit Px':>7} {'Total':>8}"
+            hdc.TextOut(x_left, y, header_line)
+            y += 28
+            
+            draw_separator(y)
+            y += 12
+            
+            # Items Details
+            hdc.SelectObject(font_regular)
+            for raw_item in receipt_data.get('items', []):
+                split_rows = split_item_for_receipt(raw_item)
+                for s_item in split_rows:
+                    qty_val = s_item['qty']
+                    unit_name = s_item.get('unit_name', 'pcs')
+                    qty_num_str = f"{qty_val:g}" if isinstance(qty_val, float) else f"{qty_val}"
+                    qty_str = f"{qty_num_str}{unit_name}"
+                    
+                    name = s_item['name']
+                    unit_price = s_item['price']
+                    total_price = s_item['total']
+                    
+                    unit_str = f"{unit_price:,.2f}"
+                    total_str = f"{total_price:,.2f}"
+                    
+                    # Wrap name into 13-character chunks
+                    name_chunks = [name[i:i+13] for i in range(0, len(name), 13)]
+                    if not name_chunks:
+                        name_chunks = [""]
+                    
+                    # First line contains Qty, Name, Unit Px, Total
+                    first_line = f"{qty_str:<4} {name_chunks[0]:<13}{unit_str:>7} {total_str:>8}"
+                    hdc.TextOut(x_left, y, first_line)
+                    y += 28
+                    
+                    # Subsequent lines contain wrapped name chunks indented under the Name column (starts at index 5)
+                    for chunk in name_chunks[1:]:
+                        sub_line = f"     {chunk}"
+                        hdc.TextOut(x_left, y, sub_line)
+                        y += 28
+                
+            # Divider
+            y += 4
+            draw_separator(y)
+            y += 12
+            
+            subtotal = receipt_data.get('total', 0.0)
+            cash = receipt_data.get('amount_paid', 0.0)
+            change = max(0.0, cash - subtotal)
+            
+            def format_currency_line(label, amount):
+                amt_str = f"₱{amount:,.2f}"
+                spaces = 34 - len(label) - len(amt_str)
+                if spaces < 1:
+                    spaces = 1
+                return f"{label}{' ' * spaces}{amt_str}"
+            
+            hdc.SelectObject(font_regular)
+            
+            # Subtotal
+            subtotal_line = format_currency_line("Subtotal:", subtotal)
+            hdc.TextOut(x_left, y, subtotal_line)
+            y += 28
+            
+            # Cash Received
+            cash_line = format_currency_line("Cash Received:", cash)
+            hdc.TextOut(x_left, y, cash_line)
+            y += 28
+            
+            # Change Given
+            change_line = format_currency_line("Change Given:", change)
+            hdc.TextOut(x_left, y, change_line)
+            y += 28
+            
+            # Total Box
+            y += 4
+            draw_separator(y)
+            y += 12
+            
+            hdc.SelectObject(font_bold)
+            total_line = format_currency_line("TOTAL AMOUNT:", subtotal)
+            hdc.TextOut(x_left, y, total_line)
+            y += 32
+            
+            draw_separator(y)
+            y += 16
+            
+            # Footer (Centered)
+            y += draw_centered_text(receipt_data.get('footer', 'Thank you! Come again!'), y, font_regular)
+            y += 6
+            y += draw_centered_text("Agyamanak unay!", y, font_regular)
+            y += 16
+            
+            # Sub-footer non-official notice in clean small font
+            y += draw_centered_text("--- CUSTOMER SALES SUMMARY ---", y, font_small)
+            y += 4
+            y += draw_centered_text("THIS IS NOT AN OFFICIAL RECEIPT", y, font_small)
+            y += 4
+            y += draw_centered_text("Thank you for shopping with us!", y, font_small)
+            y += 40
             
             # Feed paper
-            y += font_size * 5
-            hdc.TextOut(0, y, " ")
-
+            y += 400
+            hdc.SelectObject(font_small)
+            hdc.TextOut(x_left, y, ".")
+            
             # Finish
             hdc.EndPage()
             hdc.EndDoc()
@@ -318,7 +516,7 @@ if __name__ == "__main__":
     # Test printing helper without crashing
     printer = ReceiptPrinter() # No IDs provided -> Dummy fallback
     test_receipt = {
-        'header': 'ARCHER STORE',
+        'header': 'ARCHERMART',
         'subheader': 'Date: 2026-03-28\nCashier: admin',
         'items': [
             {'name': 'Apple', 'qty': 2, 'price': 3.50},

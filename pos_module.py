@@ -83,7 +83,15 @@ class POSModule(QWidget):
         # Cart Table
         self.cart_table = QTableWidget(0, 5)
         self.cart_table.setHorizontalHeaderLabels(["Barcode", "Product Name", "Pricing", "Price", "Qty"])
+        self.cart_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.cart_table.setColumnWidth(0, 140)
         self.cart_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.cart_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        self.cart_table.setColumnWidth(2, 110)
+        self.cart_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        self.cart_table.setColumnWidth(3, 110)
+        self.cart_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        self.cart_table.setColumnWidth(4, 180)
         self.cart_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.cart_table.setStyleSheet("font-size: 16px;")
         self.cart_table.horizontalHeader().setStyleSheet("font-size: 16px; font-weight: bold;")
@@ -508,14 +516,20 @@ class POSModule(QWidget):
                     
                 is_manual_multiplier = '*' in text
                 
-                # Always add product normally as a single/loose item; pricing is dynamically auto-converted as quantities scale
-                if not is_manual_multiplier:
-                    final_qty = 1.0
-                    self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, p_price, p_type)
-                else:
+                if bundles:
                     is_deferred = True
-                    # Defer showing the AddToCartDialog to let key buffers clear
-                    QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add, p_type))
+                    # Defer showing the package selection dialog to let key buffers clear
+                    QTimer.singleShot(150, lambda: self.prompt_package_selection(
+                        p_id, p_name, retail_p, wholesale_p, bundles, qty_to_add, is_manual_multiplier, p_type
+                    ))
+                else:
+                    if not is_manual_multiplier:
+                        final_qty = 1.0
+                        self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, p_price, p_type)
+                    else:
+                        is_deferred = True
+                        # Defer showing the AddToCartDialog to let key buffers clear
+                        QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add, p_type))
             else:
                 is_deferred = True
                 # Defer prompting the add new product workflow after a 150ms delay.
@@ -678,9 +692,53 @@ class POSModule(QWidget):
             self.cart_table.setCurrentCell(0, 4)
 
     def update_cart_display(self):
+        # 0. Merge loose items that meet bundle threshold into existing explicit bundles if present
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        try:
+            barcodes_in_cart = set(item["barcode"] for item in self.cart)
+            items_to_remove = []
+            for barcode in barcodes_in_cart:
+                cursor.execute("SELECT bundle_name, quantity FROM product_bundles WHERE product_id=?", (barcode,))
+                bundles = cursor.fetchall()
+                if not bundles:
+                    continue
+                sorted_bundles = sorted(bundles, key=lambda x: x[1], reverse=True)
+                explicit_bundles = [item for item in self.cart if item["barcode"] == barcode and item.get("is_bundle")]
+                if not explicit_bundles:
+                    continue
+                loose_items = [item for item in self.cart if item["barcode"] == barcode and not item.get("is_bundle")]
+                if not loose_items:
+                    continue
+                for item in loose_items:
+                    for b_name, b_qty in sorted_bundles:
+                        b_qty_float = float(b_qty)
+                        if b_qty_float <= 0:
+                            continue
+                        matching_eb = None
+                        for eb in explicit_bundles:
+                            if eb.get("bundle_name") == b_name:
+                                matching_eb = eb
+                                break
+                        if matching_eb and item["qty"] >= b_qty_float:
+                            num_packs = int(item["qty"] // b_qty_float)
+                            matching_eb["qty"] += num_packs
+                            item["qty"] -= num_packs * b_qty_float
+                    if item["qty"] <= 0.001:
+                        items_to_remove.append(item)
+            for item in items_to_remove:
+                if item in self.cart:
+                    self.cart.remove(item)
+        except Exception as e:
+            import logging
+            logging.error(f"Error merging loose pieces to existing bundles: {e}")
+        finally:
+            conn.close()
+
         # 1. Dynamically apply volume-based and bundle-based pricing adjustments for loose pieces in the cart.
         conn = database.get_connection()
         cursor = conn.cursor()
+        barcode_to_bundles = {}
         try:
             # Group items by barcode to process each product collectively
             barcodes_in_cart = set(item["barcode"] for item in self.cart)
@@ -694,13 +752,18 @@ class POSModule(QWidget):
                 if not bundles:
                     for item in self.cart:
                         if item["barcode"] == barcode and not item.get("is_bundle"):
-                            cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (barcode,))
-                            p_row = cursor.fetchone()
-                            if p_row:
-                                retail_p, wholesale_p = p_row
-                                base_price = wholesale_p if (item.get("pricing_type") == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
-                                item["price"] = base_price
+                            if not item.get("manually_discounted"):
+                                cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (barcode,))
+                                p_row = cursor.fetchone()
+                                if p_row:
+                                    retail_p, wholesale_p = p_row
+                                    base_price = wholesale_p if (item.get("pricing_type") == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
+                                    item["price"] = base_price
                     continue
+                
+                # Store bundles sorted by quantity descending for display formatting
+                sorted_bundles = sorted([(b[0], b[1]) for b in bundles], key=lambda x: x[1], reverse=True)
+                barcode_to_bundles[barcode] = sorted_bundles
                 
                 # Check if a bundle item of this barcode is explicitly scanned in the cart
                 explicit_bundles = [item for item in self.cart if item["barcode"] == barcode and item.get("is_bundle")]
@@ -734,23 +797,25 @@ class POSModule(QWidget):
                 if unlocked_rates:
                     best_rate = min(unlocked_rates)
                     for item in loose_items:
-                        item["price"] = best_rate
+                        if not item.get("manually_discounted"):
+                            item["price"] = best_rate
                 else:
                     # No bundle thresholds met; restore base product price
                     for item in loose_items:
-                        cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (barcode,))
-                        p_row = cursor.fetchone()
-                        if p_row:
-                            retail_p, wholesale_p = p_row
-                            base_price = wholesale_p if (item.get("pricing_type") == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
-                            item["price"] = base_price
+                        if not item.get("manually_discounted"):
+                            cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (barcode,))
+                            p_row = cursor.fetchone()
+                            if p_row:
+                                retail_p, wholesale_p = p_row
+                                base_price = wholesale_p if (item.get("pricing_type") == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
+                                item["price"] = base_price
                             
         except Exception as e:
             import logging
             logging.error(f"Error applying dynamic tiered bundle pricing: {e}")
         finally:
             conn.close()
-
+ 
         self.cart_table.setRowCount(0)
         total = 0.0
         for i, item in enumerate(self.cart):
@@ -770,7 +835,42 @@ class POSModule(QWidget):
             item_price = QTableWidgetItem(f"₱{item['price']:,.2f}")
             item_price.setFont(self.get_bold_font(16)) # Bold and bigger price
             
-            item_qty = QTableWidgetItem(str(item["qty"]))
+            # Format quantity with bundles if applicable
+            qty_val = item["qty"]
+            barcode = item["barcode"]
+            
+            display_qty = str(int(qty_val)) if qty_val.is_integer() else str(qty_val)
+            
+            if item.get("is_bundle"):
+                b_suffix = item.get("bundle_name", "pck")
+                display_qty = f"{display_qty}{b_suffix}"
+            else:
+                if barcode in barcode_to_bundles:
+                    bundles_list = barcode_to_bundles[barcode]
+                    remaining = qty_val
+                    parts = []
+                    has_bundle_matched = False
+                    for b_name, b_qty in bundles_list:
+                        b_qty_float = float(b_qty)
+                        if b_qty_float <= 0:
+                            continue
+                        if remaining >= b_qty_float:
+                            b_count = int(remaining // b_qty_float)
+                            remaining = remaining % b_qty_float
+                            parts.append(f"{b_count}{b_name}")
+                            has_bundle_matched = True
+                    
+                    if has_bundle_matched:
+                        if remaining > 0:
+                            pcs_str = str(int(remaining)) if remaining.is_integer() else str(remaining)
+                            parts.append(f"{pcs_str}pcs")
+                        display_qty = " ".join(parts)
+                    else:
+                        display_qty = f"{display_qty}pcs"
+                else:
+                    display_qty = f"{display_qty}pcs"
+            
+            item_qty = QTableWidgetItem(display_qty)
             item_qty.setFont(self.get_bold_font(16))
             
             self.cart_table.setItem(i, 0, item_barcode)
@@ -919,11 +1019,12 @@ class POSModule(QWidget):
             
         if not self.verify_admin():
             return
-
+ 
         dialog = DiscountDialog(self.cart[current_row]["name"], self.cart[current_row]["price"], self)
         if dialog.exec():
             new_price = dialog.get_price()
             self.cart[current_row]["price"] = new_price
+            self.cart[current_row]["manually_discounted"] = True
             database.log_action("POS_DISCOUNT", f"Discounted {self.cart[current_row]['name']} to ₱{new_price:,.2f}", self.user_role)
             self.update_cart_display()
             self.search_input.setFocus()
@@ -997,7 +1098,7 @@ class POSModule(QWidget):
             # Print Receipt
             if reply == QMessageBox.Yes:
                 receipt_data = {
-                    'header': 'ARCHER STORE',
+                    'header': 'ARCHERMART',
                     'cashier': self.user_role.capitalize(),
                     'sale_id': sale_id,
                     'items': [{'barcode': i["barcode"], 'name': i["name"], 'qty': i["qty"], 'price': i["price"]} for i in self.cart],

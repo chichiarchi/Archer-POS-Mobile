@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QShortcut, QKeySequence
 import database
-from printer_helper import ReceiptPrinter, clean_receipt_item_name
+from printer_helper import ReceiptPrinter, clean_receipt_item_name, get_formatted_bundle_qty, split_item_for_receipt
 from datetime import datetime
 
 class ReceiptPreviewDialog(QDialog):
@@ -42,8 +42,13 @@ class ReceiptPreviewDialog(QDialog):
         info_lbl.setStyleSheet("font-size: 13px; color: #64748B; border: none;")
         receipt_layout.addWidget(info_lbl)
 
+        # Split items to match receipt printout exactly
+        split_items = []
+        for raw_item in self.receipt_data.get('items', []):
+            split_items.extend(split_item_for_receipt(raw_item))
+            
         # Items Table
-        items_table = QTableWidget(len(self.receipt_data['items']), 3)
+        items_table = QTableWidget(len(split_items), 3)
         items_table.setHorizontalHeaderLabels(["Item", "Qty", "Price"])
         items_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -52,22 +57,24 @@ class ReceiptPreviewDialog(QDialog):
         items_table.setEditTriggers(QTableWidget.NoEditTriggers)
         items_table.setStyleSheet("border: none; background-color: transparent;")
         
-        for i, item in enumerate(self.receipt_data['items']):
-            clean_name = clean_receipt_item_name(item.get('barcode'), item['name'])
+        for i, s_item in enumerate(split_items):
+            items_table.setItem(i, 0, QTableWidgetItem(s_item['name']))
             
-            printed_qty = item['qty']
-            
-            items_table.setItem(i, 0, QTableWidgetItem(clean_name))
-            
-            if printed_qty.is_integer():
-                qty_str = f"{int(printed_qty):,d}"
+            qty_val = s_item['qty']
+            unit_name = s_item.get('unit_name', 'pcs')
+            if isinstance(qty_val, float) and qty_val.is_integer():
+                qty_str = f"{int(qty_val):,d}"
+            elif isinstance(qty_val, int):
+                qty_str = f"{qty_val:,d}"
             else:
-                qty_str = f"{printed_qty:,.2f}"
-            items_table.setItem(i, 1, QTableWidgetItem(qty_str))
+                qty_str = f"{qty_val:,.2f}"
+                
+            qty_display = f"{qty_str}{unit_name}"
+            items_table.setItem(i, 1, QTableWidgetItem(qty_display))
             
-            total_item_price = item['price'] * item['qty']
-            items_table.setItem(i, 2, QTableWidgetItem(f"₱{total_item_price:,.2f}"))
+            items_table.setItem(i, 2, QTableWidgetItem(f"₱{s_item['total']:,.2f}"))
 
+        items_table.resizeRowsToContents()
         receipt_layout.addWidget(items_table)
 
         # Totals
@@ -89,9 +96,15 @@ class ReceiptPreviewDialog(QDialog):
             line.addWidget(val)
             totals_layout.addLayout(line)
 
-        add_total_line("Total Amount:", self.receipt_data['total'], True)
-        add_total_line("Amount Paid:", self.receipt_data['amount_paid'])
-        if self.receipt_data['balance_due'] > 0:
+        total = self.receipt_data.get('total', 0.0)
+        paid = self.receipt_data.get('amount_paid', 0.0)
+        change = max(0.0, paid - total)
+
+        add_total_line("Subtotal:", total)
+        add_total_line("Cash Received:", paid)
+        add_total_line("Change Given:", change)
+        add_total_line("Total Amount:", total, True)
+        if self.receipt_data.get('balance_due', 0.0) > 0:
             add_total_line("Balance Due:", self.receipt_data['balance_due'])
         
         receipt_layout.addLayout(totals_layout)
@@ -396,7 +409,7 @@ class LogsModule(QWidget):
 
         # Prepare receipt data
         receipt_data = {
-            'header': 'ARCHER STORE (REPRINT)',
+            'header': 'ARCHERMART (REPRINT)',
             'cashier': self.user_role.capitalize(),
             'sale_id': sale_id,
             'items': [{'barcode': row[3], 'name': row[0], 'qty': row[1], 'price': row[2]} for row in items_rows],
