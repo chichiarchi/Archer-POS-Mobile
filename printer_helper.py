@@ -236,10 +236,9 @@ class ReceiptPrinter:
             for item in receipt_data.get('items', []):
                 full_name = clean_receipt_item_name(item.get('barcode'), item['name'])
 
-                b_qty = get_bundle_qty(item.get('barcode'), item['name'])
-                qty_val = item['qty'] * b_qty
+                qty_val = item['qty']
                 qty = int(qty_val) if qty_val.is_integer() else qty_val
-                unit_price = item['price'] / b_qty
+                unit_price = item['price']
                 total_item_price = item['price'] * item['qty']
 
                 qty_str   = f"{qty:>2}"              # 2 chars

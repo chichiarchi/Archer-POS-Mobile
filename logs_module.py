@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QShortcut, QKeySequence
 import database
-from printer_helper import ReceiptPrinter, clean_receipt_item_name, get_bundle_qty
+from printer_helper import ReceiptPrinter, clean_receipt_item_name
 from datetime import datetime
 
 class ReceiptPreviewDialog(QDialog):
@@ -55,8 +55,7 @@ class ReceiptPreviewDialog(QDialog):
         for i, item in enumerate(self.receipt_data['items']):
             clean_name = clean_receipt_item_name(item.get('barcode'), item['name'])
             
-            b_qty = get_bundle_qty(item.get('barcode'), item['name'])
-            printed_qty = item['qty'] * b_qty
+            printed_qty = item['qty']
             
             items_table.setItem(i, 0, QTableWidgetItem(clean_name))
             

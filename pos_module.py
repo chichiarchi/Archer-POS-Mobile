@@ -508,19 +508,14 @@ class POSModule(QWidget):
                     
                 is_manual_multiplier = '*' in text
                 
-                if not bundles:
-                    # No bundles: proceed normally
-                    if not is_manual_multiplier:
-                        final_qty = 1.0
-                        self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, p_price, p_type)
-                    else:
-                        is_deferred = True
-                        # Defer showing the AddToCartDialog to let key buffers clear
-                        QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add, p_type))
+                # Always add product normally as a single/loose item; pricing is dynamically auto-converted as quantities scale
+                if not is_manual_multiplier:
+                    final_qty = 1.0
+                    self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, p_price, p_type)
                 else:
-                    # Bundles exist! Show package selection popup
                     is_deferred = True
-                    QTimer.singleShot(150, lambda: self.prompt_package_selection(p_id, p_name, retail_p, wholesale_p, bundles, qty_to_add, is_manual_multiplier, p_type))
+                    # Defer showing the AddToCartDialog to let key buffers clear
+                    QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add, p_type))
             else:
                 is_deferred = True
                 # Defer prompting the add new product workflow after a 150ms delay.
@@ -683,6 +678,79 @@ class POSModule(QWidget):
             self.cart_table.setCurrentCell(0, 4)
 
     def update_cart_display(self):
+        # 1. Dynamically apply volume-based and bundle-based pricing adjustments for loose pieces in the cart.
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        try:
+            # Group items by barcode to process each product collectively
+            barcodes_in_cart = set(item["barcode"] for item in self.cart)
+            
+            for barcode in barcodes_in_cart:
+                # Fetch all bundle configurations for this barcode
+                cursor.execute("SELECT bundle_name, quantity, price, wholesale_price FROM product_bundles WHERE product_id=?", (barcode,))
+                bundles = cursor.fetchall()
+                
+                # If no bundles are configured for this product, reset to base retail/wholesale price
+                if not bundles:
+                    for item in self.cart:
+                        if item["barcode"] == barcode and not item.get("is_bundle"):
+                            cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (barcode,))
+                            p_row = cursor.fetchone()
+                            if p_row:
+                                retail_p, wholesale_p = p_row
+                                base_price = wholesale_p if (item.get("pricing_type") == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
+                                item["price"] = base_price
+                    continue
+                
+                # Check if a bundle item of this barcode is explicitly scanned in the cart
+                explicit_bundles = [item for item in self.cart if item["barcode"] == barcode and item.get("is_bundle")]
+                
+                # Sum up total quantity of loose items of this barcode in the cart
+                loose_items = [item for item in self.cart if item["barcode"] == barcode and not item.get("is_bundle")]
+                total_loose_qty = sum(item["qty"] for item in loose_items)
+                
+                # Determine all unlocked per-piece rates
+                unlocked_rates = []
+                
+                # Rate from explicitly scanned bundles
+                for eb in explicit_bundles:
+                    eb_name = eb.get("bundle_name")
+                    for b_name, b_qty, b_retail_price, b_wholesale_price in bundles:
+                        if b_name == eb_name:
+                            qty_float = float(b_qty)
+                            if qty_float > 0:
+                                unlocked_rates.append(eb["price"] / qty_float)
+                
+                # Rate from loose quantity volume thresholds
+                for b_name, b_qty, b_retail_price, b_wholesale_price in bundles:
+                    qty_float = float(b_qty)
+                    if qty_float > 0 and qty_float <= total_loose_qty:
+                        # Determine bundle price based on pricing type
+                        pricing_type = loose_items[0].get("pricing_type", "retail") if loose_items else "retail"
+                        bundle_price = b_wholesale_price if (pricing_type == "wholesale" and b_wholesale_price and b_wholesale_price > 0) else b_retail_price
+                        unlocked_rates.append(bundle_price / qty_float)
+                
+                # Apply the best unlocked rate to all loose items, or revert to base price if none unlocked
+                if unlocked_rates:
+                    best_rate = min(unlocked_rates)
+                    for item in loose_items:
+                        item["price"] = best_rate
+                else:
+                    # No bundle thresholds met; restore base product price
+                    for item in loose_items:
+                        cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (barcode,))
+                        p_row = cursor.fetchone()
+                        if p_row:
+                            retail_p, wholesale_p = p_row
+                            base_price = wholesale_p if (item.get("pricing_type") == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
+                            item["price"] = base_price
+                            
+        except Exception as e:
+            import logging
+            logging.error(f"Error applying dynamic tiered bundle pricing: {e}")
+        finally:
+            conn.close()
+
         self.cart_table.setRowCount(0)
         total = 0.0
         for i, item in enumerate(self.cart):
