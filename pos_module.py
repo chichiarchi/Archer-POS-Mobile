@@ -932,7 +932,7 @@ class POSModule(QWidget):
                     'header': 'ARCHER STORE',
                     'cashier': self.user_role.capitalize(),
                     'sale_id': sale_id,
-                    'items': [{'name': i["name"], 'qty': i["qty"], 'price': i["price"]} for i in self.cart],
+                    'items': [{'barcode': i["barcode"], 'name': i["name"], 'qty': i["qty"], 'price': i["price"]} for i in self.cart],
                     'total': total,
                     'amount_paid': amount_paid,
                     'balance_due': balance_due if balance_due > 0 else 0.0,

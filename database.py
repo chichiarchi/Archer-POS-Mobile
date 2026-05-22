@@ -148,6 +148,17 @@ def init_db():
         )
     """)
 
+    # Create Payment Notes Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payment_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amount REAL NOT NULL,
+            recipient TEXT NOT NULL,
+            purpose TEXT,
+            timestamp DATETIME DEFAULT (datetime('now', '+8 hours'))
+        )
+    """)
+
     # Create Parked Sales Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS parked_sales (
@@ -312,8 +323,48 @@ def set_setting(key, value):
 def is_stock_management_disabled():
     return True
 
-def is_expiry_tracking_disabled():
-    return True
+def add_payment_note(amount, recipient, purpose, timestamp=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    if timestamp:
+        cursor.execute("""
+            INSERT INTO payment_notes (amount, recipient, purpose, timestamp)
+            VALUES (?, ?, ?, ?)
+        """, (amount, recipient, purpose, timestamp))
+    else:
+        cursor.execute("""
+            INSERT INTO payment_notes (amount, recipient, purpose)
+            VALUES (?, ?, ?)
+        """, (amount, recipient, purpose))
+    conn.commit()
+    conn.close()
+
+def get_payment_notes(date_from=None, date_to=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    if date_from and date_to:
+        cursor.execute("""
+            SELECT id, amount, recipient, purpose, timestamp
+            FROM payment_notes
+            WHERE DATE(timestamp) BETWEEN ? AND ?
+            ORDER BY timestamp DESC
+        """, (date_from, date_to))
+    else:
+        cursor.execute("""
+            SELECT id, amount, recipient, purpose, timestamp
+            FROM payment_notes
+            ORDER BY timestamp DESC
+        """)
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+def delete_payment_note(note_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM payment_notes WHERE id = ?", (note_id,))
+    conn.commit()
+    conn.close()
 
 if __name__ == "__main__":
     init_db()

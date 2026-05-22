@@ -10,7 +10,45 @@ try:
     WIN32_AVAILABLE = True
 except ImportError:
     WIN32_AVAILABLE = False
-    logging.warning("pywin32 is not installed.")
+def clean_receipt_item_name(barcode, name):
+    # 1. Strip wholesale/retail tags
+    for term in [" (Wholesale)", " (Retail)", " (Wholesales)", " (Retails)",
+                 " (wholesale)", " (retail)", " (wholesales)", " (retails)",
+                 "(Wholesale)", "(Retail)"]:
+        name = name.replace(term, "")
+    
+    # 2. Get bundle names for this product from database to strip them
+    if barcode:
+        try:
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT bundle_name FROM product_bundles WHERE product_id=?", (barcode,))
+            bundles = cursor.fetchall()
+            conn.close()
+            for (b_name,) in bundles:
+                name = name.replace(f" ({b_name})", "")
+                name = name.replace(f"({b_name})", "")
+        except Exception:
+            pass
+            
+    return name.strip()
+
+def get_bundle_qty(barcode, name):
+    # If the product name contains a bundle name in parentheses, return its multiplier, else 1.0.
+    if not barcode or not name:
+        return 1.0
+    try:
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT bundle_name, quantity FROM product_bundles WHERE product_id=?", (barcode,))
+        bundles = cursor.fetchall()
+        conn.close()
+        for b_name, b_qty in bundles:
+            if f"({b_name})" in name or f" ({b_name})" in name:
+                return float(b_qty)
+    except Exception:
+        pass
+    return 1.0
 
 class ReceiptPrinter:
     _instance = None
@@ -187,45 +225,40 @@ class ReceiptPrinter:
             y += font_size
             
             # 3. Items Header
-            # Layout (32 chars): Q(2) space Name(11) space UnitPrc(7) space Total(8)
-            # e.g: "Qt Name        Unit Px   Total"
-            hdc.TextOut(0, y, "Qt Name        Unit Px   Total")
+            # Layout (32 chars): Qt(2) + sp(1) + Name(13) + UnitPx(7) + sp(1) + Total(8) = 32
+            hdc.TextOut(0, y, "Qt Name         Unit Px    Total")
             y += font_size
             hdc.TextOut(0, y, "-" * 32)
             y += font_size
 
             # 4. Items
-            # Columns: qty(2) | name(11) | unit_price(7) | total(8)  = 30 + 2 spaces = 32
+            # Columns: qty(2) | sp(1) | name(13) | unit_price(7) | sp(1) | total(8) = 32
             for item in receipt_data.get('items', []):
-                full_name = item['name']
-                for term in [" (Wholesale)", " (Retail)", " (Wholesales)", " (Retails)",
-                             " (wholesale)", " (retail)", " (wholesales)", " (retails)",
-                             "(Wholesale)", "(Retail)"]:
-                    full_name = full_name.replace(term, "")
-                full_name = full_name.strip()
+                full_name = clean_receipt_item_name(item.get('barcode'), item['name'])
 
-                qty_val = item['qty']
-                qty = int(qty_val)
-                unit_price = item['price']          # price per piece
-                total_item_price = unit_price * qty_val
+                b_qty = get_bundle_qty(item.get('barcode'), item['name'])
+                qty_val = item['qty'] * b_qty
+                qty = int(qty_val) if qty_val.is_integer() else qty_val
+                unit_price = item['price'] / b_qty
+                total_item_price = item['price'] * item['qty']
 
-                qty_str   = f"{qty:>2}"             # 2 chars
-                unit_str  = f"{unit_price:>7.2f}"  # 7 chars  e.g " 123.50"
+                qty_str   = f"{qty:>2}"              # 2 chars
+                unit_str  = f"{unit_price:>7.2f}"   # 7 chars  e.g " 123.50"
                 total_str = f"{total_item_price:>8.2f}"  # 8 chars e.g "  246.00"
 
-                # Split name into 11-char chunks for wrapping
-                chunks = [full_name[i:i+11] for i in range(0, len(full_name), 11)]
+                # Split name into 13-char chunks for wrapping
+                chunks = [full_name[i:i+13] for i in range(0, len(full_name), 13)]
                 if not chunks:
                     chunks = [""]
 
-                # First line: Qt Name(11) UnitPx(7) Total(8)
-                first_line = f"{qty_str} {chunks[0]:<11}{unit_str} {total_str}"
+                # First line: qty(2) sp(1) name(13) unit(7) sp(1) total(8) = 32
+                first_line = f"{qty_str} {chunks[0]:<13}{unit_str} {total_str}"
                 hdc.TextOut(0, y, first_line)
                 y += font_size
 
                 # Remaining name chunks (indented under name column)
                 for chunk in chunks[1:]:
-                    hdc.TextOut(0, y, f"   {chunk:<11}")
+                    hdc.TextOut(0, y, f"   {chunk:<13}")
                     y += font_size
 
             hdc.TextOut(0, y, "-" * 32)

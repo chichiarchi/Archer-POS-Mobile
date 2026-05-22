@@ -43,6 +43,8 @@ class BalanceModule(QWidget):
             "Debtor ID", "Customer Name", "Phone", "Sale ID", "Balance Date", "Balance Due"
         ])
         self.balance_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for col in [0, 2, 3, 4, 5]:
+            self.balance_table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeToContents)
         self.balance_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.balance_table.setStyleSheet("font-size: 16px;")
         self.balance_table.horizontalHeader().setStyleSheet("font-size: 16px; font-weight: bold;")

@@ -11,6 +11,7 @@ from dashboard_module import DashboardModule
 from balance_module import BalanceModule
 from logs_module import LogsModule
 from account_module import AccountModule
+from payment_notes_module import PaymentNotesModule
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -191,10 +192,11 @@ class ArcherPOS(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet("""
             QTabBar::tab {
-                height: 50px;
-                width: 180px;
-                font-size: 15px;
+                height: 38px;
+                width: 160px;
+                font-size: 12px;
                 font-weight: bold;
+                padding: 6px 10px;
             }
         """)
         layout.addWidget(self.tabs)
@@ -224,6 +226,10 @@ class ArcherPOS(QMainWindow):
         self.account_tab.logout_requested.connect(self.handle_logout)
         self.tabs.addTab(self.account_tab, QIcon(resource_path("archer_logo.png")), "Account Settings (F7)")
 
+        # Tab 7: Payment Notes
+        self.payment_notes_tab = PaymentNotesModule(self.user_role)
+        self.tabs.addTab(self.payment_notes_tab, QIcon(resource_path("archer_logo.png")), "Payment Notes (F8)")
+
         # Keyboard shortcuts for Tabs
         QShortcut(QKeySequence("F1"), self).activated.connect(lambda: self.tabs.setCurrentIndex(0))
         QShortcut(QKeySequence("F2"), self).activated.connect(lambda: self.tabs.setCurrentIndex(1))
@@ -231,6 +237,7 @@ class ArcherPOS(QMainWindow):
         QShortcut(QKeySequence("F5"), self).activated.connect(lambda: self.tabs.setCurrentIndex(3))
         QShortcut(QKeySequence("F6"), self).activated.connect(lambda: self.tabs.setCurrentIndex(4))
         QShortcut(QKeySequence("F7"), self).activated.connect(lambda: self.tabs.setCurrentIndex(5))
+        QShortcut(QKeySequence("F8"), self).activated.connect(lambda: self.tabs.setCurrentIndex(6))
         
         # Update dashboard elements every time user clicks tabs (Refresh warnings)
         self.tabs.currentChanged.connect(self.on_tab_change)
@@ -251,6 +258,9 @@ class ArcherPOS(QMainWindow):
         elif index == 4:
             self.logs_tab.reset_dates()
             self.logs_tab.load_logs()
+        elif index == 6:
+            self.payment_notes_tab.load_recipients()
+            self.payment_notes_tab.load_notes()
 
     def handle_logout(self):
         reply = QMessageBox.question(

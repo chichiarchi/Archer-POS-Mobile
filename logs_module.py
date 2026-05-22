@@ -5,7 +5,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QShortcut, QKeySequence
 import database
-from printer_helper import ReceiptPrinter
+from printer_helper import ReceiptPrinter, clean_receipt_item_name, get_bundle_qty
+from datetime import datetime
 
 class ReceiptPreviewDialog(QDialog):
     def __init__(self, receipt_data, parent=None):
@@ -45,18 +46,26 @@ class ReceiptPreviewDialog(QDialog):
         items_table = QTableWidget(len(self.receipt_data['items']), 3)
         items_table.setHorizontalHeaderLabels(["Item", "Qty", "Price"])
         items_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        items_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        items_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         items_table.verticalHeader().setVisible(False)
         items_table.setEditTriggers(QTableWidget.NoEditTriggers)
         items_table.setStyleSheet("border: none; background-color: transparent;")
         
         for i, item in enumerate(self.receipt_data['items']):
-            clean_name = item['name']
-            for term in [" (Wholesale)", " (Retail)", " (Wholesales)", " (Retails)", " (wholesale)", " (retail)", " (wholesales)", " (retails)", "(Wholesale)", "(Retail)"]:
-                clean_name = clean_name.replace(term, "")
-            clean_name = clean_name.strip()
+            clean_name = clean_receipt_item_name(item.get('barcode'), item['name'])
+            
+            b_qty = get_bundle_qty(item.get('barcode'), item['name'])
+            printed_qty = item['qty'] * b_qty
             
             items_table.setItem(i, 0, QTableWidgetItem(clean_name))
-            items_table.setItem(i, 1, QTableWidgetItem(f"{int(item['qty']):,d}"))
+            
+            if printed_qty.is_integer():
+                qty_str = f"{int(printed_qty):,d}"
+            else:
+                qty_str = f"{printed_qty:,.2f}"
+            items_table.setItem(i, 1, QTableWidgetItem(qty_str))
+            
             total_item_price = item['price'] * item['qty']
             items_table.setItem(i, 2, QTableWidgetItem(f"₱{total_item_price:,.2f}"))
 
@@ -169,6 +178,8 @@ class LogsModule(QWidget):
         self.logs_table = QTableWidget(0, 4)
         self.logs_table.setHorizontalHeaderLabels(["Timestamp", "User Role", "Action", "Details"])
         self.logs_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        for col in [0, 1, 2]:
+            self.logs_table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeToContents)
         self.logs_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.logs_table.setStyleSheet("font-size: 14px;")
         layout.addWidget(self.logs_table)
@@ -312,7 +323,15 @@ class LogsModule(QWidget):
         self.logs_table.setRowCount(0)
         for i, row in enumerate(rows):
             self.logs_table.insertRow(i)
-            self.logs_table.setItem(i, 0, QTableWidgetItem(str(row[0])))
+            
+            # Format datetime nicely to be readable (e.g., May 22, 2026 08:44 AM)
+            try:
+                dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+                formatted_dt = dt.strftime("%b %d, %Y %I:%M %p")
+            except Exception:
+                formatted_dt = str(row[0])
+
+            self.logs_table.setItem(i, 0, QTableWidgetItem(formatted_dt))
             self.logs_table.setItem(i, 1, QTableWidgetItem(str(row[1])))
 
             action_text = str(row[2]).replace('_', ' ') if row[2] else ""
@@ -367,7 +386,7 @@ class LogsModule(QWidget):
         total, paid, due, timestamp = sale
         
         # Get Items
-        cursor.execute("SELECT product_name, quantity, price FROM sale_items WHERE sale_id = ?", (sale_id,))
+        cursor.execute("SELECT product_name, quantity, price, product_id FROM sale_items WHERE sale_id = ?", (sale_id,))
         items_rows = cursor.fetchall()
         conn.close()
 
@@ -381,7 +400,7 @@ class LogsModule(QWidget):
             'header': 'ARCHER STORE (REPRINT)',
             'cashier': self.user_role.capitalize(),
             'sale_id': sale_id,
-            'items': [{'name': row[0], 'qty': row[1], 'price': row[2]} for row in items_rows],
+            'items': [{'barcode': row[3], 'name': row[0], 'qty': row[1], 'price': row[2]} for row in items_rows],
             'total': total,
             'amount_paid': paid,
             'balance_due': due,

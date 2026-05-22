@@ -65,8 +65,10 @@ class InventoryModule(QWidget):
 
         # Product Table
         self.inventory_table = QTableWidget(0, 6)
-        self.inventory_table.setHorizontalHeaderLabels(["Barcode", "Name", "Cost", "Retail Price", "Wholesale Price", "Category"])
+        self.inventory_table.setHorizontalHeaderLabels(["Barcode", "Name", "Cost", "Retail Price", "Wholesale Price", "Bundle"])
         self.inventory_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for col in [0, 2, 3, 4, 5]:
+            self.inventory_table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeToContents)
         self.inventory_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.inventory_table.setStyleSheet("font-size: 15px;")
         self.inventory_table.horizontalHeader().setStyleSheet("font-size: 15px; font-weight: bold;")
@@ -106,7 +108,9 @@ class InventoryModule(QWidget):
         cursor = conn.cursor()
         
         query = """
-            SELECT id, name, cost, price, wholesale_price, category
+            SELECT id, name, cost, price, wholesale_price,
+                   (CASE WHEN EXISTS (SELECT 1 FROM product_bundles WHERE product_id = products.id)
+                         THEN 'With Bundle' ELSE 'Without Bundle' END)
             FROM products
         """
         
@@ -372,11 +376,9 @@ class StockInDialog(QDialog):
         self.inp_sell.textEdited.connect(self.format_cash_input)
         self.inp_wholesale = QLineEdit()
         self.inp_wholesale.textEdited.connect(self.format_cash_input)
-        self.inp_category = QLineEdit()
 
         form.addRow("Barcode / ID:", self.inp_barcode)
         form.addRow("Product Name:", self.inp_name)
-        form.addRow("Category:", self.inp_category)
         form.addRow("Cost (₱):", self.inp_cost)
         form.addRow("Retail Price (₱):", self.inp_sell)
         form.addRow("Wholesale Price (₱):", self.inp_wholesale)
@@ -419,7 +421,6 @@ class StockInDialog(QDialog):
         barcode = barcode.strip()
         if not barcode:
             self.inp_name.clear()
-            self.inp_category.clear()
             self.inp_cost.clear()
             self.inp_sell.clear()
             self.inp_wholesale.clear()
@@ -433,7 +434,6 @@ class StockInDialog(QDialog):
         
         if product:
             self.inp_name.setText(product[0])
-            self.inp_category.setText(product[1] if product[1] else "")
             self.inp_sell.setText(f"{product[2]:,.2f}" if product[2] else "0.00")
             self.inp_wholesale.setText(f"{product[3]:,.2f}" if product[3] else "0.00")
             cost_val = product[4] if product[4] is not None else 0.0
@@ -443,7 +443,7 @@ class StockInDialog(QDialog):
         return {
             "barcode": self.inp_barcode.text().strip(),
             "name": self.inp_name.text().strip() or "Unnamed",
-            "category": self.inp_category.text().strip() or "General",
+            "category": "General",
             "cost": float(self.inp_cost.text().replace(',', '').strip() or 0.0),
             "sell_price": float(self.inp_sell.text().replace(',', '').strip() or 0.0),
             "wholesale_price": float(self.inp_wholesale.text().replace(',', '').strip() or 0.0)
@@ -466,7 +466,6 @@ class EditProductDialog(QDialog):
         cost = cost if cost is not None else 0.0
 
         self.inp_name = QLineEdit(name)
-        self.inp_category = QLineEdit(category if category else "")
         self.inp_cost = QLineEdit(f"{cost:,.2f}")
         self.inp_cost.textEdited.connect(self.format_cash_input)
         self.inp_sell = QLineEdit(f"{sell_price:,.2f}")
@@ -476,7 +475,6 @@ class EditProductDialog(QDialog):
 
         form.addRow("Barcode / ID:", QLabel(self.barcode))
         form.addRow("Product Name:", self.inp_name)
-        form.addRow("Category:", self.inp_category)
         form.addRow("Cost (₱):", self.inp_cost)
         form.addRow("Retail Price (₱):", self.inp_sell)
         form.addRow("Wholesale Price (₱):", self.inp_wholesale)
@@ -518,7 +516,7 @@ class EditProductDialog(QDialog):
     def get_data(self):
         return {
             "name": self.inp_name.text().strip() or "Unnamed",
-            "category": self.inp_category.text().strip() or "General",
+            "category": "General",
             "cost": float(self.inp_cost.text().replace(',', '').strip() or 0.0),
             "sell_price": float(self.inp_sell.text().replace(',', '').strip() or 0.0),
             "wholesale_price": float(self.inp_wholesale.text().replace(',', '').strip() or 0.0),
@@ -546,6 +544,8 @@ class ManageBundlesDialog(QDialog):
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(["ID", "Bundle Name", "Quantity (pcs)", "Cost (₱)", "Retail Price (₱)", "Wholesale Price (₱)"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        for col in [0, 2, 3, 4, 5]:
+            self.table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeToContents)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
