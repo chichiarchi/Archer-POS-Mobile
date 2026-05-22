@@ -1581,6 +1581,7 @@ class QuickAddItemDialog(QDialog):
         self.inp_qty.setValue(1.0)
         self.inp_qty.setDecimals(1)
         self.inp_qty.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.inp_qty.valueChanged.connect(self.update_total_preview)
         
         lbl_q = QLabel("Quantity:")
         lbl_q.setStyleSheet("font-size: 14px; font-weight: bold;")
@@ -1590,12 +1591,31 @@ class QuickAddItemDialog(QDialog):
         self.inp_price.setMinimumHeight(45)
         self.inp_price.setStyleSheet("font-size: 18px; font-weight: bold;")
         self.inp_price.textEdited.connect(self.format_cash_input)
+        self.inp_price.textChanged.connect(self.update_total_preview)
         
         lbl_p = QLabel("Price (₱):")
         lbl_p.setStyleSheet("font-size: 14px; font-weight: bold;")
         form.addRow(lbl_p, self.inp_price)
         
         layout.addLayout(form)
+        
+        # Gorgeous dynamic Total Preview display
+        self.lbl_total_preview = QLabel("Total Preview: ₱0.00")
+        self.lbl_total_preview.setStyleSheet("""
+            QLabel {
+                font-size: 20px; 
+                font-weight: bold; 
+                color: #2ECC71; 
+                margin-top: 10px; 
+                margin-bottom: 10px;
+                background-color: #F8F9FA;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
+                padding: 10px;
+            }
+        """)
+        self.lbl_total_preview.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.lbl_total_preview)
         
         btn_confirm = QPushButton("Add to Cart (Enter)")
         btn_confirm.setStyleSheet("""
@@ -1614,6 +1634,9 @@ class QuickAddItemDialog(QDialog):
         """)
         btn_confirm.clicked.connect(self.accept_validation)
         layout.addWidget(btn_confirm)
+        
+        # Initialize total preview with defaults
+        self.update_total_preview()
 
     def format_cash_input(self, text):
         line_edit = self.sender()
@@ -1634,6 +1657,16 @@ class QuickAddItemDialog(QDialog):
                 new_pos = pos + (len(formatted) - len(old_text))
                 line_edit.setCursorPosition(max(0, new_pos))
         except ValueError: pass
+
+    def update_total_preview(self):
+        try:
+            qty = self.inp_qty.value()
+            price_str = self.inp_price.text().replace(',', '').strip()
+            price = float(price_str or 0.0)
+            total = qty * price
+            self.lbl_total_preview.setText(f"Total Preview: ₱{total:,.2f}")
+        except Exception:
+            self.lbl_total_preview.setText("Total Preview: ₱0.00")
 
     def accept_validation(self):
         if not self.inp_name.text().strip():
