@@ -835,9 +835,40 @@ class POSModule(QWidget):
             item_price = QTableWidgetItem(f"₱{item['price']:,.2f}")
             item_price.setFont(self.get_bold_font(16)) # Bold and bigger price
             
-            # Format quantity as raw numeric value to avoid suffix clutter
+            # Format quantity with bundles if applicable
             qty_val = item["qty"]
+            barcode = item["barcode"]
+            
             display_qty = str(int(qty_val)) if qty_val.is_integer() else str(qty_val)
+            
+            if item.get("is_bundle"):
+                b_suffix = item.get("bundle_name", "pck")
+                display_qty = f"{display_qty}{b_suffix}"
+            else:
+                if barcode in barcode_to_bundles:
+                    bundles_list = barcode_to_bundles[barcode]
+                    remaining = qty_val
+                    parts = []
+                    has_bundle_matched = False
+                    for b_name, b_qty in bundles_list:
+                        b_qty_float = float(b_qty)
+                        if b_qty_float <= 0:
+                            continue
+                        if remaining >= b_qty_float:
+                            b_count = int(remaining // b_qty_float)
+                            remaining = remaining % b_qty_float
+                            parts.append(f"{b_count}{b_name}")
+                            has_bundle_matched = True
+                    
+                    if has_bundle_matched:
+                        if remaining > 0:
+                            pcs_str = str(int(remaining)) if remaining.is_integer() else str(remaining)
+                            parts.append(f"{pcs_str}pcs")
+                        display_qty = " ".join(parts)
+                    else:
+                        display_qty = f"{display_qty}pcs"
+                else:
+                    display_qty = f"{display_qty}pcs"
             
             item_qty = QTableWidgetItem(display_qty)
             item_qty.setFont(self.get_bold_font(16))

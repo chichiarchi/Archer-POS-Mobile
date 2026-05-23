@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QShortcut, QKeySequence
 import database
-from printer_helper import ReceiptPrinter, clean_receipt_item_name, get_formatted_bundle_qty, split_item_for_receipt, clean_unit_name
+from printer_helper import ReceiptPrinter, clean_receipt_item_name, get_formatted_bundle_qty, split_item_for_receipt
 from datetime import datetime
 
 class ReceiptPreviewDialog(QDialog):
@@ -61,6 +61,7 @@ class ReceiptPreviewDialog(QDialog):
             items_table.setItem(i, 0, QTableWidgetItem(s_item['name']))
             
             qty_val = s_item['qty']
+            unit_name = s_item.get('unit_name', 'pcs')
             if isinstance(qty_val, float) and qty_val.is_integer():
                 qty_str = f"{int(qty_val):,d}"
             elif isinstance(qty_val, int):
@@ -68,7 +69,7 @@ class ReceiptPreviewDialog(QDialog):
             else:
                 qty_str = f"{qty_val:,.2f}"
                 
-            qty_display = qty_str
+            qty_display = f"{qty_str}{unit_name}"
             items_table.setItem(i, 1, QTableWidgetItem(qty_display))
             
             items_table.setItem(i, 2, QTableWidgetItem(f"₱{s_item['total']:,.2f}"))

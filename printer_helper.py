@@ -10,27 +10,6 @@ try:
     WIN32_AVAILABLE = True
 except ImportError:
     WIN32_AVAILABLE = False
-
-def clean_unit_name(unit_name):
-    if not unit_name:
-        return "pcs"
-    s = str(unit_name).strip()
-    s = " ".join(s.split())
-    words = s.split()
-    if not words:
-        return "pcs"
-    cleaned_words = []
-    for w in words:
-        if not cleaned_words or w.lower() != cleaned_words[-1].lower():
-            cleaned_words.append(w)
-    res = " ".join(cleaned_words)
-    lowered = res.lower()
-    if lowered == "pcs":
-        return "pcs"
-    if lowered == "pck":
-        return "pck"
-    return res
-
 def clean_receipt_item_name(barcode, name):
     # 1. Strip wholesale/retail tags
     for term in [" (Wholesale)", " (Retail)", " (Wholesales)", " (Retails)",
@@ -86,7 +65,7 @@ def get_formatted_bundle_qty(barcode, qty_val, name=""):
             if remaining >= b_qty_float:
                 b_count = int(remaining // b_qty_float)
                 remaining = remaining % b_qty_float
-                parts.append(f"{b_count}{clean_unit_name(b_name)}")
+                parts.append(f"{b_count}{b_name}")
                 has_bundle_matched = True
         
         if has_bundle_matched:
@@ -126,7 +105,7 @@ def split_item_for_receipt(item):
         for b_name, b_qty in bundles:
             if f"({b_name})" in raw_name or f" ({b_name})" in raw_name:
                 qty_int = int(qty_val) if qty_val.is_integer() else qty_val
-                return [{'qty': qty_int, 'unit_name': clean_unit_name(b_name), 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
+                return [{'qty': qty_int, 'unit_name': b_name, 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
                 
         # Sort bundles descending by quantity size
         sorted_bundles = sorted([(b[0], b[1]) for b in bundles], key=lambda x: x[1], reverse=True)
@@ -144,7 +123,7 @@ def split_item_for_receipt(item):
                 bundle_unit_price = b_qty_float * item_price
                 rows.append({
                     'qty': b_count,
-                    'unit_name': clean_unit_name(b_name),
+                    'unit_name': b_name,
                     'name': clean_name,
                     'price': bundle_unit_price,
                     'total': b_count * bundle_unit_price
@@ -421,8 +400,9 @@ class ReceiptPrinter:
                 split_rows = split_item_for_receipt(raw_item)
                 for s_item in split_rows:
                     qty_val = s_item['qty']
+                    unit_name = s_item.get('unit_name', 'pcs')
                     qty_num_str = f"{qty_val:g}" if isinstance(qty_val, float) else f"{qty_val}"
-                    qty_str = qty_num_str
+                    qty_str = f"{qty_num_str}{unit_name}"
                     
                     name = s_item['name']
                     unit_price = s_item['price']
