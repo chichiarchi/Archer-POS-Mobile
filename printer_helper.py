@@ -238,6 +238,7 @@ class ReceiptPrinter:
         This works on ALL Windows printers by 'drawing' the text.
         """
         if not WIN32_AVAILABLE:
+            self.last_error = "Windows printing library (pywin32) is not installed in the virtual environment. Please run setup_project.bat to install it."
             return False
 
         if not self.is_connected or not self.printer_name:
@@ -245,42 +246,34 @@ class ReceiptPrinter:
             if not self.is_connected:
                 return False
 
-        # Advanced Status Check & Queue Purging
+        # Advanced Status Check (Non-blocking)
         try:
             hprinter = win32print.OpenPrinter(self.printer_name)
-
-            printer_info = win32print.GetPrinter(hprinter, 2)
-            status = printer_info['Status']
-
-            paper_out = (status & win32print.PRINTER_STATUS_PAPER_OUT)
-            offline = (status & win32print.PRINTER_STATUS_OFFLINE) or (status & win32print.PRINTER_STATUS_NOT_AVAILABLE) or (status & win32print.PRINTER_STATUS_ERROR)
-
-            # Manually delete stuck jobs in the spooler to prevent "pile up"
-            # Using EnumJobs and SetJob avoids the "Access Denied" error that SetPrinter(PURGE) causes for non-admins
-            jobs = win32print.EnumJobs(hprinter, 0, -1, 1)
-            if jobs:
-                for job in jobs:
-                    try:
-                        win32print.SetJob(hprinter, job['JobId'], 0, None, win32print.JOB_CONTROL_DELETE)
-                    except Exception as e:
-                        logging.warning(f"Could not delete job {job['JobId']}: {e}")
+            try:
+                printer_info = win32print.GetPrinter(hprinter, 2)
+                status = printer_info['Status']
+                paper_out = (status & win32print.PRINTER_STATUS_PAPER_OUT)
+                offline = (status & win32print.PRINTER_STATUS_OFFLINE) or (status & win32print.PRINTER_STATUS_NOT_AVAILABLE) or (status & win32print.PRINTER_STATUS_ERROR)
                 
-                # If there were jobs stuck in the queue, the printer is likely offline or jammed
-                offline = True
+                if paper_out:
+                    logging.warning("Printer status reports OUT OF PAPER. Attempting to print anyway...")
+                if offline:
+                    logging.warning("Printer status reports OFFLINE or BUSY. Attempting to print anyway...")
+            except Exception as status_err:
+                logging.warning(f"Could not retrieve printer status flags: {status_err}")
+
+            # Safe check of queue size without deleting jobs
+            try:
+                jobs = win32print.EnumJobs(hprinter, 0, -1, 1)
+                if jobs:
+                    logging.info(f"Printer spooler queue has {len(jobs)} active jobs.")
+            except Exception as queue_err:
+                logging.warning(f"Could not query print queue: {queue_err}")
 
             win32print.ClosePrinter(hprinter)
+        except Exception as conn_err:
+            logging.warning(f"Could not open printer to check status: {conn_err}")
 
-            # Warning: Generic 58mm thermal drivers often do not report status properly to Windows.
-            if paper_out:
-                self.last_error = "Printer is OUT OF PAPER. Please insert a new roll."
-                return False
-            if offline:
-                self.last_error = "Printer is OFFLINE, TURNED OFF, or BUSY. Please power it on before printing."
-                return False
-
-        except Exception as e:
-            self.last_error = f"Failed to verify printer status: {e}"
-            return False
 
         try:
             # Create a Device Context (DC) for the printer

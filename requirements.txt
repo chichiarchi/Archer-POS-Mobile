@@ -12,3 +12,4 @@ qrcode==8.2
 setuptools==82.0.1
 shiboken6==6.11.0
 six==1.17.0
+pywin32==308
