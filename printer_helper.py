@@ -85,66 +85,8 @@ def split_item_for_receipt(item):
     
     clean_name = clean_receipt_item_name(barcode, raw_name)
     
-    if not barcode:
-        qty_int = int(qty_val) if qty_val.is_integer() else qty_val
-        return [{'qty': qty_int, 'unit_name': 'pcs', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
-        
-    try:
-        conn = database.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT bundle_name, quantity FROM product_bundles WHERE product_id=?", (barcode,))
-        bundles = cursor.fetchall()
-        conn.close()
-        
-        if not bundles:
-            qty_int = int(qty_val) if qty_val.is_integer() else qty_val
-            return [{'qty': qty_int, 'unit_name': 'pcs', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
-            
-        # If the name already contains one of the bundle names in parentheses, 
-        # then it is an explicitly scanned bundle package. We do not split it.
-        for b_name, b_qty in bundles:
-            if f"({b_name})" in raw_name or f" ({b_name})" in raw_name:
-                qty_int = int(qty_val) if qty_val.is_integer() else qty_val
-                return [{'qty': qty_int, 'unit_name': b_name, 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
-                
-        # Sort bundles descending by quantity size
-        sorted_bundles = sorted([(b[0], b[1]) for b in bundles], key=lambda x: x[1], reverse=True)
-        
-        remaining = qty_val
-        rows = []
-        for b_name, b_qty in sorted_bundles:
-            b_qty_float = float(b_qty)
-            if b_qty_float <= 0:
-                continue
-            if remaining >= b_qty_float:
-                b_count = int(remaining // b_qty_float)
-                remaining = remaining % b_qty_float
-                
-                bundle_unit_price = b_qty_float * item_price
-                rows.append({
-                    'qty': b_count,
-                    'unit_name': b_name,
-                    'name': clean_name,
-                    'price': bundle_unit_price,
-                    'total': b_count * bundle_unit_price
-                })
-                
-        if remaining > 0:
-            pcs_qty = int(remaining) if remaining.is_integer() else remaining
-            rows.append({
-                'qty': pcs_qty,
-                'unit_name': 'pcs',
-                'name': clean_name,
-                'price': item_price,
-                'total': remaining * item_price
-            })
-            
-        return rows if rows else [{'qty': int(qty_val) if qty_val.is_integer() else qty_val, 'unit_name': 'pcs', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
-        
-    except Exception as e:
-        logging.error(f"Error splitting receipt item: {e}")
-        qty_int = int(qty_val) if qty_val.is_integer() else qty_val
-        return [{'qty': qty_int, 'unit_name': 'pcs', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
+    qty_int = int(qty_val) if qty_val.is_integer() else qty_val
+    return [{'qty': qty_int, 'unit_name': '', 'name': clean_name, 'price': item_price, 'total': qty_val * item_price}]
 
 def get_bundle_qty(barcode, name):
     # If the product name contains a bundle name in parentheses, return its multiplier, else 1.0.
@@ -393,9 +335,8 @@ class ReceiptPrinter:
                 split_rows = split_item_for_receipt(raw_item)
                 for s_item in split_rows:
                     qty_val = s_item['qty']
-                    unit_name = s_item.get('unit_name', 'pcs')
                     qty_num_str = f"{qty_val:g}" if isinstance(qty_val, float) else f"{qty_val}"
-                    qty_str = f"{qty_num_str}{unit_name}"
+                    qty_str = qty_num_str
                     
                     name = s_item['name']
                     unit_price = s_item['price']

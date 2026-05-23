@@ -152,8 +152,8 @@ class POSModule(QWidget):
         layout.addLayout(top_layout)
 
         # Cart Table
-        self.cart_table = QTableWidget(0, 5)
-        self.cart_table.setHorizontalHeaderLabels(["Barcode", "Product Name", "Pricing", "Price", "Qty"])
+        self.cart_table = QTableWidget(0, 6)
+        self.cart_table.setHorizontalHeaderLabels(["Barcode", "Product Name", "Pricing", "Price", "Total", "Qty"])
         self.cart_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
         self.cart_table.setColumnWidth(0, 140)
         self.cart_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -162,7 +162,9 @@ class POSModule(QWidget):
         self.cart_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
         self.cart_table.setColumnWidth(3, 110)
         self.cart_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.cart_table.setColumnWidth(4, 180)
+        self.cart_table.setColumnWidth(4, 120)
+        self.cart_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        self.cart_table.setColumnWidth(5, 150)
         self.cart_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.cart_table.setStyleSheet("font-size: 16px;")
         self.cart_table.horizontalHeader().setStyleSheet("font-size: 16px; font-weight: bold;")
@@ -382,7 +384,7 @@ class POSModule(QWidget):
     def eventFilter(self, obj, event):
         # Commit inline qty editor when its spinbox loses focus, or handle Escape/Enter
         if self._qty_editor_row >= 0:
-            widget = self.cart_table.cellWidget(self._qty_editor_row, 4)
+            widget = self.cart_table.cellWidget(self._qty_editor_row, 5)
             if isinstance(widget, QSpinBox) and (obj is widget or obj is widget.lineEdit()):
                 if event.type() == QEvent.FocusOut:
                     self._commit_qty_editor()
@@ -444,11 +446,11 @@ class POSModule(QWidget):
         )
         self.update_cart_display()
         # Re-select the same row after refresh
-        self.cart_table.setCurrentCell(current_row, 4)
+        self.cart_table.setCurrentCell(current_row, 5)
 
     def on_cell_double_clicked(self, row, col):
         """Open an inline QSpinBox editor in the Qty cell on double-click."""
-        if col != 4:  # Only allow editing the Qty column
+        if col != 5:  # Only allow editing the Qty column
             return
         if row < 0 or row >= len(self.cart):
             return
@@ -474,7 +476,7 @@ class POSModule(QWidget):
         editor.installEventFilter(self)
         editor.lineEdit().installEventFilter(self)
 
-        self.cart_table.setCellWidget(row, 4, editor)
+        self.cart_table.setCellWidget(row, 5, editor)
         editor.setFocus()
         editor.selectAll()
 
@@ -485,7 +487,7 @@ class POSModule(QWidget):
             self._qty_editor_row = -1
             return
 
-        widget = self.cart_table.cellWidget(row, 4)
+        widget = self.cart_table.cellWidget(row, 5)
         if isinstance(widget, QSpinBox):
             new_qty = widget.value()
             if new_qty > 0:
@@ -692,7 +694,7 @@ class POSModule(QWidget):
         
         self.update_cart_display()
         if self.cart_table.rowCount() > 0:
-            self.cart_table.setCurrentCell(0, 4)
+            self.cart_table.setCurrentCell(0, 5)
 
     def update_cart_display(self):
         # Dynamically apply volume-based and bundle-based pricing adjustments in the cart.
@@ -801,6 +803,25 @@ class POSModule(QWidget):
             item_price = QTableWidgetItem(formatted_price)
             item_price.setFont(self.get_bold_font(16))
             
+            # Format subtotal/total of this item
+            subtotal = item["price"] * item["qty"]
+            subtotal_str = f"{subtotal:.3f}".rstrip('0').rstrip('.')
+            if '.' in subtotal_str:
+                sub_parts = subtotal_str.split('.')
+                if len(sub_parts[1]) < 2:
+                    subtotal_str = f"{subtotal:.2f}"
+            else:
+                subtotal_str = f"{subtotal:.2f}"
+                
+            try:
+                sub_whole, sub_decimal = subtotal_str.split('.')
+                formatted_subtotal = f"₱{int(sub_whole):,}.{sub_decimal}"
+            except ValueError:
+                formatted_subtotal = f"₱{subtotal:,.2f}"
+                
+            item_subtotal = QTableWidgetItem(formatted_subtotal)
+            item_subtotal.setFont(self.get_bold_font(16))
+            
             qty_val = item["qty"]
             display_qty = str(int(qty_val)) if qty_val.is_integer() else str(qty_val)
             
@@ -811,7 +832,8 @@ class POSModule(QWidget):
             self.cart_table.setItem(i, 1, item_name)
             self.cart_table.setItem(i, 2, item_pricing)
             self.cart_table.setItem(i, 3, item_price)
-            self.cart_table.setItem(i, 4, item_qty)
+            self.cart_table.setItem(i, 4, item_subtotal)
+            self.cart_table.setItem(i, 5, item_qty)
             total += round(item["price"] * item["qty"], 4)
  
         self.total_label.setText(f"Total: ₱{round(total, 2):,.2f}")

@@ -69,7 +69,7 @@ class ReceiptPreviewDialog(QDialog):
             else:
                 qty_str = f"{qty_val:,.2f}"
                 
-            qty_display = f"{qty_str}{unit_name}"
+            qty_display = qty_str
             items_table.setItem(i, 1, QTableWidgetItem(qty_display))
             
             items_table.setItem(i, 2, QTableWidgetItem(f"₱{s_item['total']:,.2f}"))
