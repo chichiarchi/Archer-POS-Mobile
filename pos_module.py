@@ -57,6 +57,77 @@ class POSModule(QWidget):
         
         top_layout.addWidget(self.search_input)
 
+        # Quantity Pre-selection Spinbox
+        self.qty_label = QLabel("Qty:")
+        self.qty_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #1E293B; margin-left: 10px;")
+        top_layout.addWidget(self.qty_label)
+        
+        self.qty_input = QSpinBox()
+        self.qty_input.setRange(1, 99999)
+        self.qty_input.setValue(1)
+        self.qty_input.setMinimumHeight(50)
+        self.qty_input.setMinimumWidth(80)
+        self.qty_input.setMaximumWidth(120)
+        self.qty_input.setStyleSheet("""
+            QSpinBox {
+                font-size: 18px; 
+                font-weight: bold; 
+                padding-left: 10px;
+                padding-right: 32px; /* Leaves room for sleek custom buttons */
+                background-color: #F8FAFC; 
+                border: 2px solid #CBD5E1; 
+                border-radius: 8px;
+                color: #1E293B;
+            }
+            QSpinBox:focus {
+                border: 2px solid #0072FF;
+                background-color: #FFFFFF;
+            }
+            QSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 28px;
+                height: 24px;
+                border-left: 1px solid #CBD5E1;
+                border-bottom: 1px solid #E2E8F0;
+                border-top-right-radius: 6px;
+                background-color: #F1F5F9;
+            }
+            QSpinBox::up-button:hover {
+                background-color: #E2E8F0;
+            }
+            QSpinBox::up-button:pressed {
+                background-color: #CBD5E1;
+            }
+            QSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 28px;
+                height: 24px;
+                border-left: 1px solid #CBD5E1;
+                border-bottom-right-radius: 6px;
+                background-color: #F1F5F9;
+            }
+            QSpinBox::down-button:hover {
+                background-color: #E2E8F0;
+            }
+            QSpinBox::down-button:pressed {
+                background-color: #CBD5E1;
+            }
+            QSpinBox::up-arrow {
+                image: url(up_arrow.svg);
+                width: 10px;
+                height: 10px;
+            }
+            QSpinBox::down-arrow {
+                image: url(down_arrow.svg);
+                width: 10px;
+                height: 10px;
+            }
+        """)
+        self.qty_input.setAlignment(Qt.AlignCenter)
+        top_layout.addWidget(self.qty_input)
+
         # Global Pricing Mode Toggle Button
         self.btn_pricing_mode = QPushButton("Pricing: RETAIL (Ctrl+W)")
         self.btn_pricing_mode.setMinimumHeight(50)
@@ -312,7 +383,7 @@ class POSModule(QWidget):
         # Commit inline qty editor when its spinbox loses focus, or handle Escape/Enter
         if self._qty_editor_row >= 0:
             widget = self.cart_table.cellWidget(self._qty_editor_row, 4)
-            if obj is widget:
+            if isinstance(widget, QSpinBox) and (obj is widget or obj is widget.lineEdit()):
                 if event.type() == QEvent.FocusOut:
                     self._commit_qty_editor()
                     return False  # Don't consume focus event
@@ -324,7 +395,7 @@ class POSModule(QWidget):
                         # Cancel: discard editor without committing
                         self._qty_editor_row = -1
                         self.update_cart_display()
-                        self.cart_table.setFocus()
+                        QTimer.singleShot(50, self.search_input.setFocus)
                         return True
 
         if event.type() == QEvent.KeyPress:
@@ -399,8 +470,9 @@ class POSModule(QWidget):
 
         # Commit on Enter/Return
         editor.editingFinished.connect(lambda: self._commit_qty_editor())
-        # Also commit if focus leaves the spinbox
+        # Also commit if focus leaves the spinbox, and capture key presses on the internal lineEdit!
         editor.installEventFilter(self)
+        editor.lineEdit().installEventFilter(self)
 
         self.cart_table.setCellWidget(row, 4, editor)
         editor.setFocus()
@@ -426,7 +498,7 @@ class POSModule(QWidget):
 
         self._qty_editor_row = -1
         self.update_cart_display()
-        self.cart_table.setFocus()
+        QTimer.singleShot(50, self.search_input.setFocus)
 
     def refresh_completer(self):
         conn = database.get_connection()
@@ -491,13 +563,9 @@ class POSModule(QWidget):
             conn = database.get_connection()
             cursor = conn.cursor()
             product = None
-            bundles = []
             try:
                 cursor.execute("SELECT id, name, price, wholesale_price FROM products WHERE id=?", (barcode,))
                 product = cursor.fetchone()
-                if product:
-                    cursor.execute("SELECT bundle_name, quantity, price, wholesale_price FROM product_bundles WHERE product_id=?", (barcode,))
-                    bundles = cursor.fetchall()
             finally:
                 conn.close()
 
@@ -515,26 +583,18 @@ class POSModule(QWidget):
                     p_type = "retail"
                     
                 is_manual_multiplier = '*' in text
-                
-                if bundles:
-                    is_deferred = True
-                    # Defer showing the package selection dialog to let key buffers clear
-                    QTimer.singleShot(150, lambda: self.prompt_package_selection(
-                        p_id, p_name, retail_p, wholesale_p, bundles, qty_to_add, is_manual_multiplier, p_type
-                    ))
+                if not is_manual_multiplier:
+                    final_qty = float(self.qty_input.value())
                 else:
-                    if not is_manual_multiplier:
-                        final_qty = 1.0
-                        self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, p_price, p_type)
-                    else:
-                        is_deferred = True
-                        # Defer showing the AddToCartDialog to let key buffers clear
-                        QTimer.singleShot(150, lambda: self.prompt_add_to_cart_multiplier(p_id, p_name, p_price, qty_to_add, p_type))
+                    final_qty = qty_to_add
+                
+                # Reset quantity pre-selection spinbox to 1 after consumption
+                self.qty_input.setValue(1)
+                
+                self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, p_price, p_type)
             else:
                 is_deferred = True
                 # Defer prompting the add new product workflow after a 150ms delay.
-                # This delay allows any buffered keys or carriage returns from the barcode scanner
-                # to be fully processed and discarded by the OS before any modal dialogs are presented.
                 QTimer.singleShot(150, lambda: self.prompt_add_new_product(barcode))
 
         finally:
@@ -545,43 +605,7 @@ class POSModule(QWidget):
                 # Ensure input is cleared (handles completer re-fill race condition)
                 QTimer.singleShot(50, self.search_input.clear)
 
-    def prompt_package_selection(self, p_id, p_name, retail_p, wholesale_p, bundles, qty_to_add, is_manual_multiplier, pricing_type="retail"):
-        self.search_input.setEnabled(False)
-        try:
-            dialog = PackageSelectionDialog(p_name, retail_p, wholesale_p, bundles, self)
-            if dialog.exec():
-                choice = dialog.selected_choice
-                if choice is None:
-                    # Single item chosen
-                    single_price = wholesale_p if (pricing_type == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
-                    p_price_name = p_name
-                    if pricing_type == "wholesale" and wholesale_p and wholesale_p > 0:
-                        if " (Wholesale)" not in p_price_name:
-                            p_price_name += " (Wholesale)"
-                    
-                    if not is_manual_multiplier:
-                        self.add_product_to_cart_record(p_id, p_price_name, single_price, 1.0, single_price, pricing_type)
-                    else:
-                        self.prompt_add_to_cart_multiplier(p_id, p_price_name, single_price, qty_to_add, pricing_type)
-                else:
-                    # Bundle chosen: choice is (bundle_name, qty, price, wholesale_price)
-                    b_name, b_qty, b_retail_price, b_wholesale_price = choice
-                    
-                    # Determine bundle price based on pricing_type
-                    bundle_price = b_wholesale_price if (pricing_type == "wholesale" and b_wholesale_price and b_wholesale_price > 0) else b_retail_price
-                    bundle_display_name = f"{p_name} ({b_name})"
-                    if pricing_type == "wholesale" and b_wholesale_price and b_wholesale_price > 0:
-                        if " (Wholesale)" not in bundle_display_name:
-                            bundle_display_name += " (Wholesale)"
-                    
-                    # Use multiplier if keyed in
-                    final_qty = qty_to_add if is_manual_multiplier else 1.0
-                    self.add_product_to_cart_record(p_id, bundle_display_name, bundle_price, final_qty, bundle_price, pricing_type, is_bundle=True, bundle_name=b_name)
-        finally:
-            self._last_add_time = time.time()
-            self.search_input.setEnabled(True)
-            self.search_input.setFocus()
-            QTimer.singleShot(50, self.search_input.clear)
+
 
     def prompt_add_new_product(self, barcode):
         self.search_input.setEnabled(False)
@@ -640,33 +664,14 @@ class POSModule(QWidget):
             self.search_input.setFocus()
             QTimer.singleShot(50, self.search_input.clear)
 
-    def prompt_add_to_cart_multiplier(self, p_id, p_name, p_price, qty_to_add, pricing_type="retail"):
-        self.search_input.setEnabled(False)
-        try:
-            dialog = AddToCartDialog(p_name, int(qty_to_add), p_price, self)
-            if dialog.exec():
-                final_qty, final_price = dialog.get_data()
-                if final_qty > 0:
-                    # If price is changed, require admin
-                    if abs(final_price - p_price) > 0.001:
-                        if not self.verify_admin():
-                            return
-                    self.add_product_to_cart_record(p_id, p_name, p_price, final_qty, final_price, pricing_type)
-        finally:
-            self._last_add_time = time.time()
-            self.search_input.setEnabled(True)
-            self.search_input.setFocus()
-            QTimer.singleShot(50, self.search_input.clear)
+
 
     def add_product_to_cart_record(self, p_id, p_name, p_price, final_qty, final_price, pricing_type="retail", is_bundle=False, bundle_name=None):
-        # Check if already in cart with exact same barcode, price, pricing_type, bundle status and name
+        # Check if already in cart with exact same barcode and pricing_type
         found_item = None
         for item in self.cart:
             if (item["barcode"] == p_id and 
-                item.get("pricing_type", "retail") == pricing_type and 
-                item.get("is_bundle", False) == is_bundle and 
-                item.get("bundle_name") == bundle_name and 
-                abs(item["price"] - final_price) < 0.001):
+                item.get("pricing_type", "retail") == pricing_type):
                 found_item = item
                 break
 
@@ -683,8 +688,6 @@ class POSModule(QWidget):
                 "price": final_price, 
                 "qty": final_qty,
                 "pricing_type": pricing_type,
-                "is_bundle": is_bundle,
-                "bundle_name": bundle_name
             })
         
         self.update_cart_display()
@@ -692,53 +695,9 @@ class POSModule(QWidget):
             self.cart_table.setCurrentCell(0, 4)
 
     def update_cart_display(self):
-        # 0. Merge loose items that meet bundle threshold into existing explicit bundles if present
+        # Dynamically apply volume-based and bundle-based pricing adjustments in the cart.
         conn = database.get_connection()
         cursor = conn.cursor()
-        try:
-            barcodes_in_cart = set(item["barcode"] for item in self.cart)
-            items_to_remove = []
-            for barcode in barcodes_in_cart:
-                cursor.execute("SELECT bundle_name, quantity FROM product_bundles WHERE product_id=?", (barcode,))
-                bundles = cursor.fetchall()
-                if not bundles:
-                    continue
-                sorted_bundles = sorted(bundles, key=lambda x: x[1], reverse=True)
-                explicit_bundles = [item for item in self.cart if item["barcode"] == barcode and item.get("is_bundle")]
-                if not explicit_bundles:
-                    continue
-                loose_items = [item for item in self.cart if item["barcode"] == barcode and not item.get("is_bundle")]
-                if not loose_items:
-                    continue
-                for item in loose_items:
-                    for b_name, b_qty in sorted_bundles:
-                        b_qty_float = float(b_qty)
-                        if b_qty_float <= 0:
-                            continue
-                        matching_eb = None
-                        for eb in explicit_bundles:
-                            if eb.get("bundle_name") == b_name:
-                                matching_eb = eb
-                                break
-                        if matching_eb and item["qty"] >= b_qty_float:
-                            num_packs = int(item["qty"] // b_qty_float)
-                            matching_eb["qty"] += num_packs
-                            item["qty"] -= num_packs * b_qty_float
-                    if item["qty"] <= 0.001:
-                        items_to_remove.append(item)
-            for item in items_to_remove:
-                if item in self.cart:
-                    self.cart.remove(item)
-        except Exception as e:
-            import logging
-            logging.error(f"Error merging loose pieces to existing bundles: {e}")
-        finally:
-            conn.close()
-
-        # 1. Dynamically apply volume-based and bundle-based pricing adjustments for loose pieces in the cart.
-        conn = database.get_connection()
-        cursor = conn.cursor()
-        barcode_to_bundles = {}
         try:
             # Group items by barcode to process each product collectively
             barcodes_in_cart = set(item["barcode"] for item in self.cart)
@@ -748,67 +707,58 @@ class POSModule(QWidget):
                 cursor.execute("SELECT bundle_name, quantity, price, wholesale_price FROM product_bundles WHERE product_id=?", (barcode,))
                 bundles = cursor.fetchall()
                 
-                # If no bundles are configured for this product, reset to base retail/wholesale price
-                if not bundles:
-                    for item in self.cart:
-                        if item["barcode"] == barcode and not item.get("is_bundle"):
-                            if not item.get("manually_discounted"):
-                                cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (barcode,))
-                                p_row = cursor.fetchone()
-                                if p_row:
-                                    retail_p, wholesale_p = p_row
-                                    base_price = wholesale_p if (item.get("pricing_type") == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
-                                    item["price"] = base_price
+                # Fetch base product details
+                cursor.execute("SELECT name, price, wholesale_price FROM products WHERE id=?", (barcode,))
+                prod_row = cursor.fetchone()
+                if not prod_row:
                     continue
                 
-                # Store bundles sorted by quantity descending for display formatting
-                sorted_bundles = sorted([(b[0], b[1]) for b in bundles], key=lambda x: x[1], reverse=True)
-                barcode_to_bundles[barcode] = sorted_bundles
+                base_name, base_retail, base_wholesale = prod_row
                 
-                # Check if a bundle item of this barcode is explicitly scanned in the cart
-                explicit_bundles = [item for item in self.cart if item["barcode"] == barcode and item.get("is_bundle")]
+                # Filter cart items of this barcode
+                prod_items = [item for item in self.cart if item["barcode"] == barcode]
                 
-                # Sum up total quantity of loose items of this barcode in the cart
-                loose_items = [item for item in self.cart if item["barcode"] == barcode and not item.get("is_bundle")]
-                total_loose_qty = sum(item["qty"] for item in loose_items)
+                # Sum up total quantity of this barcode in the cart
+                total_qty = sum(item["qty"] for item in prod_items)
                 
-                # Determine all unlocked per-piece rates
-                unlocked_rates = []
-                
-                # Rate from explicitly scanned bundles
-                for eb in explicit_bundles:
-                    eb_name = eb.get("bundle_name")
+                for item in prod_items:
+                    pricing_type = item.get("pricing_type", "retail")
+                    
+                    # Determine base price
+                    base_price = base_wholesale if (pricing_type == "wholesale" and base_wholesale and base_wholesale > 0) else base_retail
+                    
+                    # If no bundles are configured for this product, use the base price
+                    if not bundles:
+                        if not item.get("manually_discounted"):
+                            item["price"] = base_price
+                        continue
+                    
+                    # Find all unlocked per-piece rates based on the total quantity
+                    unlocked_rates = []
+                    
                     for b_name, b_qty, b_retail_price, b_wholesale_price in bundles:
-                        if b_name == eb_name:
-                            qty_float = float(b_qty)
-                            if qty_float > 0:
-                                unlocked_rates.append(eb["price"] / qty_float)
-                
-                # Rate from loose quantity volume thresholds
-                for b_name, b_qty, b_retail_price, b_wholesale_price in bundles:
-                    qty_float = float(b_qty)
-                    if qty_float > 0 and qty_float <= total_loose_qty:
-                        # Determine bundle price based on pricing type
-                        pricing_type = loose_items[0].get("pricing_type", "retail") if loose_items else "retail"
-                        bundle_price = b_wholesale_price if (pricing_type == "wholesale" and b_wholesale_price and b_wholesale_price > 0) else b_retail_price
-                        unlocked_rates.append(bundle_price / qty_float)
-                
-                # Apply the best unlocked rate to all loose items, or revert to base price if none unlocked
-                if unlocked_rates:
-                    best_rate = min(unlocked_rates)
-                    for item in loose_items:
+                        qty_float = float(b_qty)
+                        if qty_float > 0 and qty_float <= total_qty:
+                            # Determine bundle price based on pricing type
+                            bundle_price = b_wholesale_price if (pricing_type == "wholesale" and b_wholesale_price and b_wholesale_price > 0) else b_retail_price
+                            # Per-piece rate is bundle price divided by bundle quantity
+                            unlocked_rates.append(bundle_price / qty_float)
+                    
+                    # Apply the best unlocked rate (cheapest per-piece price), or revert to base price if none unlocked
+                    if unlocked_rates:
+                        best_rate = min(unlocked_rates)
                         if not item.get("manually_discounted"):
                             item["price"] = best_rate
-                else:
-                    # No bundle thresholds met; restore base product price
-                    for item in loose_items:
+                    else:
                         if not item.get("manually_discounted"):
-                            cursor.execute("SELECT price, wholesale_price FROM products WHERE id=?", (barcode,))
-                            p_row = cursor.fetchone()
-                            if p_row:
-                                retail_p, wholesale_p = p_row
-                                base_price = wholesale_p if (item.get("pricing_type") == "wholesale" and wholesale_p and wholesale_p > 0) else retail_p
-                                item["price"] = base_price
+                            item["price"] = base_price
+                            
+                    # Update cart display name to keep it clean (without any old bundle suffixes)
+                    cleaned_name = base_name
+                    if pricing_type == "wholesale" and base_wholesale and base_wholesale > 0:
+                        if " (Wholesale)" not in cleaned_name:
+                            cleaned_name += " (Wholesale)"
+                    item["name"] = cleaned_name
                             
         except Exception as e:
             import logging
@@ -832,10 +782,25 @@ class POSModule(QWidget):
             else:
                 item_pricing.setForeground(Qt.darkGreen)
             
-            item_price = QTableWidgetItem(f"₱{item['price']:,.2f}")
-            item_price.setFont(self.get_bold_font(16)) # Bold and bigger price
+            # Format unit price dynamically to show up to 3 decimal places if it has fractional cents
+            price_str = f"{item['price']:.3f}".rstrip('0').rstrip('.')
+            if '.' in price_str:
+                parts = price_str.split('.')
+                if len(parts[1]) < 2:
+                    price_str = f"{item['price']:.2f}"
+            else:
+                price_str = f"{item['price']:.2f}"
+                
+            # Formatting with thousands separator
+            try:
+                whole, decimal = price_str.split('.')
+                formatted_price = f"₱{int(whole):,}.{decimal}"
+            except ValueError:
+                formatted_price = f"₱{item['price']:,.2f}"
+                
+            item_price = QTableWidgetItem(formatted_price)
+            item_price.setFont(self.get_bold_font(16))
             
-            # Format quantity (show raw number only with no suffixes)
             qty_val = item["qty"]
             display_qty = str(int(qty_val)) if qty_val.is_integer() else str(qty_val)
             
@@ -847,9 +812,9 @@ class POSModule(QWidget):
             self.cart_table.setItem(i, 2, item_pricing)
             self.cart_table.setItem(i, 3, item_price)
             self.cart_table.setItem(i, 4, item_qty)
-            total += item["price"] * item["qty"]
-
-        self.total_label.setText(f"Total: ₱{total:,.2f}")
+            total += round(item["price"] * item["qty"], 4)
+ 
+        self.total_label.setText(f"Total: ₱{round(total, 2):,.2f}")
 
     def park_sale(self):
         if not self.cart:
@@ -960,6 +925,7 @@ class POSModule(QWidget):
             self.cart[current_row]["qty"] = int(new_qty)
             database.log_action("POS_QTY_UPDATE", f"Changed qty of {self.cart[current_row]['name']} to {new_qty}", self.user_role)
             self.update_cart_display()
+            self.search_input.setFocus()
 
     def delete_item(self):
         current_row = self.cart_table.currentRow()
@@ -1444,78 +1410,7 @@ class DiscountDialog(QDialog):
             return 0.0
 
 
-class PackageSelectionDialog(QDialog):
-    def __init__(self, product_name, single_retail_price, single_wholesale_price, bundles, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Select Package / Bundle")
-        self.setMinimumWidth(450)
-        self.selected_choice = None # Will store None (single) or bundle tuple (bundle_name, qty, price, wholesale_price)
-        self.product_name = product_name
-        self.single_retail_price = single_retail_price
-        self.single_wholesale_price = single_wholesale_price
-        self.bundles = bundles
-        self.setup_ui()
 
-    def setup_ui(self):
-        layout = QVBoxLayout(self)
-        
-        lbl_title = QLabel(f"Select Package for:\n{self.product_name}")
-        lbl_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #1E293B; margin-bottom: 10px;")
-        lbl_title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(lbl_title)
-        
-        self.list_widget = QListWidget()
-        self.list_widget.setStyleSheet("font-size: 16px; padding: 5px;")
-        
-        # Option 1: Single
-        single_wh = self.single_wholesale_price if (self.single_wholesale_price and self.single_wholesale_price > 0) else self.single_retail_price
-        item_single = QListWidgetItem(f"1. Single (1 pc) - Retail: ₱{self.single_retail_price:,.2f} | Wholesale: ₱{single_wh:,.2f}")
-        item_single.setData(Qt.UserRole, None)
-        self.list_widget.addItem(item_single)
-        
-        # Bundle options
-        for idx, b in enumerate(self.bundles, start=2):
-            b_name, b_qty, b_price, b_wholesale_price = b
-            b_wh = b_wholesale_price if (b_wholesale_price and b_wholesale_price > 0) else b_price
-            item = QListWidgetItem(f"{idx}. {b_name} ({int(b_qty)} pcs) - Retail: ₱{b_price:,.2f} | Wholesale: ₱{b_wh:,.2f}")
-            item.setData(Qt.UserRole, b)
-            self.list_widget.addItem(item)
-            
-        self.list_widget.setCurrentRow(0)
-        layout.addWidget(self.list_widget)
-        
-        lbl_hint = QLabel("Use Arrow Keys + Enter or press [1, 2...] key to select")
-        lbl_hint.setStyleSheet("font-size: 12px; color: #64748B; font-style: italic;")
-        lbl_hint.setAlignment(Qt.AlignCenter)
-        layout.addWidget(lbl_hint)
-        
-        btn_confirm = QPushButton("Confirm")
-        btn_confirm.setMinimumHeight(40)
-        btn_confirm.clicked.connect(self.confirm_selection)
-        layout.addWidget(btn_confirm)
-        
-        # Double click to confirm
-        self.list_widget.itemDoubleClicked.connect(self.confirm_selection)
-        
-    def keyPressEvent(self, event):
-        key = event.key()
-        # Direct key mappings for 1, 2, 3...
-        if Qt.Key_1 <= key <= Qt.Key_9:
-            idx = key - Qt.Key_1
-            if idx < self.list_widget.count():
-                self.list_widget.setCurrentRow(idx)
-                self.confirm_selection()
-                return
-        elif key in (Qt.Key_Return, Qt.Key_Enter):
-            self.confirm_selection()
-            return
-        super().keyPressEvent(event)
-        
-    def confirm_selection(self):
-        current_item = self.list_widget.currentItem()
-        if current_item:
-            self.selected_choice = current_item.data(Qt.UserRole)
-            self.accept()
 
 
 class QuickAddItemDialog(QDialog):
