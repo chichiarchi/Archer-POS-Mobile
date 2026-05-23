@@ -15,6 +15,16 @@ import printer_helper
 from printer_helper import ReceiptPrinter
 # Import StockInDialog for the "Add Product" prompt
 from inventory_module import StockInDialog
+import os
+import sys
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class POSModule(QWidget):
     def __init__(self, user_role="staff"):
@@ -68,8 +78,10 @@ class POSModule(QWidget):
         self.qty_input.setMinimumHeight(50)
         self.qty_input.setMinimumWidth(80)
         self.qty_input.setMaximumWidth(120)
-        self.qty_input.setStyleSheet("""
-            QSpinBox {
+        up_path = resource_path("up_arrow.svg").replace("\\", "/")
+        down_path = resource_path("down_arrow.svg").replace("\\", "/")
+        self.qty_input.setStyleSheet(f"""
+            QSpinBox {{
                 font-size: 18px; 
                 font-weight: bold; 
                 padding-left: 10px;
@@ -78,12 +90,12 @@ class POSModule(QWidget):
                 border: 2px solid #CBD5E1; 
                 border-radius: 8px;
                 color: #1E293B;
-            }
-            QSpinBox:focus {
+            }}
+            QSpinBox:focus {{
                 border: 2px solid #0072FF;
                 background-color: #FFFFFF;
-            }
-            QSpinBox::up-button {
+            }}
+            QSpinBox::up-button {{
                 subcontrol-origin: border;
                 subcontrol-position: top right;
                 width: 28px;
@@ -92,14 +104,14 @@ class POSModule(QWidget):
                 border-bottom: 1px solid #E2E8F0;
                 border-top-right-radius: 6px;
                 background-color: #F1F5F9;
-            }
-            QSpinBox::up-button:hover {
+            }}
+            QSpinBox::up-button:hover {{
                 background-color: #E2E8F0;
-            }
-            QSpinBox::up-button:pressed {
+            }}
+            QSpinBox::up-button:pressed {{
                 background-color: #CBD5E1;
-            }
-            QSpinBox::down-button {
+            }}
+            QSpinBox::down-button {{
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
                 width: 28px;
@@ -107,23 +119,23 @@ class POSModule(QWidget):
                 border-left: 1px solid #CBD5E1;
                 border-bottom-right-radius: 6px;
                 background-color: #F1F5F9;
-            }
-            QSpinBox::down-button:hover {
+            }}
+            QSpinBox::down-button:hover {{
                 background-color: #E2E8F0;
-            }
-            QSpinBox::down-button:pressed {
+            }}
+            QSpinBox::down-button:pressed {{
                 background-color: #CBD5E1;
-            }
-            QSpinBox::up-arrow {
-                image: url(up_arrow.svg);
+            }}
+            QSpinBox::up-arrow {{
+                image: url("{up_path}");
                 width: 10px;
                 height: 10px;
-            }
-            QSpinBox::down-arrow {
-                image: url(down_arrow.svg);
+            }}
+            QSpinBox::down-arrow {{
+                image: url("{down_path}");
                 width: 10px;
                 height: 10px;
-            }
+            }}
         """)
         self.qty_input.setAlignment(Qt.AlignCenter)
         top_layout.addWidget(self.qty_input)
@@ -220,20 +232,7 @@ class POSModule(QWidget):
 
         # Bottom Bar: Total & Checkout
         bottom_layout = QHBoxLayout()
-        self.total_label = QLabel("Total: ₱0.00")
-        self.total_label.setStyleSheet("""
-            font-size: 42px; 
-            font-weight: 900; 
-            color: #0072FF; 
-            background-color: #F8FAFC;
-            border: 2px solid #0072FF;
-            border-radius: 12px;
-            padding: 15px 30px;
-        """)
-        bottom_layout.addWidget(self.total_label)
-
-        bottom_layout.addStretch()
-
+        
         self.btn_checkout = QPushButton("Checkout (F12)")
         self.btn_checkout.setMinimumWidth(180)
         self.btn_checkout.setStyleSheet("""
@@ -258,6 +257,20 @@ class POSModule(QWidget):
         QShortcut(QKeySequence("Ctrl+Return"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.checkout)
         QShortcut(QKeySequence("F12"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.checkout)
         bottom_layout.addWidget(self.btn_checkout)
+
+        bottom_layout.addStretch()
+
+        self.total_label = QLabel("Total: ₱0.00")
+        self.total_label.setStyleSheet("""
+            font-size: 42px; 
+            font-weight: 900; 
+            color: #0072FF; 
+            background-color: #F8FAFC;
+            border: 2px solid #0072FF;
+            border-radius: 12px;
+            padding: 15px 30px;
+        """)
+        bottom_layout.addWidget(self.total_label)
 
         layout.addLayout(bottom_layout)
 

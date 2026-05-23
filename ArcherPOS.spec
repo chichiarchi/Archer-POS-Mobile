@@ -65,7 +65,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['archer_logo.ico'],
+    icon='archer_logo.ico',
 )
 coll = COLLECT(
     exe,
