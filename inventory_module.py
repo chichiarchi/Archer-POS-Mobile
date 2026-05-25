@@ -1,10 +1,13 @@
+import os
+from datetime import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, 
     QTableWidget, QTableWidgetItem, QLabel, QMessageBox, QDialog, QFormLayout, QDateEdit, QHeaderView, QInputDialog,
-    QDoubleSpinBox
+    QDoubleSpinBox, QFileDialog
 )
-from PySide6.QtCore import Qt, QDate
-from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtCore import Qt, QDate, QMarginsF
+from PySide6.QtGui import QShortcut, QKeySequence, QTextDocument, QPageLayout
+from PySide6.QtPrintSupport import QPrinter
 import database
 
 class InventoryModule(QWidget):
@@ -48,6 +51,12 @@ class InventoryModule(QWidget):
         self.btn_manage_bundles.clicked.connect(self.show_manage_bundles_dialog)
         QShortcut(QKeySequence("Ctrl+B"), self, context=Qt.WidgetWithChildrenShortcut).activated.connect(self.show_manage_bundles_dialog)
         top_layout.addWidget(self.btn_manage_bundles)
+
+        self.btn_generate_pdf = QPushButton("Generate Price List PDF")
+        self.btn_generate_pdf.setMinimumHeight(45)
+        self.btn_generate_pdf.setStyleSheet("font-size: 14px; font-weight: bold; color: #0284c7;")
+        self.btn_generate_pdf.clicked.connect(self.generate_price_list_pdf)
+        top_layout.addWidget(self.btn_generate_pdf)
 
         layout.addLayout(top_layout)
 
@@ -160,6 +169,284 @@ class InventoryModule(QWidget):
     def refresh_all(self):
         self.current_page = 0
         self.load_inventory()
+
+    def generate_price_list_pdf(self):
+        # Open save file dialog
+        default_name = os.path.join(os.path.expanduser("~"), "Documents", "Archer_Product_Price_List.pdf")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Price List PDF",
+            default_name,
+            "PDF Files (*.pdf)"
+        )
+        
+        if not file_path:
+            return # User cancelled
+
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+
+        try:
+            conn = database.get_connection()
+            cursor = conn.cursor()
+            
+            # Fetch all products sorted alphabetically
+            cursor.execute("""
+                SELECT id, name, cost, price, wholesale_price 
+                FROM products 
+                ORDER BY name ASC
+            """)
+            products = cursor.fetchall()
+            
+            # Fetch all product bundles
+            cursor.execute("""
+                SELECT product_id, bundle_name, quantity, cost, price, wholesale_price 
+                FROM product_bundles
+                ORDER BY quantity ASC
+            """)
+            bundles = cursor.fetchall()
+            conn.close()
+
+            # Organize bundles by product_id
+            bundles_by_product = {}
+            for b in bundles:
+                p_id = b[0]
+                if p_id not in bundles_by_product:
+                    bundles_by_product[p_id] = []
+                bundles_by_product[p_id].append({
+                    'name': b[1],
+                    'qty': b[2],
+                    'cost': b[3] if b[3] is not None else 0.0,
+                    'price': b[4],
+                    'wholesale_price': b[5] if b[5] is not None else 0.0
+                })
+
+            # Check role for cost visibility and dynamic column widths
+            is_admin = (self.user_role == "admin")
+            if is_admin:
+                cost_header = '<th style="width: 12%; text-align: right;">Cost</th>'
+                barcode_w = "15%"
+                name_w = "43%"
+                retail_w = "15%"
+                wholesale_w = "15%"
+            else:
+                cost_header = ''
+                barcode_w = "18%"
+                name_w = "52%"
+                retail_w = "15%"
+                wholesale_w = "15%"
+            
+            # Build HTML rows
+            table_rows = []
+            for idx, p in enumerate(products):
+                p_id, name, cost, price, wholesale_price = p
+                row_class = "even" if idx % 2 == 0 else "odd"
+                
+                cost_val = cost if cost is not None else 0.0
+                cost_td = f'<td class="currency">₱{cost_val:,.2f}</td>' if is_admin else ''
+                
+                table_rows.append(f"""
+                    <tr class="{row_class}">
+                        <td class="barcode-cell">{p_id}</td>
+                        <td><strong>{name}</strong></td>
+                        {cost_td}
+                        <td class="currency">₱{price:,.2f}</td>
+                        <td class="currency">₱{wholesale_price:,.2f}</td>
+                    </tr>
+                """)
+                
+                # Check for bundles
+                if p_id in bundles_by_product:
+                    for b in bundles_by_product[p_id]:
+                        cost_b_td = f'<td class="currency" style="color: #64748b;">₱{b["cost"]:,.2f}</td>' if is_admin else ''
+                        table_rows.append(f"""
+                            <tr class="bundle-row">
+                                <td></td>
+                                <td>&nbsp;&nbsp;&nbsp;&nbsp;&bull; Bundle: {b['name']} ({b['qty']:g} pcs)</td>
+                                {cost_b_td}
+                                <td class="currency">₱{b['price']:,.2f}</td>
+                                <td class="currency">₱{b['wholesale_price']:,.2f}</td>
+                            </tr>
+                        """)
+
+            # Construct HTML page template
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            total_products = len(products)
+            
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset="utf-8">
+            <style>
+                body {{
+                    font-family: 'Segoe UI', 'Inter', -apple-system, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    color: #1e293b;
+                    font-size: 10px;
+                }}
+                .header {{
+                    text-align: center;
+                    border-bottom: 2px solid #0f766e;
+                    padding-bottom: 6px;
+                    margin-bottom: 12px;
+                }}
+                .header h1 {{
+                    margin: 0;
+                    color: #0f766e;
+                    font-size: 20px;
+                    font-weight: 800;
+                    letter-spacing: 0.5px;
+                }}
+                .header p {{
+                    margin: 3px 0 0 0;
+                    color: #64748b;
+                    font-size: 10px;
+                }}
+                .meta-table {{
+                    width: 100%;
+                    margin-bottom: 12px;
+                    font-size: 9.5px;
+                }}
+                .meta-table td {{
+                    padding: 2px 0;
+                    color: #475569;
+                }}
+                .meta-table td.right {{
+                    text-align: right;
+                }}
+                table.price-table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 20px;
+                }}
+                table.price-table th {{
+                    background-color: #0f766e;
+                    color: white;
+                    font-weight: bold;
+                    text-align: left;
+                    padding: 4px 6px;
+                    font-size: 9px;
+                    text-transform: uppercase;
+                    border: 1px solid #0f766e;
+                }}
+                table.price-table td {{
+                    padding: 3px 6px;
+                    border-bottom: 1px solid #e2e8f0;
+                    vertical-align: middle;
+                    font-size: 8px;
+                }}
+                table.price-table tr.even {{
+                    background-color: #f8fafc;
+                }}
+                table.price-table tr.bundle-row {{
+                    background-color: #f1f5f9;
+                    font-style: italic;
+                }}
+                table.price-table tr.bundle-row td {{
+                    padding: 2px 6px 2px 18px;
+                    color: #0f766e;
+                    border-bottom: 1px solid #e2e8f0;
+                }}
+                .barcode-cell {{
+                    white-space: nowrap;
+                    font-family: Consolas, monospace;
+                    font-size: 8px;
+                }}
+                .currency {{
+                    text-align: right;
+                    font-weight: 600;
+                }}
+                .text-center {{
+                    text-align: center;
+                }}
+                .footer {{
+                    text-align: center;
+                    margin-top: 20px;
+                    border-top: 1px solid #e2e8f0;
+                    padding-top: 8px;
+                    color: #64748b;
+                    font-size: 8px;
+                }}
+            </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>ARCHERMART PRODUCT PRICE LIST</h1>
+                    <p>Narvacan, Ilocos Sur | Premium POS System Catalog</p>
+                </div>
+                
+                <table class="meta-table">
+                    <tr>
+                        <td><strong>Date Generated:</strong> {current_time}</td>
+                        <td class="right"><strong>Total Products:</strong> {total_products}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Generated By:</strong> {self.user_role.upper()}</td>
+                        <td class="right"><strong>Status:</strong> Active System Prices</td>
+                    </tr>
+                </table>
+                
+                <table class="price-table">
+                    <thead>
+                        <tr>
+                            <th style="width: {barcode_w};">Barcode</th>
+                            <th style="width: {name_w};">Product Name</th>
+                            {cost_header}
+                            <th style="width: {retail_w}; text-align: right;">Retail Price</th>
+                            <th style="width: {wholesale_w}; text-align: right;">Wholesale Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {"".join(table_rows)}
+                    </tbody>
+                </table>
+                
+                <div class="footer">
+                    <p>This is an automatically generated product price catalog from Archer POS v2. Prices are subject to change without prior notice.</p>
+                    <p>Thank you for choosing Archermart!</p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # Print to PDF using QPrinter
+            printer = QPrinter(QPrinter.PrinterResolution)
+            printer.setOutputFormat(QPrinter.PdfFormat)
+            printer.setOutputFileName(file_path)
+            printer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout.Unit.Millimeter)
+            
+            doc = QTextDocument()
+            doc.setHtml(html_content)
+            
+            # Run the print safely using hasattr wrapper to support all PySide6 environments
+            if hasattr(doc, 'print_'):
+                doc.print_(printer)
+            else:
+                doc.print(printer)
+                
+            # Log action
+            database.log_action(
+                "PRICE_LIST_PDF_EXPORT", 
+                f"Generated all product prices PDF saved to: {os.path.basename(file_path)}", 
+                self.user_role
+            )
+            
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Product price list has been successfully exported and saved to:\n{file_path}"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Export Error",
+                f"An error occurred while generating the PDF:\n{e}"
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def show_add_product_dialog(self):
         if self.user_role != "admin":
