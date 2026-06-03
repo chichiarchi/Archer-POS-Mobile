@@ -38,6 +38,15 @@ class POSScreenState extends State<POSScreen> {
   bool _cameraScannerMode = false;
   MobileScannerController? _cameraController;
   DateTime? _lastScanTime;
+  static const _beepChannel = MethodChannel('com.example.archer_pos/beep');
+
+  Future<void> _playBeep() async {
+    try {
+      await _beepChannel.invokeMethod('playBeep');
+    } catch (_) {
+      SystemSound.play(SystemSoundType.click);
+    }
+  }
 
   @override
   void initState() {
@@ -57,6 +66,7 @@ class POSScreenState extends State<POSScreen> {
           _cameraScannerMode = true;
           _cameraController = MobileScannerController(
             detectionSpeed: DetectionSpeed.noDuplicates,
+            detectionTimeoutMs: 500,
             autoStart: true,
             formats: const [
               BarcodeFormat.code128,
@@ -518,7 +528,7 @@ class POSScreenState extends State<POSScreen> {
                   controller: _cameraController!,
                   onDetect: (capture) {
                     final now = DateTime.now();
-                    if (_lastScanTime != null && now.difference(_lastScanTime!) < const Duration(milliseconds: 500)) {
+                    if (_lastScanTime != null && now.difference(_lastScanTime!) < const Duration(milliseconds: 1000)) {
                       return; // Throttle scans to prevent duplicate fast adding
                     }
                     final List<Barcode> barcodes = capture.barcodes;
@@ -527,7 +537,7 @@ class POSScreenState extends State<POSScreen> {
                         _lastScanTime = now;
                         final code = barcode.rawValue!;
                         HapticFeedback.lightImpact();
-                        SystemSound.play(SystemSoundType.click);
+                        _playBeep();
                         _addItemByBarcode(code);
                         break;
                       }
