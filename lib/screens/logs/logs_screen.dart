@@ -273,6 +273,7 @@ class LogsScreenState extends State<LogsScreen> {
                       const SizedBox(height: 16),
                       Text('Sale ID: #$saleId', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
                       Text('Date: ${formatDateTime(sale['timestamp'] as String)}'),
+                      Text('Cashier: ${sale['created_by'] ?? 'admin'}'),
                       if (customerName != null) Text('Customer: $customerName'),
                       const Divider(height: 24),
                       Text('ITEMS:', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: kTextSecondary)),

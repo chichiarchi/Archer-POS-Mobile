@@ -251,6 +251,7 @@ class POSScreenState extends State<POSScreen> {
           customerId: result['customer_id'] as int?,
           items: saleItems,
           payments: [{'method': 'Cash', 'amount': result['amount_paid']}],
+          createdBy: widget.username,
         );
 
         await DatabaseHelper.instance.logAction(

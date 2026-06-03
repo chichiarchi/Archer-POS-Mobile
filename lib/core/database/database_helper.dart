@@ -22,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -81,6 +81,7 @@ class DatabaseHelper {
         customer_id INTEGER,
         voided INTEGER DEFAULT 0,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_by TEXT DEFAULT 'admin',
         FOREIGN KEY(customer_id) REFERENCES customers(id)
       )
     ''');
@@ -175,6 +176,11 @@ class DatabaseHelper {
       } catch (_) {}
       try {
         await db.execute('ALTER TABLE product_bundles ADD COLUMN cost REAL DEFAULT 0.0');
+      } catch (_) {}
+    }
+    if (oldVersion < 4) {
+      try {
+        await db.execute("ALTER TABLE sales ADD COLUMN created_by TEXT DEFAULT 'admin'");
       } catch (_) {}
     }
   }
@@ -379,6 +385,7 @@ class DatabaseHelper {
     int? customerId,
     required List<Map<String, dynamic>> items,
     List<Map<String, dynamic>>? payments,
+    String? createdBy,
   }) async {
     final db = await database;
     return await db.transaction((txn) async {
@@ -394,6 +401,7 @@ class DatabaseHelper {
         'customer_id': customerId,
         'voided': 0,
         'timestamp': timestamp,
+        'created_by': createdBy ?? 'admin',
       });
 
       for (final item in items) {
