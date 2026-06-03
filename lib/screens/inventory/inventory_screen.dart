@@ -503,27 +503,39 @@ class InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildProductList() {
-    final isTablet = MediaQuery.of(context).size.width >= 768;
-    if (isTablet) {
-      return GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: MediaQuery.of(context).size.width >= 1100 ? 3 : 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.6,
-        ),
-        itemCount: _products.length,
-        itemBuilder: (ctx, i) => _buildProductCard(_products[i]),
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
-      itemCount: _products.length,
-      itemBuilder: (ctx, i) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: _buildProductCard(_products[i]),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final isTablet = w >= 768;
+        if (isTablet) {
+          // Determine column count based on available width
+          final cols = w >= 1100 ? 3 : 2;
+          // Compute card height: name (2 lines) + barcode + prices (3 chips) + actions
+          // ~190px content; aspect = width / height
+          final cardW = (w - 16 * 2 - 12.0 * (cols - 1)) / cols;
+          final cardH = 190.0;
+          final ratio = (cardW / cardH).clamp(1.0, 2.2);
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: ratio,
+            ),
+            itemCount: _products.length,
+            itemBuilder: (ctx, i) => _buildProductCard(_products[i]),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+          itemCount: _products.length,
+          itemBuilder: (ctx, i) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _buildProductCard(_products[i]),
+          ),
+        );
+      },
     );
   }
 

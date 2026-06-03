@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/auth_provider.dart';
+import '../../core/utils/constants.dart';
 import '../login/login_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../pos/pos_screen.dart';
@@ -95,6 +96,8 @@ class _MainScreenState extends State<MainScreen> {
   // ── GlobalKeys for refresh ────────────────────────────────────────────────
   final GlobalKey<DashboardScreenState> _dashboardKey =
       GlobalKey<DashboardScreenState>();
+  final GlobalKey<POSScreenState> _posKey =
+      GlobalKey<POSScreenState>();
   final GlobalKey<InventoryScreenState> _inventoryKey =
       GlobalKey<InventoryScreenState>();
   final GlobalKey<BalanceScreenState> _balanceKey =
@@ -119,6 +122,7 @@ class _MainScreenState extends State<MainScreen> {
         userRole: widget.userRole,
       ),
       POSScreen(
+        key: _posKey,
         username: widget.username,
         userRole: widget.userRole,
       ),
@@ -158,6 +162,8 @@ class _MainScreenState extends State<MainScreen> {
     switch (index) {
       case 0:
         _dashboardKey.currentState?.refresh();
+      case 1:
+        _posKey.currentState?.refresh();
       case 2:
         _inventoryKey.currentState?.refresh();
       case 3:
@@ -258,7 +264,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTablet = constraints.maxWidth >= 768;
+        final isTablet = constraints.maxWidth >= AppConstants.tabletBreakpoint;
         return isTablet ? _buildTabletLayout() : _buildPhoneLayout();
       },
     );
@@ -301,39 +307,48 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildNavigationRail() {
     return Container(
       color: Colors.white,
-      child: NavigationRail(
-        backgroundColor: Colors.white,
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onTabChanged,
-        extended: false,
-        minWidth: 76,
-        useIndicator: true,
-        indicatorColor: const Color(0xFFE0F2FE),
-        labelType: NavigationRailLabelType.all,
-        selectedIconTheme: const IconThemeData(color: _primaryBlue, size: 24),
-        unselectedIconTheme:
-            const IconThemeData(color: Color(0xFF94A3B8), size: 22),
-        selectedLabelTextStyle: GoogleFonts.inter(
-          color: _primaryBlue,
-          fontWeight: FontWeight.w700,
-          fontSize: 10,
-        ),
-        unselectedLabelTextStyle: GoogleFonts.inter(
-          color: const Color(0xFF94A3B8),
-          fontSize: 10,
-        ),
-        leading: _buildRailHeader(),
-        trailing: _buildRailTrailing(),
-        destinations: _navItems
-            .map(
-              (item) => NavigationRailDestination(
-                icon: Icon(item.icon),
-                selectedIcon: Icon(item.activeIcon),
-                label: Text(item.label),
-                padding: const EdgeInsets.symmetric(vertical: 2),
+      child: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height,
+          ),
+          child: IntrinsicHeight(
+            child: NavigationRail(
+              backgroundColor: Colors.white,
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: _onTabChanged,
+              extended: false,
+              minWidth: 72,
+              useIndicator: true,
+              indicatorColor: const Color(0xFFE0F2FE),
+              labelType: NavigationRailLabelType.all,
+              selectedIconTheme: const IconThemeData(color: _primaryBlue, size: 22),
+              unselectedIconTheme:
+                  const IconThemeData(color: Color(0xFF94A3B8), size: 20),
+              selectedLabelTextStyle: GoogleFonts.inter(
+                color: _primaryBlue,
+                fontWeight: FontWeight.w700,
+                fontSize: 9,
               ),
-            )
-            .toList(),
+              unselectedLabelTextStyle: GoogleFonts.inter(
+                color: const Color(0xFF94A3B8),
+                fontSize: 9,
+              ),
+              leading: _buildRailHeader(),
+              trailing: _buildRailTrailing(),
+              destinations: _navItems
+                  .map(
+                    (item) => NavigationRailDestination(
+                      icon: Icon(item.icon),
+                      selectedIcon: Icon(item.activeIcon),
+                      label: Text(item.label),
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -504,9 +519,12 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFE8EEF2),
       appBar: _buildPhoneAppBar(),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
+      body: SafeArea(
+        top: false,
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
+        ),
       ),
       bottomNavigationBar: _buildBottomNavBar(),
     );
@@ -561,6 +579,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildBottomNavBar() {
+    // 7 items are too many for a standard BottomNavigationBar on small phones.
+    // We use a compact scrollable row to avoid label truncation and overflow.
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -573,40 +593,72 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
       child: SafeArea(
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onTabChanged,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: _primaryBlue,
-          unselectedItemColor: const Color(0xFF94A3B8),
-          selectedLabelStyle: GoogleFonts.inter(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-          ),
-          unselectedLabelStyle: GoogleFonts.inter(
-            fontSize: 9,
-            fontWeight: FontWeight.w400,
-          ),
-          elevation: 0,
-          items: _navItems
-              .map(
-                (item) => BottomNavigationBarItem(
-                  icon: Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Icon(item.icon, size: 22),
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            children: List.generate(_navItems.length, (index) {
+              final item = _navItems[index];
+              final isSelected = _selectedIndex == index;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => _onTabChanged(index),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isSelected ? item.activeIcon : item.icon,
+                        color: isSelected
+                            ? _primaryBlue
+                            : const Color(0xFF94A3B8),
+                        size: 20,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        // Shorten labels that are too long for 7-item nav
+                        _shortLabel(item.label),
+                        style: GoogleFonts.inter(
+                          fontSize: 8,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: isSelected
+                              ? _primaryBlue
+                              : const Color(0xFF94A3B8),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  activeIcon: Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Icon(item.activeIcon, size: 24),
-                  ),
-                  label: item.label,
                 ),
-              )
-              .toList(),
+              );
+            }),
+          ),
         ),
       ),
     );
+  }
+
+  String _shortLabel(String label) {
+    // Compact labels so 7 items fit without overflow
+    switch (label) {
+      case 'Dashboard':
+        return 'Home';
+      case 'Point of Sale':
+        return 'POS';
+      case 'Products':
+        return 'Products';
+      case 'Balance':
+        return 'Balance';
+      case 'Logs':
+        return 'Logs';
+      case 'Account':
+        return 'Account';
+      case 'Pay Notes':
+        return 'Pay';
+      default:
+        return label;
+    }
   }
 
   // ===========================================================================

@@ -285,22 +285,28 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = MediaQuery.of(context).size.width >= 768;
+    return LayoutBuilder(
+      builder: (context, outerConstraints) {
+        final isTablet = outerConstraints.maxWidth >= 768;
+        final isLandscape =
+            MediaQuery.of(context).orientation == Orientation.landscape;
+        // Show side-by-side either on tablet OR landscape phone (width >= 600)
+        final useSideBySide = isTablet || (isLandscape && outerConstraints.maxWidth >= 600);
 
-    final filteredNotes = _notesList.where((n) {
-      final recipient = (n['recipient'] as String? ?? '').toLowerCase();
-      final purpose = (n['purpose'] as String? ?? '').toLowerCase();
-      final query = _searchQuery.toLowerCase();
-      return recipient.contains(query) || purpose.contains(query);
-    }).toList();
+        final filteredNotes = _notesList.where((n) {
+          final recipient = (n['recipient'] as String? ?? '').toLowerCase();
+          final purpose = (n['purpose'] as String? ?? '').toLowerCase();
+          final query = _searchQuery.toLowerCase();
+          return recipient.contains(query) || purpose.contains(query);
+        }).toList();
 
-    double totalPayout = 0.0;
-    for (final n in filteredNotes) {
-      totalPayout += (n['amount'] as num?)?.toDouble() ?? 0.0;
-    }
+        double totalPayout = 0.0;
+        for (final n in filteredNotes) {
+          totalPayout += (n['amount'] as num?)?.toDouble() ?? 0.0;
+        }
 
-    // ──────────────────────── Form Widget ────────────────────────
-    Widget buildForm() {
+        // ──────────────────────── Form Widget ────────────────────────
+        Widget buildForm() {
       return Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         color: Colors.white,
@@ -319,14 +325,14 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                       'Record Cash Outflow',
                       style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: kTextPrimary),
                     ),
-                    if (!isTablet)
-                      IconButton(
+                    if (!useSideBySide)
+                  IconButton(
                         icon: Icon(_isFormExpanded ? Icons.expand_less : Icons.expand_more),
                         onPressed: () => setState(() => _isFormExpanded = !_isFormExpanded),
                       ),
                   ],
                 ),
-                if (isTablet || _isFormExpanded) ...[
+                  if (useSideBySide || _isFormExpanded) ...[
                   const Divider(height: 24),
                   // Recipient
                   Autocomplete<String>(
@@ -450,8 +456,8 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
       );
     }
 
-    // ──────────────────────── History Column ────────────────────────
-    Widget buildHistory() {
+        // ──────────────────────── History Column ────────────────────────
+        Widget buildHistory() {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -589,42 +595,44 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
       );
     }
 
-    // ──────────────────────── Adaptive Layout ────────────────────────
-    return Scaffold(
-      backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Payout Manager',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: kTextPrimary),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: isTablet
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Form Column
-                  SizedBox(
-                    width: 320,
-                    child: SingleChildScrollView(child: buildForm()),
+        // ──────────────────────── Adaptive Layout ────────────────────────
+        return Scaffold(
+          backgroundColor: kBackgroundColor,
+          appBar: AppBar(
+            title: Text(
+              'Payout Manager',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: kTextPrimary),
+            ),
+            backgroundColor: Colors.white,
+            elevation: 0,
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: useSideBySide
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Form Column — percentage-based width clamped between 260-340px
+                      SizedBox(
+                        width: (outerConstraints.maxWidth * 0.32).clamp(260.0, 340.0),
+                        child: SingleChildScrollView(child: buildForm()),
+                      ),
+                      const SizedBox(width: 20),
+                      // History Column
+                      Expanded(child: buildHistory()),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      buildForm(),
+                      const SizedBox(height: 16),
+                      Expanded(child: buildHistory()),
+                    ],
                   ),
-                  const SizedBox(width: 20),
-                  // History Column
-                  Expanded(child: buildHistory()),
-                ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  buildForm(),
-                  const SizedBox(height: 16),
-                  Expanded(child: buildHistory()),
-                ],
-              ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

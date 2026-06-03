@@ -225,7 +225,7 @@ class DashboardScreenState extends State<DashboardScreen>
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(
                   isTablet ? 24 : 16,
-                  0,
+                  isTablet ? 24 : 16,
                   isTablet ? 24 : 16,
                   isTablet ? 8 : 4,
                 ),
@@ -407,7 +407,7 @@ class DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // ── Stat Cards — Phone (2×2 grid) ─────────────────────────────────────────
+  // ── Stat Cards — Phone (2×2 grid) ─────────────────────────────────────────────
   Widget _buildPhoneCards() {
     return SliverGrid(
       delegate: SliverChildListDelegate([
@@ -416,17 +416,20 @@ class DashboardScreenState extends State<DashboardScreen>
         _buildStatCard(config: _cardConfigs[2], animValue: _productsAnim),
         _buildStatCard(config: _cardConfigs[3], animValue: _balanceAnim),
       ]),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.55,
+        // Use FittedBox inside cards so we don't need to hard-code aspect ratio;
+        // 1.45 is comfortable for most phone widths.
+        childAspectRatio: (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2 / 120,
       ),
     );
   }
 
-  // ── Stat Cards — Tablet (1×4 horizontal row) ──────────────────────────────
+  // ── Stat Cards — Tablet (1×4 horizontal row) ──────────────────────────────────────────────
   Widget _buildTabletCards() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     return SliverGrid(
       delegate: SliverChildListDelegate([
         _buildStatCard(config: _cardConfigs[0], animValue: _salesTodayAnim),
@@ -434,11 +437,12 @@ class DashboardScreenState extends State<DashboardScreen>
         _buildStatCard(config: _cardConfigs[2], animValue: _productsAnim),
         _buildStatCard(config: _cardConfigs[3], animValue: _balanceAnim),
       ]),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 4,
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
-        childAspectRatio: 1.1,
+        // Adapt aspect ratio: wide/short in landscape (1.7), taller in portrait (1.05) to prevent overflow
+        childAspectRatio: isLandscape ? 1.7 : 1.05,
       ),
     );
   }
@@ -589,7 +593,7 @@ class DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // ── Quick info row (summary tiles) ────────────────────────────────────────
+  // ── Quick info row (summary tiles) ─────────────────────────────────────────────────────
   Widget _buildQuickInfoRow(bool isTablet) {
     final salesToday = ((_stats['sales_today'] as num?)?.toDouble() ?? 0.0);
     final transactions = ((_stats['transactions_today'] as num?)?.toInt() ?? 0);
@@ -620,47 +624,95 @@ class DashboardScreenState extends State<DashboardScreen>
                 ),
               ),
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildInfoTile(
-                    icon: Icons.receipt_long_rounded,
-                    iconColor: const Color(0xFF6366F1),
-                    bgColor: const Color(0xFFEDE9FE),
-                    label: 'Avg. Ticket',
-                    value: Formatters.currency(avgTicket),
-                    isTablet: isTablet,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildInfoTile(
-                    icon: Icons.inventory_2_rounded,
-                    iconColor: const Color(0xFF10B981),
-                    bgColor: const Color(0xFFD1FAE5),
-                    label: 'Products Listed',
-                    value: '$products items',
-                    isTablet: isTablet,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildInfoTile(
-                    icon: Icons.today_rounded,
-                    iconColor: const Color(0xFFF59E0B),
-                    bgColor: const Color(0xFFFEF3C7),
-                    label: 'Date',
-                    value: DateFormat('MMM d').format(DateTime.now()),
-                    isTablet: isTablet,
-                  ),
-                ),
-              ],
+            // LayoutBuilder makes tiles resize gracefully on narrow screens
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (!isTablet) {
+                  // On phone, stack in a 2-column + 1 full-width row to prevent text clipping
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      SizedBox(
+                        width: (constraints.maxWidth - 10) / 2,
+                        child: _buildInfoTile(
+                          icon: Icons.receipt_long_rounded,
+                          iconColor: const Color(0xFF6366F1),
+                          bgColor: const Color(0xFFEDE9FE),
+                          label: 'Avg. Ticket',
+                          value: Formatters.currency(avgTicket),
+                          isTablet: isTablet,
+                        ),
+                      ),
+                      SizedBox(
+                        width: (constraints.maxWidth - 10) / 2,
+                        child: _buildInfoTile(
+                          icon: Icons.inventory_2_rounded,
+                          iconColor: const Color(0xFF10B981),
+                          bgColor: const Color(0xFFD1FAE5),
+                          label: 'Products Listed',
+                          value: '$products items',
+                          isTablet: isTablet,
+                        ),
+                      ),
+                      SizedBox(
+                        width: constraints.maxWidth,
+                        child: _buildInfoTile(
+                          icon: Icons.today_rounded,
+                          iconColor: const Color(0xFFF59E0B),
+                          bgColor: const Color(0xFFFEF3C7),
+                          label: 'Date',
+                          value: DateFormat('MMMM d, yyyy').format(DateTime.now()),
+                          isTablet: isTablet,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _buildInfoTile(
+                        icon: Icons.receipt_long_rounded,
+                        iconColor: const Color(0xFF6366F1),
+                        bgColor: const Color(0xFFEDE9FE),
+                        label: 'Avg. Ticket',
+                        value: Formatters.currency(avgTicket),
+                        isTablet: isTablet,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildInfoTile(
+                        icon: Icons.inventory_2_rounded,
+                        iconColor: const Color(0xFF10B981),
+                        bgColor: const Color(0xFFD1FAE5),
+                        label: 'Products Listed',
+                        value: '$products items',
+                        isTablet: isTablet,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildInfoTile(
+                        icon: Icons.today_rounded,
+                        iconColor: const Color(0xFFF59E0B),
+                        bgColor: const Color(0xFFFEF3C7),
+                        label: 'Date',
+                        value: DateFormat('MMM d').format(DateTime.now()),
+                        isTablet: isTablet,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
       ),
     );
   }
+
 
   Widget _buildInfoTile({
     required IconData icon,
@@ -913,10 +965,10 @@ class _StatCard extends StatelessWidget {
             // Content
             Padding(
               padding: EdgeInsets.fromLTRB(
-                isTablet ? 18 : 14,
-                isTablet ? 18 : 14,
-                isTablet ? 16 : 12,
-                isTablet ? 14 : 12,
+                isTablet ? 14 : 14,
+                isTablet ? 14 : 14,
+                isTablet ? 12 : 12,
+                isTablet ? 10 : 12,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

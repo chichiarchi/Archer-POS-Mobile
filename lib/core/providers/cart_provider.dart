@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../database/database_helper.dart';
 
 /// Represents a single item in the shopping cart.
 class CartItem {
@@ -70,22 +71,12 @@ class CartItem {
       );
 }
 
-/// Holds a bundle tier definition for tiered pricing logic.
-class _BundleTier {
-  final double quantity;
-  final double pricePerPiece; // bundle.price / bundle.quantity
-  final double wholesalePricePerPiece;
-
-  const _BundleTier({
-    required this.quantity,
-    required this.pricePerPiece,
-    required this.wholesalePricePerPiece,
-  });
-}
-
 class CartProvider extends ChangeNotifier {
   final List<CartItem> _items = [];
   String _pricingMode = 'retail';
+  
+  // Store bundle definitions for each product in the cart
+  final Map<String, List<Map<String, dynamic>>> _productBundles = {};
 
   /// All items currently in the cart.
   List<CartItem> get items => List.unmodifiable(_items);
@@ -105,52 +96,62 @@ class CartProvider extends ChangeNotifier {
       _items.fold(0.0, (sum, item) => sum + item.quantity);
 
   // ---------------------------------------------------------------------------
-  // Internal helpers
+  // Internal pricing recalculation (Python equivalent)
   // ---------------------------------------------------------------------------
 
-  /// Extracts sorted bundle tiers from the product map for tiered pricing.
-  List<_BundleTier> _extractBundles(Map<String, dynamic> product) {
-    final rawBundles = product['bundles'];
-    if (rawBundles == null || rawBundles is! List) return [];
+  void _recalculatePrices() {
+    // Group items by barcode
+    final grouped = <String, List<CartItem>>{};
+    for (final item in _items) {
+      grouped.putIfAbsent(item.barcode, () => []).add(item);
+    }
 
-    final tiers = <_BundleTier>[];
-    for (final b in rawBundles) {
-      if (b is Map<String, dynamic>) {
-        final qty = (b['quantity'] as num?)?.toDouble() ?? 0;
-        final bundlePrice = (b['price'] as num?)?.toDouble() ?? 0;
-        final bundleWholesale = (b['wholesalePrice'] as num?)?.toDouble() ?? bundlePrice;
-        if (qty > 0 && bundlePrice > 0) {
-          tiers.add(_BundleTier(
-            quantity: qty,
-            pricePerPiece: bundlePrice / qty,
-            wholesalePricePerPiece: bundleWholesale / qty,
-          ));
+    for (final entry in grouped.entries) {
+      final barcode = entry.key;
+      final prodItems = entry.value;
+
+      // Sum up total quantity of this barcode in the cart
+      final totalQty = prodItems.fold<double>(0.0, (sum, item) => sum + item.quantity);
+
+      // Get bundles for this barcode
+      final bundles = _productBundles[barcode] ?? [];
+
+      for (final item in prodItems) {
+        if (item.manuallyDiscounted) continue;
+
+        final basePrice = item.pricingMode == 'wholesale' && item.wholesalePrice > 0
+            ? item.wholesalePrice
+            : item.retailPrice;
+
+        if (bundles.isEmpty) {
+          item.price = basePrice;
+          continue;
+        }
+
+        // Find all unlocked per-piece rates based on the total quantity
+        final unlockedRates = <double>[];
+
+        for (final b in bundles) {
+          final qty = (b['quantity'] as num?)?.toDouble() ?? 0.0;
+          if (qty > 0 && qty <= totalQty) {
+            final bPrice = item.pricingMode == 'wholesale'
+                ? ((b['wholesale_price'] as num?)?.toDouble() ?? 0.0)
+                : ((b['price'] as num?)?.toDouble() ?? 0.0);
+            
+            final finalBPrice = bPrice > 0 ? bPrice : ((b['price'] as num?)?.toDouble() ?? 0.0);
+            unlockedRates.add(finalBPrice / qty);
+          }
+        }
+
+        if (unlockedRates.isNotEmpty) {
+          // Apply the best unlocked rate (cheapest per-piece price)
+          final bestRate = unlockedRates.reduce((a, b) => a < b ? a : b);
+          item.price = bestRate;
+        } else {
+          item.price = basePrice;
         }
       }
     }
-
-    // Sort descending by quantity so we pick the best (highest-qty) applicable tier.
-    tiers.sort((a, b) => b.quantity.compareTo(a.quantity));
-    return tiers;
-  }
-
-  /// Given a quantity and available bundle tiers, resolve the best unit price.
-  /// Returns the base retail/wholesale price if no tier applies.
-  double _resolvePriceForQty({
-    required double qty,
-    required List<_BundleTier> tiers,
-    required double baseRetail,
-    required double baseWholesale,
-    required String mode,
-  }) {
-    for (final tier in tiers) {
-      if (qty >= tier.quantity) {
-        return mode == 'wholesale'
-            ? tier.wholesalePricePerPiece
-            : tier.pricePerPiece;
-      }
-    }
-    return mode == 'wholesale' ? baseWholesale : baseRetail;
   }
 
   // ---------------------------------------------------------------------------
@@ -158,64 +159,35 @@ class CartProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// Adds a product to the cart. Handles bundle/tiered pricing.
-  ///
-  /// [product] must include at minimum:
-  ///   'barcode', 'name', 'price' (retail), 'wholesalePrice'
-  /// and optionally 'bundles' (List of bundle maps).
   void addItem(
     Map<String, dynamic> product,
     double quantity,
     String mode, {
     List<dynamic>? bundles,
   }) {
-    if (bundles != null) {
-      product = Map<String, dynamic>.from(product)..['bundles'] = bundles;
-    }
-    final barcode = product['barcode'] as String? ?? '';
+    final barcode = product['barcode'] as String? ?? product['id'] as String? ?? '';
     final name = product['name'] as String? ?? 'Unknown';
     final baseRetail = (product['price'] as num?)?.toDouble() ?? 0.0;
     final baseWholesale =
-        (product['wholesalePrice'] as num?)?.toDouble() ?? baseRetail;
+        (product['wholesale_price'] as num? ?? product['wholesalePrice'] as num?)?.toDouble() ?? baseRetail;
 
-    final tiers = _extractBundles(product);
+    if (bundles != null) {
+      _productBundles[barcode] = List<Map<String, dynamic>>.from(bundles);
+    }
 
-    // Check if this barcode already exists in cart.
+    // Check if this barcode already exists in cart with matching mode.
     final existingIndex =
-        _items.indexWhere((item) => item.barcode == barcode);
+        _items.indexWhere((item) => item.barcode == barcode && item.pricingMode == mode);
 
     if (existingIndex >= 0) {
       final existing = _items[existingIndex];
-      // Don't change manually discounted item's price when adding more qty.
       final newQty = existing.quantity + quantity;
-
-      double newPrice = existing.price;
-      if (!existing.manuallyDiscounted) {
-        newPrice = _resolvePriceForQty(
-          qty: newQty,
-          tiers: tiers,
-          baseRetail: baseRetail,
-          baseWholesale: baseWholesale,
-          mode: existing.pricingMode,
-        );
-      }
-
-      _items[existingIndex] = existing.copyWith(
-        quantity: newQty,
-        price: newPrice,
-      );
+      _items[existingIndex] = existing.copyWith(quantity: newQty);
     } else {
-      final unitPrice = _resolvePriceForQty(
-        qty: quantity,
-        tiers: tiers,
-        baseRetail: baseRetail,
-        baseWholesale: baseWholesale,
-        mode: mode,
-      );
-
       _items.add(CartItem(
         barcode: barcode,
         name: name,
-        price: unitPrice,
+        price: mode == 'wholesale' && baseWholesale > 0 ? baseWholesale : baseRetail,
         quantity: quantity,
         pricingMode: mode,
         manuallyDiscounted: false,
@@ -224,18 +196,26 @@ class CartProvider extends ChangeNotifier {
       ));
     }
 
+    _recalculatePrices();
     notifyListeners();
   }
 
   /// Removes the item at [index] from the cart.
   void removeItem(int index) {
     if (index < 0 || index >= _items.length) return;
+    final item = _items[index];
     _items.removeAt(index);
+    
+    // If no more items with this barcode exist in cart, clear the bundle configuration
+    if (_items.where((i) => i.barcode == item.barcode).isEmpty) {
+      _productBundles.remove(item.barcode);
+    }
+    
+    _recalculatePrices();
     notifyListeners();
   }
 
   /// Updates the quantity of the item at [index].
-  /// Re-evaluates tiered pricing unless the item has a manual discount.
   void updateQuantity(int index, double qty) {
     if (index < 0 || index >= _items.length) return;
     if (qty <= 0) {
@@ -245,11 +225,11 @@ class CartProvider extends ChangeNotifier {
 
     final item = _items[index];
     _items[index] = item.copyWith(quantity: qty);
+    _recalculatePrices();
     notifyListeners();
   }
 
   /// Applies a manual discount by setting a new [newPrice] for the item at [index].
-  /// Marks the item as manually discounted so global pricing changes won't override it.
   void applyDiscount(int index, double newPrice) {
     if (index < 0 || index >= _items.length) return;
     final item = _items[index];
@@ -264,18 +244,14 @@ class CartProvider extends ChangeNotifier {
   void removeDiscount(int index) {
     if (index < 0 || index >= _items.length) return;
     final item = _items[index];
-    final restoredPrice = item.pricingMode == 'wholesale'
-        ? item.wholesalePrice
-        : item.retailPrice;
     _items[index] = item.copyWith(
-      price: restoredPrice,
       manuallyDiscounted: false,
     );
+    _recalculatePrices();
     notifyListeners();
   }
 
   /// Toggles the pricing mode for a single item at [index] between retail/wholesale.
-  /// Does not affect manually discounted items.
   void toggleItemPricing(int index) {
     if (index < 0 || index >= _items.length) return;
     final item = _items[index];
@@ -283,13 +259,11 @@ class CartProvider extends ChangeNotifier {
 
     final newMode =
         item.pricingMode == 'retail' ? 'wholesale' : 'retail';
-    final newPrice =
-        newMode == 'wholesale' ? item.wholesalePrice : item.retailPrice;
 
     _items[index] = item.copyWith(
       pricingMode: newMode,
-      price: newPrice,
     );
+    _recalculatePrices();
     notifyListeners();
   }
 
@@ -301,14 +275,12 @@ class CartProvider extends ChangeNotifier {
       final item = _items[i];
       if (item.manuallyDiscounted) continue;
 
-      final newPrice =
-          _pricingMode == 'wholesale' ? item.wholesalePrice : item.retailPrice;
       _items[i] = item.copyWith(
         pricingMode: _pricingMode,
-        price: newPrice,
       );
     }
 
+    _recalculatePrices();
     notifyListeners();
   }
 
@@ -322,20 +294,19 @@ class CartProvider extends ChangeNotifier {
       final item = _items[i];
       if (item.manuallyDiscounted) continue;
 
-      final newPrice =
-          mode == 'wholesale' ? item.wholesalePrice : item.retailPrice;
       _items[i] = item.copyWith(
         pricingMode: mode,
-        price: newPrice,
       );
     }
 
+    _recalculatePrices();
     notifyListeners();
   }
 
   /// Clears all items from the cart and resets pricing mode to retail.
   void clearCart() {
     _items.clear();
+    _productBundles.clear();
     _pricingMode = 'retail';
     notifyListeners();
   }

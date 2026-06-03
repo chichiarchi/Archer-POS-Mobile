@@ -27,11 +27,12 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   final TextEditingController _customerAddressController = TextEditingController();
   
   List<Map<String, dynamic>> _allCustomers = [];
-  Map<String, dynamic>? _selectedCustomer;
+  int? _selectedCustomerId;
   bool _isNewCustomer = false;
   double _amountPaid = 0.0;
   double _balanceDue = 0.0;
   double _change = 0.0;
+  double _existingDebtorDebt = 0.0;
 
   @override
   void initState() {
@@ -80,17 +81,17 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   }
 
   Future<void> _onConfirm() async {
-    if (_amountPaid <= 0) {
+    if (_amountPaid < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter an amount paid.'),
+          content: Text('Please enter a valid amount paid.'),
           backgroundColor: kErrorColor,
         ),
       );
       return;
     }
 
-    int? customerId = _selectedCustomer != null ? _selectedCustomer!['id'] as int? : null;
+    int? customerId = _selectedCustomerId;
 
     if (_balanceDue > 0) {
       if (_isNewCustomer) {
@@ -328,8 +329,8 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                if (!_isNewCustomer)
-                  DropdownButtonFormField<Map<String, dynamic>>(
+                if (!_isNewCustomer) ...[
+                  DropdownButtonFormField<int>(
                     decoration: InputDecoration(
                       labelText: 'Select Debtor',
                       border: OutlineInputBorder(
@@ -337,19 +338,73 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                       ),
                       prefixIcon: const Icon(Icons.person_search_outlined),
                     ),
-                    value: _selectedCustomer,
+                    value: _selectedCustomerId,
                     items: _allCustomers.map((c) {
-                      return DropdownMenuItem<Map<String, dynamic>>(
-                        value: c,
-                        child: Text('${c['name']} (${c['phone'] ?? 'No Phone'})'),
+                      final id = c['id'] as int;
+                      final phone = c['phone']?.toString().trim() ?? '';
+                      final displayText = phone.isNotEmpty ? '${c['name']} - $phone' : '${c['name']}';
+                      return DropdownMenuItem<int>(
+                        value: id,
+                        child: Text(displayText),
                       );
                     }).toList(),
-                    onChanged: (val) {
+                    onChanged: (val) async {
+                      double debt = 0.0;
+                      if (val != null) {
+                        debt = await DatabaseHelper.instance.getCustomerTotalDebt(val);
+                      }
                       setState(() {
-                        _selectedCustomer = val;
+                        _selectedCustomerId = val;
+                        _existingDebtorDebt = debt;
                       });
                     },
-                  )
+                  ),
+                  if (_selectedCustomerId != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: kPrimaryColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kPrimaryColor.withOpacity(0.15)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Current Outstanding Debt:',
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextSecondary, fontSize: 13),
+                              ),
+                              Text(
+                                formatCurrency(_existingDebtorDebt),
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kErrorColor, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                          if (_balanceDue > 0) ...[
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'New Total Debt:',
+                                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kTextPrimary, fontSize: 13),
+                                ),
+                                Text(
+                                  formatCurrency(_existingDebtorDebt + _balanceDue),
+                                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: kErrorColor, fontSize: 15),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ]
                 else ...[
                   TextField(
                     controller: _customerNameController,

@@ -76,6 +76,45 @@ class AppConstants {
   static const double spaceLG = 24.0;
 
   static const double elevationCard = 2.0;
-  static const double tabletBreakpoint = 800.0;
+
+  // Responsive breakpoints
+  static const double phoneBreakpoint = 600.0;   // < 600 = phone
+  static const double tabletBreakpoint = 768.0;  // >= 768 = tablet
+}
+
+/// Centralised responsive helper — pass a [BoxConstraints] (from LayoutBuilder)
+/// or the screen width from MediaQuery.
+class Responsive {
+  final double width;
+  const Responsive(this.width);
+
+  /// Width < 600
+  bool get isPhone => width < AppConstants.phoneBreakpoint;
+
+  /// 600 ≤ width < 768  (large phone / small portrait tablet)
+  bool get isTabletSm =>
+      width >= AppConstants.phoneBreakpoint &&
+      width < AppConstants.tabletBreakpoint;
+
+  /// Width >= 768
+  bool get isTablet => width >= AppConstants.tabletBreakpoint;
+
+  /// Width >= 1024 (landscape tablet / desktop)
+  bool get isLarge => width >= 1024;
+
+  /// Picks a value based on current breakpoint.
+  /// [phone] is always required; [tabletSm] falls back to [phone];
+  /// [tablet] falls back to [tabletSm] ?? [phone]; [large] falls back to [tablet].
+  T pick<T>({
+    required T phone,
+    T? tabletSm,
+    T? tablet,
+    T? large,
+  }) {
+    if (isLarge) return large ?? tablet ?? tabletSm ?? phone;
+    if (isTablet) return tablet ?? tabletSm ?? phone;
+    if (isTabletSm) return tabletSm ?? phone;
+    return phone;
+  }
 }
 

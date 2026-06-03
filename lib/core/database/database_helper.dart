@@ -507,8 +507,16 @@ class DatabaseHelper {
       FROM debtors d
       JOIN customers c ON d.customer_id = c.id
       WHERE d.balance_amount > 0
-      ORDER BY d.created_at DESC
     ''');
+  }
+
+  Future<double> getCustomerTotalDebt(int customerId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT SUM(balance_amount) as total FROM debtors WHERE customer_id = ?',
+      [customerId],
+    );
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
   Future<bool> resolveBalance(int debtorId, int saleId, double paymentAmount, double currentBalance) async {

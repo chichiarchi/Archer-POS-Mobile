@@ -30,17 +30,46 @@ class POSScreenState extends State<POSScreen> {
   List<Map<String, dynamic>> _searchSuggestions = [];
   bool _showSuggestions = false;
   int _quantity = 1;
+  final TextEditingController _qtyController = TextEditingController();
+  final FocusNode _qtyFocus = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _qtyController.text = '$_quantity';
+    _qtyFocus.addListener(_onQtyFocusChange);
     _loadSuggestions();
+  }
+
+  void _onQtyFocusChange() {
+    if (!_qtyFocus.hasFocus) {
+      final parsed = int.tryParse(_qtyController.text);
+      if (parsed == null || parsed <= 0) {
+        _qtyController.text = '$_quantity';
+      } else {
+        setState(() {
+          _quantity = parsed.clamp(1, 9999);
+          _qtyController.text = '$_quantity';
+        });
+      }
+    }
+  }
+
+  void _updateQuantity(int newQty) {
+    final clamped = newQty.clamp(1, 9999);
+    setState(() {
+      _quantity = clamped;
+      _qtyController.text = '$clamped';
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocus.dispose();
+    _qtyController.dispose();
+    _qtyFocus.removeListener(_onQtyFocusChange);
+    _qtyFocus.dispose();
     super.dispose();
   }
 
@@ -102,7 +131,7 @@ class POSScreenState extends State<POSScreen> {
 
     _searchController.clear();
     setState(() => _showSuggestions = false);
-    setState(() => _quantity = 1);
+    _updateQuantity(1);
     _searchFocus.requestFocus();
   }
 
@@ -325,10 +354,58 @@ class POSScreenState extends State<POSScreen> {
     }
   }
 
+  Future<bool> _confirmClearCart() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Clear Cart',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: kErrorColor,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to clear all items from the cart?',
+          style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(color: kTextSecondary, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kErrorColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Clear',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isTablet = MediaQuery.of(context).size.width >= 768;
-    return isTablet ? _buildTabletLayout() : _buildPhoneLayout();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = constraints.maxWidth >= 768;
+        return isTablet ? _buildTabletLayout(constraints) : _buildPhoneLayout();
+      },
+    );
   }
 
   Widget _buildPhoneLayout() {
@@ -344,14 +421,15 @@ class POSScreenState extends State<POSScreen> {
     );
   }
 
-  Widget _buildTabletLayout() {
+  Widget _buildTabletLayout(BoxConstraints constraints) {
+    // Use 35% of screen width for summary panel, clamped between 285 and 360px
+    final summaryWidth = (constraints.maxWidth * 0.35).clamp(285.0, 360.0);
     return Scaffold(
       backgroundColor: kBackgroundColor,
       body: Row(
         children: [
           // Left: Cart
           Expanded(
-            flex: 3,
             child: Column(
               children: [
                 _buildSearchBar(),
@@ -362,7 +440,7 @@ class POSScreenState extends State<POSScreen> {
           ),
           // Right: Order Summary
           Container(
-            width: 320,
+            width: summaryWidth,
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(left: BorderSide(color: Color(0xFFE2E8F0))),
@@ -375,132 +453,196 @@ class POSScreenState extends State<POSScreen> {
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      color: Colors.white,
-      child: Column(
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        // Switch to 2-row layout if screen/column width is narrow to prevent horizontal overflow
+        final isNarrowLayout = screenWidth < 550;
+        final isNarrow = screenWidth < 900;
+
+        final searchField = TextField(
+          controller: _searchController,
+          focusNode: _searchFocus,
+          decoration: InputDecoration(
+            hintText: isNarrow
+                ? 'Scan or search...'
+                : 'Scan barcode or type product name...',
+            prefixIcon: const Icon(Icons.qr_code_scanner, color: kPrimaryColor),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _showSuggestions = false);
+                    },
+                  )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kBorderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kPrimaryColor, width: 2),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+          ),
+          onChanged: (val) {
+            setState(() => _showSuggestions = val.isNotEmpty);
+          },
+          onSubmitted: _addItemByBarcode,
+          style: GoogleFonts.inter(fontSize: 16),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_.*]'))],
+        );
+
+        final qtySelector = Container(
+          width: isNarrowLayout ? double.infinity : 120,
+          height: 50,
+          decoration: BoxDecoration(
+            border: Border.all(color: kBorderColor),
+            borderRadius: BorderRadius.circular(10),
+            color: Colors.white,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _updateQuantity(_quantity - 1),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  child: Icon(Icons.remove, size: 16, color: kTextPrimary),
+                ),
+              ),
               Expanded(
                 child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocus,
-                  decoration: InputDecoration(
-                    hintText: 'Scan barcode or type product name...',
-                    prefixIcon: const Icon(Icons.qr_code_scanner, color: kPrimaryColor),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _showSuggestions = false);
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: kBorderColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: kPrimaryColor, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
+                  controller: _qtyController,
+                  focusNode: _qtyFocus,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
                   ),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onChanged: (val) {
-                    setState(() => _showSuggestions = val.isNotEmpty);
+                    final parsed = int.tryParse(val);
+                    if (parsed != null && parsed > 0) {
+                      _quantity = parsed.clamp(1, 9999);
+                    }
                   },
-                  onSubmitted: _addItemByBarcode,
-                  style: GoogleFonts.inter(fontSize: 16),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_.*]'))],
+                  onSubmitted: (val) {
+                    final parsed = int.tryParse(val) ?? 1;
+                    _updateQuantity(parsed);
+                  },
                 ),
               ),
-              const SizedBox(width: 8),
-              // Qty selector
-              Container(
-                width: 80,
-                decoration: BoxDecoration(
-                  border: Border.all(color: kBorderColor),
-                  borderRadius: BorderRadius.circular(10),
-                  color: Colors.white,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove, size: 16),
-                      onPressed: () => setState(() => _quantity = (_quantity - 1).clamp(1, 9999)),
-                      padding: EdgeInsets.zero,
-                    ),
-                    Text('$_quantity', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
-                    IconButton(
-                      icon: const Icon(Icons.add, size: 16),
-                      onPressed: () => setState(() => _quantity = (_quantity + 1).clamp(1, 9999)),
-                      padding: EdgeInsets.zero,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Pricing mode toggle
-              Consumer<CartProvider>(
-                builder: (ctx, cart, _) => ElevatedButton.icon(
-                  onPressed: () {
-                    cart.toggleGlobalPricing();
-                    setState(() {});
-                  },
-                  icon: const Icon(Icons.swap_horiz, size: 18),
-                  label: Text(
-                    cart.pricingMode == 'retail' ? 'RETAIL' : 'WHOLESALE',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: cart.pricingMode == 'retail'
-                        ? const Color(0xFF0284C7)
-                        : const Color(0xFFF59E0B),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(110, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _updateQuantity(_quantity + 1),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  child: Icon(Icons.add, size: 16, color: kTextPrimary),
                 ),
               ),
             ],
           ),
-          // Suggestions overlay
-          if (_showSuggestions && _filteredSuggestions.isNotEmpty)
-            Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: kBorderColor),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))],
+        );
+
+        final pricingToggle = Consumer<CartProvider>(
+          builder: (ctx, cart, _) {
+            final label = cart.pricingMode == 'retail'
+                ? 'RETAIL'
+                : (isNarrow ? 'WHL' : 'WHOLESALE');
+            return ElevatedButton.icon(
+              onPressed: () {
+                cart.toggleGlobalPricing();
+                setState(() {});
+              },
+              icon: const Icon(Icons.swap_horiz, size: 18),
+              label: Text(
+                label,
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+                overflow: TextOverflow.ellipsis,
               ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _filteredSuggestions.length,
-                itemBuilder: (ctx, i) {
-                  final p = _filteredSuggestions[i];
-                  return ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.inventory_2, size: 18, color: kPrimaryColor),
-                    title: Text(p['name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: Text('${p['id']}', style: GoogleFonts.inter(color: kTextSecondary, fontSize: 12)),
-                    trailing: Text(formatCurrency((p['price'] as num).toDouble()),
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kPrimaryColor)),
-                    onTap: () {
-                      _searchController.text = p['id'] as String;
-                      setState(() => _showSuggestions = false);
-                      _addItemByBarcode(p['id'] as String);
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cart.pricingMode == 'retail'
+                    ? const Color(0xFF0284C7)
+                    : const Color(0xFFF59E0B),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(80, 50),
+                maximumSize: const Size(130, 50),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            );
+          },
+        );
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.white,
+          child: Column(
+            children: [
+              if (isNarrowLayout) ...[
+                searchField,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: qtySelector),
+                    const SizedBox(width: 8),
+                    Expanded(child: pricingToggle),
+                  ],
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(child: searchField),
+                    const SizedBox(width: 8),
+                    qtySelector,
+                    const SizedBox(width: 8),
+                    pricingToggle,
+                  ],
+                ),
+              ],
+              // Suggestions overlay
+              if (_showSuggestions && _filteredSuggestions.isNotEmpty)
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: kBorderColor),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))],
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _filteredSuggestions.length,
+                    itemBuilder: (ctx, i) {
+                      final p = _filteredSuggestions[i];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.inventory_2, size: 18, color: kPrimaryColor),
+                        title: Text(p['name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+                        subtitle: Text('${p['id']}', style: GoogleFonts.inter(color: kTextSecondary, fontSize: 12)),
+                        trailing: Text(formatCurrency((p['price'] as num).toDouble()),
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kPrimaryColor)),
+                        onTap: () {
+                          _searchController.text = p['id'] as String;
+                          setState(() => _showSuggestions = false);
+                          _addItemByBarcode(p['id'] as String);
+                        },
+                      );
                     },
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -586,11 +728,11 @@ class POSScreenState extends State<POSScreen> {
               child: Row(
                 children: [
                   Expanded(flex: 3, child: _headerCell('Product')),
-                  Expanded(flex: 1, child: _headerCell('Pricing')),
-                  Expanded(flex: 1, child: _headerCell('Price')),
-                  Expanded(flex: 1, child: _headerCell('Qty')),
-                  Expanded(flex: 1, child: _headerCell('Total')),
-                  const SizedBox(width: 80),
+                  Expanded(flex: 2, child: _headerCell('Pricing', textAlign: TextAlign.center)),
+                  Expanded(flex: 2, child: _headerCell('Price', textAlign: TextAlign.end)),
+                  Expanded(flex: 2, child: _headerCell('Qty', textAlign: TextAlign.center)),
+                  Expanded(flex: 2, child: _headerCell('Total', textAlign: TextAlign.end)),
+                  Expanded(flex: 1, child: _headerCell('')),
                 ],
               ),
             ),
@@ -630,8 +772,9 @@ class POSScreenState extends State<POSScreen> {
     );
   }
 
-  Widget _headerCell(String text) => Text(
+  Widget _headerCell(String text, {TextAlign textAlign = TextAlign.start}) => Text(
         text,
+        textAlign: textAlign,
         style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: kTextSecondary),
       );
 
@@ -649,10 +792,12 @@ class POSScreenState extends State<POSScreen> {
           _actionBtn('Clear Cart', Icons.clear_all, kErrorColor, () async {
             final cart = context.read<CartProvider>();
             if (cart.items.isEmpty) return;
-            if (await _verifyAdmin()) {
-              cart.clearCart();
-              await DatabaseHelper.instance.logAction('POS_VOID_CART',
-                  details: 'Cart cleared', userId: widget.username);
+            if (await _confirmClearCart()) {
+              if (await _verifyAdmin()) {
+                cart.clearCart();
+                await DatabaseHelper.instance.logAction('POS_VOID_CART',
+                    details: 'Cart cleared', userId: widget.username);
+              }
             }
           }),
         ],
@@ -790,8 +935,10 @@ class POSScreenState extends State<POSScreen> {
                       onPressed: () async {
                         final cart = context.read<CartProvider>();
                         if (cart.items.isEmpty) return;
-                        if (await _verifyAdmin()) {
-                          cart.clearCart();
+                        if (await _confirmClearCart()) {
+                          if (await _verifyAdmin()) {
+                            cart.clearCart();
+                          }
                         }
                       },
                       icon: const Icon(Icons.clear_all, size: 18),
@@ -815,61 +962,110 @@ class POSScreenState extends State<POSScreen> {
   Widget _buildBottomBar() {
     return Consumer<CartProvider>(
       builder: (ctx, cart, _) => Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, -2))],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('TOTAL', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 16, color: kTextPrimary)),
-                Text(formatCurrency(cart.total),
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 22, color: kPrimaryColor)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _checkout,
-                icon: const Icon(Icons.point_of_sale, size: 20),
-                label: Text('CHECKOUT (${cart.items.length} items)',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryColor,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(54),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('TOTAL', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 16, color: kTextPrimary)),
+                  Text(formatCurrency(cart.total),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 22, color: kPrimaryColor)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _checkout,
+                  icon: const Icon(Icons.point_of_sale, size: 20),
+                  label: Text(
+                    'CHECKOUT (${cart.items.length} items)',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(54),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton.icon(
-                  onPressed: _quickAdd,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Quick Add'),
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _phoneActionBtn(
+                      icon: Icons.add_circle_outline,
+                      label: 'Quick Add',
+                      color: const Color(0xFF6366F1),
+                      onTap: _quickAdd,
+                    ),
+                    const SizedBox(width: 4),
+                    _phoneActionBtn(
+                      icon: Icons.pause_circle_outline,
+                      label: 'Park Sale',
+                      color: const Color(0xFF0284C7),
+                      onTap: _parkSale,
+                    ),
+                    const SizedBox(width: 4),
+                    _phoneActionBtn(
+                      icon: Icons.play_circle_outline,
+                      label: 'Recall',
+                      color: const Color(0xFF10B981),
+                      onTap: _recallSale,
+                    ),
+                    const SizedBox(width: 4),
+                    _phoneActionBtn(
+                      icon: Icons.clear_all,
+                      label: 'Clear Cart',
+                      color: kErrorColor,
+                      onTap: () async {
+                        if (cart.items.isEmpty) return;
+                        if (await _confirmClearCart()) {
+                          if (await _verifyAdmin()) {
+                            cart.clearCart();
+                            await DatabaseHelper.instance.logAction('POS_VOID_CART',
+                                details: 'Cart cleared', userId: widget.username);
+                          }
+                        }
+                      },
+                    ),
+                  ],
                 ),
-                TextButton.icon(
-                  onPressed: _parkSale,
-                  icon: const Icon(Icons.pause, size: 16),
-                  label: const Text('Park'),
-                ),
-                TextButton.icon(
-                  onPressed: _recallSale,
-                  icon: const Icon(Icons.play_arrow, size: 16),
-                  label: const Text('Recall'),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _phoneActionBtn({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, color: color, size: 16),
+      label: Text(label, style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: color.withOpacity(0.4)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }

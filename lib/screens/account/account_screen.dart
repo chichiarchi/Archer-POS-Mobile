@@ -149,12 +149,15 @@ class AccountScreenState extends State<AccountScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 550),
-            child: Column(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isPhone = constraints.maxWidth < 600;
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(isPhone ? 14 : 24),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 550),
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Profile Information Card
@@ -341,6 +344,8 @@ class AccountScreenState extends State<AccountScreen> {
             ),
           ),
         ),
+          );
+        },
       ),
     );
   }

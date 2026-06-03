@@ -422,18 +422,22 @@ class LogsScreenState extends State<LogsScreen> {
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             color: Colors.white,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Range: ${DateFormat('MMM dd, yyyy').format(_dateFrom)} - ${DateFormat('MMM dd, yyyy').format(_dateTo)}',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextSecondary),
+                Flexible(
+                  child: Text(
+                    'Range: ${DateFormat('MMM dd, yyyy').format(_dateFrom)} – ${DateFormat('MMM dd, yyyy').format(_dateTo)}',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextSecondary, fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Text(
-                  'Total logs: ${_logs.length}',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kPrimaryColor),
+                  '${_logs.length} logs',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kPrimaryColor, fontSize: 13),
                 ),
               ],
             ),
@@ -448,74 +452,92 @@ class LogsScreenState extends State<LogsScreen> {
                           style: GoogleFonts.inter(color: kTextSecondary),
                         ),
                       )
-                    : ListView.builder(
-                        itemCount: paginatedLogs.length,
-                        itemBuilder: (ctx, index) {
-                          final log = paginatedLogs[index];
-                          final action = log['action'] as String? ?? '';
-                          final user = log['user_id'] as String? ?? log['username'] as String? ?? 'system';
-                          final details = log['details'] as String? ?? '';
-                          final timestamp = log['timestamp'] as String? ?? '';
+                    : LayoutBuilder(
+                        builder: (ctx, constraints) {
+                          final isTablet = constraints.maxWidth >= 768;
+                          Widget listView = ListView.builder(
+                            itemCount: paginatedLogs.length,
+                            itemBuilder: (ctx, index) {
+                              final log = paginatedLogs[index];
+                              final action = log['action'] as String? ?? '';
+                              final user = log['user_id'] as String? ?? log['username'] as String? ?? 'system';
+                              final details = log['details'] as String? ?? '';
+                              final timestamp = log['timestamp'] as String? ?? '';
 
-                          Color actionColor = kPrimaryColor;
-                          IconData actionIcon = Icons.info_outline;
+                              Color actionColor = kPrimaryColor;
+                              IconData actionIcon = Icons.info_outline;
 
-                          if (action.contains('SALE')) {
-                            actionColor = kSuccessColor;
-                            actionIcon = Icons.point_of_sale;
-                          } else if (action.contains('VOID')) {
-                            actionColor = kErrorColor;
-                            actionIcon = Icons.block;
-                          } else if (action.contains('PRODUCT')) {
-                            actionColor = Colors.orange;
-                            actionIcon = Icons.inventory;
-                          } else if (action.contains('PASSWORD') || action.contains('LOGIN')) {
-                            actionColor = Colors.purple;
-                            actionIcon = Icons.security;
-                          }
+                              if (action.contains('SALE')) {
+                                actionColor = kSuccessColor;
+                                actionIcon = Icons.point_of_sale;
+                              } else if (action.contains('VOID')) {
+                                actionColor = kErrorColor;
+                                actionIcon = Icons.block;
+                              } else if (action.contains('PRODUCT')) {
+                                actionColor = Colors.orange;
+                                actionIcon = Icons.inventory;
+                              } else if (action.contains('PASSWORD') || action.contains('LOGIN')) {
+                                actionColor = Colors.purple;
+                                actionIcon = Icons.security;
+                              }
 
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            child: ListTile(
-                              onTap: () => _handleRowTap(log),
-                              leading: CircleAvatar(
-                                backgroundColor: actionColor.withOpacity(0.1),
-                                child: Icon(actionIcon, color: actionColor),
-                              ),
-                              title: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    action,
-                                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: actionColor),
+                              return Card(
+                                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                child: ListTile(
+                                  onTap: () => _handleRowTap(log),
+                                  leading: CircleAvatar(
+                                    backgroundColor: actionColor.withOpacity(0.1),
+                                    child: Icon(actionIcon, color: actionColor),
                                   ),
-                                  Text(
-                                    formatDateTime(timestamp),
-                                    style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary),
+                                  title: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          action,
+                                          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: actionColor),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        formatDateTime(timestamp),
+                                        style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    details,
-                                    style: GoogleFonts.inter(color: kTextPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        details,
+                                        style: GoogleFonts.inter(color: kTextPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'User: $user',
+                                        style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'User: $user',
-                                    style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                              trailing: (action == 'POS_SALE' || action == 'VOID_SALE')
-                                  ? const Icon(Icons.receipt, color: kTextSecondary)
-                                  : null,
-                            ),
+                                  trailing: (action == 'POS_SALE' || action == 'VOID_SALE')
+                                      ? const Icon(Icons.receipt, color: kTextSecondary)
+                                      : null,
+                                ),
+                              );
+                            },
                           );
+                          if (isTablet) {
+                            return Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 900),
+                                child: listView,
+                              ),
+                            );
+                          }
+                          return listView;
                         },
                       ),
           ),

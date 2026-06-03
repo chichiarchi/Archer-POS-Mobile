@@ -285,6 +285,7 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.width >= 768;
+    final isLargePhone = size.width >= 400;
 
     return Scaffold(
       body: Container(
@@ -304,8 +305,8 @@ class _LoginScreenState extends State<LoginScreen>
           child: Center(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 0 : 24,
-                vertical: 32,
+                horizontal: isTablet ? 0 : (isLargePhone ? 24 : 16),
+                vertical: 24,
               ),
               child: FadeTransition(
                 opacity: _fadeAnim,
@@ -314,7 +315,7 @@ class _LoginScreenState extends State<LoginScreen>
                   child: ConstrainedBox(
                     constraints:
                         BoxConstraints(maxWidth: isTablet ? 460 : double.infinity),
-                    child: _buildCard(),
+                    child: _buildCard(isLargePhone),
                   ),
                 ),
               ),
@@ -325,7 +326,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildCard() {
+  Widget _buildCard([bool isLargePhone = true]) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -338,7 +339,10 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 40),
+      padding: EdgeInsets.symmetric(
+        horizontal: isLargePhone ? 36 : 20,
+        vertical: 36,
+      ),
       child: Form(
         key: _formKey,
         child: Column(

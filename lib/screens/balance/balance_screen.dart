@@ -261,9 +261,9 @@ class BalanceScreenState extends State<BalanceScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
+          preferredSize: const Size.fromHeight(68),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             color: Colors.white,
             child: TextField(
               onChanged: (val) {
@@ -304,96 +304,111 @@ class BalanceScreenState extends State<BalanceScreen> {
                     ],
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredDebtors.length,
-                  itemBuilder: (ctx, index) {
-                    final debtor = filteredDebtors[index];
-                    final name = debtor['name'] as String? ?? '';
-                    final phone = debtor['phone'] as String? ?? 'No phone';
-                    final saleId = debtor['sale_id'] as int? ?? 0;
-                    final date = debtor['created_at'] as String? ?? '';
-                    final balance = (debtor['balance_amount'] as num?)?.toDouble() ?? 0.0;
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isTablet = constraints.maxWidth >= 768;
+                    Widget listWidget = ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filteredDebtors.length,
+                      itemBuilder: (ctx, index) {
+                        final debtor = filteredDebtors[index];
+                        final name = debtor['name'] as String? ?? '';
+                        final phone = debtor['phone'] as String? ?? 'No phone';
+                        final saleId = debtor['sale_id'] as int? ?? 0;
+                        final date = debtor['created_at'] as String? ?? '';
+                        final balance = (debtor['balance_amount'] as num?)?.toDouble() ?? 0.0;
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 2,
-                      color: Colors.white,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => _resolveBalance(debtor),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 2,
+                          color: Colors.white,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => _resolveBalance(debtor),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      name,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: kTextPrimary,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          name,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800,
+                                            color: kTextPrimary,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      Text(
+                                        formatCurrency(balance),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                          color: kErrorColor,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    formatCurrency(balance),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      color: kErrorColor,
-                                    ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.phone, size: 14, color: kTextSecondary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        phone,
+                                        style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        'Sale #$saleId',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: kPrimaryColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Date: ${formatDateTime(date)}',
+                                        style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+                                      ),
+                                      Text(
+                                        'Tap to resolve',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: kSuccessColor,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Icon(Icons.phone, size: 14, color: kTextSecondary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    phone,
-                                    style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    'Sale #$saleId',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: kPrimaryColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Date: ${formatDateTime(date)}',
-                                    style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
-                                  ),
-                                  Text(
-                                    'Tap to resolve',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: kSuccessColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     );
+                    // On tablets, center the list with a max-width constraint
+                    if (isTablet) {
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 700),
+                          child: listWidget,
+                        ),
+                      );
+                    }
+                    return listWidget;
                   },
                 ),
     );
