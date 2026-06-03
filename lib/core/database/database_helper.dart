@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -19,6 +21,28 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'archer_pos.db');
+
+    // Check if the database exists in local storage
+    final exists = await databaseExists(path);
+
+    if (!exists) {
+      // Ensure the parent directory exists
+      try {
+        await Directory(dirname(path)).create(recursive: true);
+      } catch (e) {
+        print("Error creating directory: $e");
+      }
+
+      // Copy from assets
+      try {
+        ByteData data = await rootBundle.load('assets/db/archer_pos.db');
+        List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+        await File(path).writeAsBytes(bytes, flush: true);
+        print("Database successfully copied from assets.");
+      } catch (e) {
+        print("Error copying database from assets: $e");
+      }
+    }
 
     return await openDatabase(
       path,
