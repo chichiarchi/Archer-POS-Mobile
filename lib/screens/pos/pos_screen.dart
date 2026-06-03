@@ -518,7 +518,7 @@ class POSScreenState extends State<POSScreen> {
                   controller: _cameraController!,
                   onDetect: (capture) {
                     final now = DateTime.now();
-                    if (_lastScanTime != null && now.difference(_lastScanTime!) < const Duration(seconds: 2)) {
+                    if (_lastScanTime != null && now.difference(_lastScanTime!) < const Duration(milliseconds: 500)) {
                       return; // Throttle scans to prevent duplicate fast adding
                     }
                     final List<Barcode> barcodes = capture.barcodes;
@@ -527,6 +527,7 @@ class POSScreenState extends State<POSScreen> {
                         _lastScanTime = now;
                         final code = barcode.rawValue!;
                         HapticFeedback.lightImpact();
+                        SystemSound.play(SystemSoundType.click);
                         _addItemByBarcode(code);
                         break;
                       }
