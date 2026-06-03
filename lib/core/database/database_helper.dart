@@ -503,10 +503,18 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getDebtors() async {
     final db = await database;
     return await db.rawQuery('''
-      SELECT d.id, c.name, c.phone, d.sale_id, d.created_at, d.balance_amount
+      SELECT 
+        c.id as customer_id, 
+        c.name, 
+        c.phone, 
+        SUM(d.balance_amount) as balance_amount,
+        COUNT(d.id) as sales_count,
+        MAX(d.created_at) as created_at
       FROM debtors d
       JOIN customers c ON d.customer_id = c.id
       WHERE d.balance_amount > 0
+      GROUP BY c.id, c.name, c.phone
+      ORDER BY MAX(d.created_at) DESC
     ''');
   }
 
@@ -519,25 +527,56 @@ class DatabaseHelper {
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
-  Future<bool> resolveBalance(int debtorId, int saleId, double paymentAmount, double currentBalance) async {
+  Future<bool> resolveCustomerBalance(int customerId, double paymentAmount) async {
     final db = await database;
-    final newBalance = (currentBalance - paymentAmount).clamp(0.0, double.infinity);
-    final actualPayment = paymentAmount > currentBalance ? currentBalance : paymentAmount;
+    double remainingPayment = paymentAmount;
 
     await db.transaction((txn) async {
-      await txn.update('debtors', {'balance_amount': newBalance},
-          where: 'id = ?', whereArgs: [debtorId]);
+      final debtors = await txn.query(
+        'debtors',
+        where: 'customer_id = ? AND balance_amount > 0',
+        whereArgs: [customerId],
+        orderBy: 'created_at ASC, id ASC',
+      );
 
-      final sales = await txn.query('sales', where: 'id = ?', whereArgs: [saleId]);
-      if (sales.isNotEmpty) {
-        final sale = sales.first;
-        final newPaid = (sale['amount_paid'] as num).toDouble() + actualPayment;
+      for (final debtor in debtors) {
+        if (remainingPayment <= 0) break;
+
+        final debtorId = debtor['id'] as int;
+        final saleId = debtor['sale_id'] as int;
+        final currentDebtorBalance = (debtor['balance_amount'] as num).toDouble();
+
+        double paymentApplied = 0.0;
+        double newDebtorBalance = 0.0;
+
+        if (remainingPayment >= currentDebtorBalance) {
+          paymentApplied = currentDebtorBalance;
+          newDebtorBalance = 0.0;
+          remainingPayment -= currentDebtorBalance;
+        } else {
+          paymentApplied = remainingPayment;
+          newDebtorBalance = currentDebtorBalance - remainingPayment;
+          remainingPayment = 0.0;
+        }
+
         await txn.update(
-          'sales',
-          {'amount_paid': newPaid, 'balance_due': newBalance},
+          'debtors',
+          {'balance_amount': newDebtorBalance},
           where: 'id = ?',
-          whereArgs: [saleId],
+          whereArgs: [debtorId],
         );
+
+        final sales = await txn.query('sales', where: 'id = ?', whereArgs: [saleId]);
+        if (sales.isNotEmpty) {
+          final sale = sales.first;
+          final newPaid = (sale['amount_paid'] as num).toDouble() + paymentApplied;
+          await txn.update(
+            'sales',
+            {'amount_paid': newPaid, 'balance_due': newDebtorBalance},
+            where: 'id = ?',
+            whereArgs: [saleId],
+          );
+        }
       }
     });
     return true;

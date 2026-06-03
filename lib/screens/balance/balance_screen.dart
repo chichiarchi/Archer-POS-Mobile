@@ -64,10 +64,10 @@ class BalanceScreenState extends State<BalanceScreen> {
   }
 
   void _resolveBalance(Map<String, dynamic> debtor) {
-    final debtorId = debtor['id'] as int;
-    final saleId = debtor['sale_id'] as int;
+    final customerId = debtor['customer_id'] as int;
     final customerName = debtor['name'] as String;
     final currentBalance = (debtor['balance_amount'] as num).toDouble();
+    final salesCount = debtor['sales_count'] as int? ?? 1;
 
     final TextEditingController amountController = TextEditingController();
     double paymentAmount = 0.0;
@@ -106,7 +106,7 @@ class BalanceScreenState extends State<BalanceScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sale ID: #$saleId',
+                  'Unpaid Transactions: $salesCount',
                   style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
                 ),
                 const SizedBox(height: 16),
@@ -121,7 +121,7 @@ class BalanceScreenState extends State<BalanceScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'BALANCE DUE',
+                        'TOTAL BALANCE DUE',
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
@@ -205,17 +205,15 @@ class BalanceScreenState extends State<BalanceScreen> {
                   }
 
                   try {
-                    final success = await DatabaseHelper.instance.resolveBalance(
-                      debtorId,
-                      saleId,
+                    final success = await DatabaseHelper.instance.resolveCustomerBalance(
+                      customerId,
                       paymentAmount,
-                      currentBalance,
                     );
 
                     if (success) {
                       await DatabaseHelper.instance.logAction(
                         'BALANCE_RESOLVE',
-                        details: 'Resolved balance for sale #$saleId. Customer: $customerName. Paid: ${formatCurrency(paymentAmount)}',
+                        details: 'Resolved balance. Customer: $customerName. Paid: ${formatCurrency(paymentAmount)}',
                         userId: widget.username,
                       );
                       Navigator.of(ctx).pop();
@@ -246,9 +244,8 @@ class BalanceScreenState extends State<BalanceScreen> {
     final filteredDebtors = _debtors.where((d) {
       final name = (d['name'] as String? ?? '').toLowerCase();
       final phone = (d['phone'] as String? ?? '').toLowerCase();
-      final saleId = (d['sale_id'] as int? ?? '').toString();
       final query = _searchQuery.toLowerCase();
-      return name.contains(query) || phone.contains(query) || saleId.contains(query);
+      return name.contains(query) || phone.contains(query);
     }).toList();
 
     return Scaffold(
@@ -272,7 +269,7 @@ class BalanceScreenState extends State<BalanceScreen> {
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Search by Customer Name, Phone, or Sale ID...',
+                hintText: 'Search by Customer Name or Phone...',
                 prefixIcon: const Icon(Icons.search, color: kTextSecondary),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -314,7 +311,7 @@ class BalanceScreenState extends State<BalanceScreen> {
                         final debtor = filteredDebtors[index];
                         final name = debtor['name'] as String? ?? '';
                         final phone = debtor['phone'] as String? ?? 'No phone';
-                        final saleId = debtor['sale_id'] as int? ?? 0;
+                        final salesCount = debtor['sales_count'] as int? ?? 0;
                         final date = debtor['created_at'] as String? ?? '';
                         final balance = (debtor['balance_amount'] as num?)?.toDouble() ?? 0.0;
 
@@ -365,7 +362,7 @@ class BalanceScreenState extends State<BalanceScreen> {
                                       ),
                                       const Spacer(),
                                       Text(
-                                        'Sale #$saleId',
+                                        '$salesCount unpaid sale${salesCount == 1 ? "" : "s"}',
                                         style: GoogleFonts.inter(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
@@ -379,7 +376,7 @@ class BalanceScreenState extends State<BalanceScreen> {
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        'Date: ${formatDateTime(date)}',
+                                        'Last Activity: ${formatDateTime(date)}',
                                         style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
                                       ),
                                       Text(
