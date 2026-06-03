@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
@@ -262,11 +263,60 @@ class _MainScreenState extends State<MainScreen> {
   // ── Build root ────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isTablet = constraints.maxWidth >= AppConstants.tabletBreakpoint;
-        return isTablet ? _buildTabletLayout() : _buildPhoneLayout();
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              'Exit App',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+            content: Text(
+              'Are you sure you want to exit the application?',
+              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF475569)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.inter(color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  'Exit',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
       },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= AppConstants.tabletBreakpoint;
+          return isTablet ? _buildTabletLayout() : _buildPhoneLayout();
+        },
+      ),
     );
   }
 
