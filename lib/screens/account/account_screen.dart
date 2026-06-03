@@ -1,6 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
 import '../../core/database/database_helper.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/utils/constants.dart';
@@ -346,6 +351,76 @@ class AccountScreenState extends State<AccountScreen> {
     }
   }
 
+  Future<void> _importDatabase() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final selectedPath = result.files.single.path!;
+
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text('Import Products Only', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+            content: Text(
+              'Are you sure you want to import products from this file? Your existing sales logs, cashiers, and configurations will NOT be changed.',
+              style: GoogleFonts.inter(color: kTextSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text('Import', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmed == true) {
+          setState(() => _isLoading = true);
+
+          // Import products only
+          await DatabaseHelper.instance.importProductsFromExternalDb(selectedPath);
+
+          setState(() => _isLoading = false);
+          _showSnackBar('Products imported successfully! 🎉');
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showSnackBar('Failed to import products: $e', isError: true);
+    }
+  }
+
+  Future<void> _exportDatabase() async {
+    try {
+      final dbPath = await getDatabasesPath();
+      final sourcePath = p.join(dbPath, 'archer_pos.db');
+      final sourceFile = File(sourcePath);
+
+      if (!await sourceFile.exists()) {
+        _showSnackBar('Database file does not exist.', isError: true);
+        return;
+      }
+
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+      if (selectedDirectory != null) {
+        final targetPath = p.join(selectedDirectory, 'archer_pos_backup.db');
+        await sourceFile.copy(targetPath);
+        _showSnackBar('Database exported successfully to: $targetPath');
+      }
+    } catch (e) {
+      _showSnackBar('Failed to export database: $e', isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final roleDisplay = widget.userRole.toLowerCase() == 'admin' ? 'Administrator' : 'Staff Cashier';
@@ -629,6 +704,67 @@ class AccountScreenState extends State<AccountScreen> {
                   ),
                   const SizedBox(height: 24),
                 ],
+
+                // Database Management Card
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Database Backup & Restore',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: kTextPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Export your database to back up your data, or import a database file (e.g. from your web app) to pre-populate products.',
+                          style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+                        ),
+                        const Divider(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kPrimaryColor,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                onPressed: _importDatabase,
+                                icon: const Icon(Icons.file_upload, size: 20),
+                                label: Text('IMPORT DATABASE', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13)),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: kPrimaryColor,
+                                  side: const BorderSide(color: kPrimaryColor, width: 2),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                onPressed: _exportDatabase,
+                                icon: const Icon(Icons.file_download, size: 20),
+                                label: Text('EXPORT DATABASE', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
 
                 // Sign Out Button
                 ElevatedButton.icon(

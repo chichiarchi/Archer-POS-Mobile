@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
@@ -22,10 +23,35 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'archer_pos.db');
 
-    // Check if the database exists in local storage
-    final exists = await databaseExists(path);
+    final prefs = await SharedPreferences.getInstance();
+    final isPreloaded = prefs.getBool('db_preloaded_v4') ?? false;
 
-    if (!exists) {
+    bool exists = await databaseExists(path);
+    bool shouldCopy = !exists || !isPreloaded;
+
+    if (exists && !shouldCopy) {
+      // Even if flagged as preloaded, double check if products table is empty
+      try {
+        final db = await openDatabase(path);
+        final countResult = await db.rawQuery('SELECT COUNT(*) as count FROM products');
+        final count = Sqflite.firstIntValue(countResult) ?? 0;
+        await db.close();
+        if (count == 0) {
+          shouldCopy = true;
+        }
+      } catch (_) {
+        shouldCopy = true;
+      }
+    }
+
+    if (shouldCopy) {
+      // Safe deletion of database to release WAL/journal locks
+      try {
+        await deleteDatabase(path);
+      } catch (e) {
+        print("Error deleting old database: $e");
+      }
+
       // Ensure the parent directory exists
       try {
         await Directory(dirname(path)).create(recursive: true);
@@ -38,6 +64,7 @@ class DatabaseHelper {
         ByteData data = await rootBundle.load('assets/db/archer_pos.db');
         List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         await File(path).writeAsBytes(bytes, flush: true);
+        await prefs.setBool('db_preloaded_v4', true);
         print("Database successfully copied from assets.");
       } catch (e) {
         print("Error copying database from assets: $e");
@@ -50,6 +77,20 @@ class DatabaseHelper {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> closeDatabase() async {
+    if (_database != null) {
+      try {
+        await _database!.close();
+      } catch (_) {}
+      _database = null;
+    }
+  }
+
+  Future<void> reloadDatabase() async {
+    await closeDatabase();
+    await database;
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -189,7 +230,7 @@ class DatabaseHelper {
       'password_hash': result['hash'],
       'salt': result['salt'],
       'role': 'admin',
-    });
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -720,5 +761,67 @@ class DatabaseHelper {
   Future<void> deleteParkedSale(int id) async {
     final db = await database;
     await db.delete('parked_sales', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> importProductsFromExternalDb(String externalDbPath) async {
+    final db = await database;
+    Database? extDb;
+    try {
+      extDb = await openDatabase(externalDbPath);
+      
+      // 1. Fetch products
+      final List<Map<String, dynamic>> extProducts = await extDb.query('products');
+      
+      // 2. Fetch bundles
+      List<Map<String, dynamic>> extBundles = [];
+      try {
+        extBundles = await extDb.query('product_bundles');
+      } catch (_) {}
+
+      await extDb.close();
+      extDb = null;
+
+      // Use a transaction to insert/upsert everything efficiently
+      await db.transaction((txn) async {
+        // Import products
+        for (var p in extProducts) {
+          await txn.insert(
+            'products',
+            {
+              'id': p['id'],
+              'name': p['name'],
+              'price': p['price'],
+              'wholesale_price': p['wholesale_price'] ?? 0.0,
+              'cost': p['cost'] ?? 0.0,
+              'category': p['category'],
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+
+        // Import bundles
+        for (var b in extBundles) {
+          await txn.insert(
+            'product_bundles',
+            {
+              'product_id': b['product_id'],
+              'bundle_name': b['bundle_name'],
+              'quantity': b['quantity'],
+              'price': b['price'],
+              'wholesale_price': b['wholesale_price'] ?? 0.0,
+              'cost': b['cost'] ?? 0.0,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      });
+    } catch (e) {
+      if (extDb != null) {
+        try {
+          await extDb.close();
+        } catch (_) {}
+      }
+      throw Exception("Error reading external products: $e");
+    }
   }
 }
