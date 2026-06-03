@@ -34,6 +34,7 @@ class AccountScreenState extends State<AccountScreen> {
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  bool _cameraScannerMode = false;
 
   List<Map<String, dynamic>> _users = [];
   bool _loadingUsers = false;
@@ -42,6 +43,22 @@ class AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     _loadUsers();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _cameraScannerMode = prefs.getBool('camera_scanner_mode') ?? false;
+    });
+  }
+
+  Future<void> _toggleCameraScannerMode(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('camera_scanner_mode', val);
+    setState(() {
+      _cameraScannerMode = val;
+    });
   }
 
   Future<void> _loadUsers() async {
@@ -609,6 +626,50 @@ class AccountScreenState extends State<AccountScreen> {
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Device & Scanner Settings Card
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Device & Scanner Settings',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: kTextPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Configure scanning preferences and hardware controls for this device.',
+                          style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+                        ),
+                        const Divider(height: 32),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            'Camera Barcode Scanner',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14, color: kTextPrimary),
+                          ),
+                          subtitle: Text(
+                            'Show live camera preview in the POS screen to scan barcodes using the front or rear device camera.',
+                            style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+                          ),
+                          activeColor: kPrimaryColor,
+                          value: _cameraScannerMode,
+                          onChanged: _toggleCameraScannerMode,
+                        ),
+                      ],
                     ),
                   ),
                 ),

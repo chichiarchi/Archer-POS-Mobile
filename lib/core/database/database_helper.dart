@@ -23,35 +23,9 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'archer_pos.db');
 
-    final prefs = await SharedPreferences.getInstance();
-    final isPreloaded = prefs.getBool('db_preloaded_v4') ?? false;
-
     bool exists = await databaseExists(path);
-    bool shouldCopy = !exists || !isPreloaded;
 
-    if (exists && !shouldCopy) {
-      // Even if flagged as preloaded, double check if products table is empty
-      try {
-        final db = await openDatabase(path);
-        final countResult = await db.rawQuery('SELECT COUNT(*) as count FROM products');
-        final count = Sqflite.firstIntValue(countResult) ?? 0;
-        await db.close();
-        if (count == 0) {
-          shouldCopy = true;
-        }
-      } catch (_) {
-        shouldCopy = true;
-      }
-    }
-
-    if (shouldCopy) {
-      // Safe deletion of database to release WAL/journal locks
-      try {
-        await deleteDatabase(path);
-      } catch (e) {
-        print("Error deleting old database: $e");
-      }
-
+    if (!exists) {
       // Ensure the parent directory exists
       try {
         await Directory(dirname(path)).create(recursive: true);
@@ -64,7 +38,6 @@ class DatabaseHelper {
         ByteData data = await rootBundle.load('assets/db/archer_pos.db');
         List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         await File(path).writeAsBytes(bytes, flush: true);
-        await prefs.setBool('db_preloaded_v4', true);
         print("Database successfully copied from assets.");
       } catch (e) {
         print("Error copying database from assets: $e");

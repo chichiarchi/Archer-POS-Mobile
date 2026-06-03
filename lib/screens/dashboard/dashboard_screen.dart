@@ -828,7 +828,7 @@ class DashboardScreenState extends State<DashboardScreen>
           accentColor: const Color(0xFF0072FF),
           isCurrency: true,
           prefix: '₱',
-          trend: '+12%',
+          trend: null,
           trendUp: true,
         ),
         _StatCardConfig(
@@ -837,7 +837,7 @@ class DashboardScreenState extends State<DashboardScreen>
           gradientColors: const [Color(0xFF6366F1), Color(0xFF8B5CF6)],
           accentColor: const Color(0xFF6366F1),
           isCurrency: false,
-          trend: '+5',
+          trend: null,
           trendUp: true,
         ),
         _StatCardConfig(
