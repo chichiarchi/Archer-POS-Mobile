@@ -1,0 +1,759 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../../core/providers/cart_provider.dart';
+import '../../../core/utils/constants.dart';
+import '../../../core/utils/formatters.dart';
+
+/// A single cart item row, adapts between phone and tablet layouts.
+class CartItemTile extends StatefulWidget {
+  final CartItem item;
+  final int index;
+  final String userRole;
+  final String username;
+  final bool isTablet;
+  final VoidCallback onDelete;
+  final Function(double) onQtyChanged;
+  final Function(double) onDiscount;
+  final VoidCallback onTogglePricing;
+
+  const CartItemTile({
+    super.key,
+    required this.item,
+    required this.index,
+    required this.userRole,
+    required this.username,
+    this.isTablet = false,
+    required this.onDelete,
+    required this.onQtyChanged,
+    required this.onDiscount,
+    required this.onTogglePricing,
+  });
+
+  @override
+  State<CartItemTile> createState() => _CartItemTileState();
+}
+
+class _CartItemTileState extends State<CartItemTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _flashController;
+  late Animation<Color?> _flashAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _flashController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _flashAnimation = ColorTween(
+      begin: AppColors.salesBlueTint,
+      end: Colors.transparent,
+    ).animate(CurvedAnimation(
+      parent: _flashController,
+      curve: Curves.easeOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _flashController.dispose();
+    super.dispose();
+  }
+
+  // ─────────────────────────── helpers ────────────────────────────────────────
+
+  void _flash() {
+    _flashController.forward(from: 0.0);
+  }
+
+  void _increment() {
+    HapticFeedback.lightImpact();
+    final newQty = _roundQty(widget.item.quantity + 1);
+    widget.onQtyChanged(newQty);
+    _flash();
+  }
+
+  void _decrement() {
+    HapticFeedback.lightImpact();
+    final newQty = _roundQty(widget.item.quantity - 1);
+    if (newQty < 0.1) {
+      _confirmDelete();
+      return;
+    }
+    widget.onQtyChanged(newQty);
+    _flash();
+  }
+
+  double _roundQty(double qty) {
+    // Keep up to 3 decimal places to avoid floating-point noise.
+    return double.parse(qty.toStringAsFixed(3));
+  }
+
+  String _formatQty(double qty) {
+    if (qty == qty.truncateToDouble()) {
+      return qty.toStringAsFixed(0);
+    }
+    return qty.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '');
+  }
+
+  // ─────────────────────────── dialogs ────────────────────────────────────────
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+        ),
+        title: Text(
+          'Remove Item',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Remove "${widget.item.name}" from the cart?',
+          style: GoogleFonts.inter(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) widget.onDelete();
+  }
+
+  Future<void> _showChangeQtyDialog() async {
+    final controller =
+        TextEditingController(text: _formatQty(widget.item.quantity));
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+        ),
+        title: Text(
+          'Change Quantity',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        ),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
+          ],
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Quantity',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+            ),
+          ),
+          onSubmitted: (_) {
+            final v = double.tryParse(controller.text);
+            if (v != null && v >= 0.1) Navigator.pop(ctx, v);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+              ),
+            ),
+            onPressed: () {
+              final v = double.tryParse(controller.text);
+              if (v != null && v >= 0.1) {
+                Navigator.pop(ctx, v);
+              } else {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('Minimum quantity is 0.1'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('Set'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      widget.onQtyChanged(result);
+      _flash();
+    }
+  }
+
+  Future<void> _showDiscountDialog() async {
+    final controller =
+        TextEditingController(text: widget.item.price.toStringAsFixed(2));
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+        ),
+        title: Text(
+          'Apply Discount',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Current price: ${formatCurrency(widget.item.price)}',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: AppConstants.spaceSM),
+            TextField(
+              controller: controller,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                    RegExp(r'^\d+\.?\d{0,2}')),
+              ],
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'New Unit Price',
+                prefixText: '₱ ',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+              ),
+            ),
+            onPressed: () {
+              final v = double.tryParse(controller.text);
+              if (v != null && v >= 0) {
+                Navigator.pop(ctx, v);
+              } else {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('Enter a valid price (≥ 0)'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) widget.onDiscount(result);
+  }
+
+  Future<void> _showLongPressMenu() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppConstants.radiusLG),
+        ),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(AppConstants.radiusFull),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.spaceMD,
+                  vertical: AppConstants.spaceSM),
+              child: Text(
+                widget.item.name,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined,
+                  color: AppColors.primary),
+              title: Text('Change Qty',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+              onTap: () => Navigator.pop(ctx, 'qty'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.local_offer_outlined,
+                  color: AppColors.warning),
+              title: Text('Apply Discount',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+              subtitle: widget.item.manuallyDiscounted
+                  ? Text('Currently discounted',
+                      style: GoogleFonts.inter(
+                          fontSize: 11, color: AppColors.warning))
+                  : null,
+              onTap: () => Navigator.pop(ctx, 'discount'),
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.swap_horiz_rounded,
+                color: widget.item.pricingMode == 'retail'
+                    ? AppColors.info
+                    : AppColors.warning,
+              ),
+              title: Text('Toggle Pricing',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+              subtitle: Text(
+                'Switch to ${widget.item.pricingMode == 'retail' ? 'Wholesale' : 'Retail'}',
+                style: GoogleFonts.inter(
+                    fontSize: 11, color: AppColors.textMuted),
+              ),
+              onTap: () => Navigator.pop(ctx, 'pricing'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.error),
+              title: Text('Delete',
+                  style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.error)),
+              onTap: () => Navigator.pop(ctx, 'delete'),
+            ),
+            const SizedBox(height: AppConstants.spaceSM),
+          ],
+        ),
+      ),
+    );
+
+    switch (choice) {
+      case 'qty':
+        await _showChangeQtyDialog();
+        break;
+      case 'discount':
+        await _showDiscountDialog();
+        break;
+      case 'pricing':
+        widget.onTogglePricing();
+        break;
+      case 'delete':
+        await _confirmDelete();
+        break;
+    }
+  }
+
+  // ─────────────────────────── pricing badge ───────────────────────────────────
+
+  Widget _pricingBadge({bool compact = false}) {
+    final isRetail = widget.item.pricingMode == 'retail';
+    final color = isRetail ? AppColors.primary : const Color(0xFFF97316);
+    final label = isRetail ? 'RETAIL' : 'WHOLESALE';
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 5 : 7,
+        vertical: compact ? 2 : 3,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(AppConstants.radiusFull),
+        border: Border.all(color: color.withOpacity(0.35), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: compact ? 9 : 10,
+          fontWeight: FontWeight.w700,
+          color: color,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────── qty controls ────────────────────────────────────
+
+  Widget _qtyControls({bool compact = false}) {
+    final btnSize = compact ? 28.0 : 32.0;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _CircleIconButton(
+          icon: Icons.remove,
+          size: btnSize,
+          onTap: _decrement,
+          backgroundColor: AppColors.background,
+          iconColor: AppColors.textPrimary,
+        ),
+        GestureDetector(
+          onTap: _showChangeQtyDialog,
+          child: Container(
+            constraints: BoxConstraints(minWidth: compact ? 32 : 40),
+            padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 6),
+            child: Text(
+              _formatQty(widget.item.quantity),
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: compact ? 13 : 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
+        _CircleIconButton(
+          icon: Icons.add,
+          size: btnSize,
+          onTap: _increment,
+          backgroundColor: AppColors.primary.withOpacity(0.1),
+          iconColor: AppColors.primary,
+        ),
+      ],
+    );
+  }
+
+  // ─────────────────────────── PHONE layout ────────────────────────────────────
+
+  Widget _phoneLayout() {
+    return AnimatedBuilder(
+      animation: _flashAnimation,
+      builder: (context, child) => Card(
+        color: _flashAnimation.value ?? Colors.white,
+        elevation: AppConstants.elevationCard,
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppConstants.spaceSM,
+            vertical: AppConstants.spaceXS),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+          side: BorderSide(color: AppColors.border, width: 0.8),
+        ),
+        child: child,
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+        onLongPress: _showLongPressMenu,
+        child: Padding(
+          padding: const EdgeInsets.all(AppConstants.spaceMD),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Row 1: name + total ──
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.name,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        if (widget.item.barcode.isNotEmpty)
+                          Text(
+                            widget.item.barcode,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppConstants.spaceSM),
+                  Text(
+                    formatCurrency(widget.item.subtotal),
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.spaceSM),
+              // ── Row 2: badge + unit price ──
+              Row(
+                children: [
+                  _pricingBadge(),
+                  const SizedBox(width: AppConstants.spaceSM),
+                  if (widget.item.manuallyDiscounted)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Icon(Icons.local_offer,
+                          size: 13, color: AppColors.warning),
+                    ),
+                  Text(
+                    '${formatCurrency(widget.item.price)} / unit',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.spaceSM),
+              // ── Row 3: qty controls + delete ──
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _qtyControls(),
+                  IconButton(
+                    onPressed: _confirmDelete,
+                    icon: const Icon(Icons.delete_outline),
+                    color: AppColors.error,
+                    iconSize: 20,
+                    tooltip: 'Remove',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────── TABLET layout ───────────────────────────────────
+
+  Widget _tabletLayout() {
+    return AnimatedBuilder(
+      animation: _flashAnimation,
+      builder: (context, child) => Container(
+        color: _flashAnimation.value ?? Colors.transparent,
+        child: child,
+      ),
+      child: InkWell(
+        onLongPress: _showLongPressMenu,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppConstants.spaceMD,
+            vertical: 10,
+          ),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: AppColors.border, width: 0.8),
+            ),
+          ),
+          child: Row(
+            children: [
+              // Product name + barcode (flex 3)
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.item.name,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (widget.item.barcode.isNotEmpty)
+                      Text(
+                        widget.item.barcode,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Pricing badge (flex 1.5)
+              Expanded(
+                flex: 2,
+                child: Center(child: _pricingBadge(compact: true)),
+              ),
+              // Price (flex 1.5)
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      formatCurrency(widget.item.price),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    if (widget.item.manuallyDiscounted)
+                      Icon(Icons.local_offer,
+                          size: 11, color: AppColors.warning),
+                  ],
+                ),
+              ),
+              // Qty controls (flex 2)
+              Expanded(
+                flex: 2,
+                child: Center(child: _qtyControls(compact: true)),
+              ),
+              // Total (flex 1.5)
+              Expanded(
+                flex: 2,
+                child: Text(
+                  formatCurrency(widget.item.subtotal),
+                  textAlign: TextAlign.end,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              // Actions (flex 1)
+              Expanded(
+                flex: 1,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _SmallIconButton(
+                      icon: Icons.local_offer_outlined,
+                      color: AppColors.warning,
+                      tooltip: 'Discount',
+                      onTap: _showDiscountDialog,
+                    ),
+                    const SizedBox(width: 4),
+                    _SmallIconButton(
+                      icon: Icons.delete_outline,
+                      color: AppColors.error,
+                      tooltip: 'Remove',
+                      onTap: _confirmDelete,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────── build ──────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.isTablet ? _tabletLayout() : _phoneLayout();
+  }
+}
+
+// ─────────────────────────── helper widgets ─────────────────────────────────
+
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final VoidCallback onTap;
+  final Color backgroundColor;
+  final Color iconColor;
+
+  const _CircleIconButton({
+    required this.icon,
+    required this.size,
+    required this.onTap,
+    required this.backgroundColor,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: size * 0.5, color: iconColor),
+      ),
+    );
+  }
+}
+
+class _SmallIconButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _SmallIconButton({
+    required this.icon,
+    required this.color,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 18, color: color),
+        ),
+      ),
+    );
+  }
+}

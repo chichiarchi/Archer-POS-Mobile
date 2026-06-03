@@ -291,7 +291,7 @@ class ReceiptPrinter:
             y += 12
             
             # Store Name (Big, Bold, Centered)
-            header_txt = receipt_data.get('header', 'ARCHERMART')
+            header_txt = receipt_data.get('header', database.get_system_title("Archer POS").upper())
             y += draw_centered_text(header_txt, y, font_header)
             y += 6
             

@@ -21,10 +21,12 @@ def resource_path(relative_path):
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Archer POS v2 - Login")
-        self.setFixedSize(400, 500)
+        self.system_title = database.get_system_title("Archer POS")
+        self.system_logo_path = database.get_system_logo("archer_logo.png")
+        self.setWindowTitle(f"{self.system_title} - Login")
+        self.setFixedSize(400, 520)
         from PySide6.QtGui import QIcon
-        self.setWindowIcon(QIcon(resource_path("archer_logo.png")))
+        self.setWindowIcon(QIcon(self.system_logo_path))
         self.setup_ui()
         
     def setup_ui(self):
@@ -71,18 +73,32 @@ class LoginWindow(QWidget):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(20)
 
+        # Logo Label (Beautiful circular/rounded/scaled logo)
+        from PySide6.QtGui import QPixmap
+        logo_label = QLabel()
+        logo_label.setAlignment(Qt.AlignCenter)
+        pixmap = QPixmap(self.system_logo_path)
+        if not pixmap.isNull():
+            scaled_pixmap = pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_label.setPixmap(scaled_pixmap)
+            logo_label.setStyleSheet("margin-top: 10px;")
+        else:
+            logo_label.setText("📦")
+            logo_label.setStyleSheet("font-size: 40px; margin-top: 10px;")
+        layout.addWidget(logo_label)
+
         # Title Label
-        title_label = QLabel("ARCHER POS")
+        title_label = QLabel(self.system_title.upper())
         title_label.setAlignment(Qt.AlignCenter)
-        title_font = QFont("Segoe UI", 24, QFont.Bold)
+        title_font = QFont("Segoe UI", 20, QFont.Bold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #0072FF; margin-bottom: 20px; font-weight: 900;")
+        title_label.setStyleSheet("color: #0072FF; margin-bottom: 5px; font-weight: 900;")
         layout.addWidget(title_label)
         
         # Subtitle
         subtitle_label = QLabel("Sign in to continue")
         subtitle_label.setAlignment(Qt.AlignCenter)
-        subtitle_label.setStyleSheet("color: #6c757d; margin-bottom: 20px;")
+        subtitle_label.setStyleSheet("color: #6c757d; margin-bottom: 10px;")
         layout.addWidget(subtitle_label)
 
         # Username Input

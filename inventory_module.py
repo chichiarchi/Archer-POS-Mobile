@@ -172,7 +172,8 @@ class InventoryModule(QWidget):
 
     def generate_price_list_pdf(self):
         # Open save file dialog
-        default_name = os.path.join(os.path.expanduser("~"), "Documents", "Archer_Product_Price_List.pdf")
+        system_title_safe = "".join([c if c.isalnum() else "_" for c in database.get_system_title("Archer POS")])
+        default_name = os.path.join(os.path.expanduser("~"), "Documents", f"{system_title_safe}_Product_Price_List.pdf")
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Price List PDF",
@@ -270,6 +271,7 @@ class InventoryModule(QWidget):
                         """)
 
             # Construct HTML page template
+            system_title = database.get_system_title("Archer POS")
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             total_products = len(products)
             
@@ -373,7 +375,7 @@ class InventoryModule(QWidget):
             </head>
             <body>
                 <div class="header">
-                    <h1>ARCHERMART PRODUCT PRICE LIST</h1>
+                    <h1>{system_title.upper()} PRODUCT PRICE LIST</h1>
                     <p>Narvacan, Ilocos Sur | Premium POS System Catalog</p>
                 </div>
                 
@@ -404,8 +406,8 @@ class InventoryModule(QWidget):
                 </table>
                 
                 <div class="footer">
-                    <p>This is an automatically generated product price catalog from Archer POS v2. Prices are subject to change without prior notice.</p>
-                    <p>Thank you for choosing Archermart!</p>
+                    <p>This is an automatically generated product price catalog from {system_title}. Prices are subject to change without prior notice.</p>
+                    <p>Thank you for choosing {system_title}!</p>
                 </div>
             </body>
             </html>

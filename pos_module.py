@@ -1068,7 +1068,7 @@ class POSModule(QWidget):
             # Print Receipt
             if reply == QMessageBox.Yes:
                 receipt_data = {
-                    'header': 'ARCHERMART',
+                    'header': database.get_system_title("Archer POS").upper(),
                     'cashier': self.user_role.capitalize(),
                     'sale_id': sale_id,
                     'items': [{'barcode': i["barcode"], 'name': i["name"], 'qty': i["qty"], 'price': i["price"]} for i in self.cart],

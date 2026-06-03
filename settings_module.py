@@ -1,16 +1,21 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-    QLabel, QMessageBox, QCheckBox, QFrame, QComboBox
+    QLabel, QMessageBox, QCheckBox, QFrame, QComboBox,
+    QLineEdit, QFileDialog
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 import database
 import win32print
+import os
+import shutil
 
 class SettingsModule(QWidget):
     def __init__(self, user_role="staff"):
         super().__init__()
         self.user_role = user_role
         self.setup_ui()
+
 
     def setup_ui(self):
         layout = QVBoxLayout(self)

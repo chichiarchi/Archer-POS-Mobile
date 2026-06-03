@@ -3,11 +3,12 @@ import sys
 from datetime import datetime
 
 # Add workspace directory to python path
-workspace_dir = r"c:\Users\USER\Documents\Archer-pos-system\archer-pos-v2"
+workspace_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, workspace_dir)
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QTextDocument
+from PySide6.QtGui import QTextDocument, QPageLayout
+from PySide6.QtCore import QMarginsF
 from PySide6.QtPrintSupport import QPrinter
 import database
 
@@ -223,7 +224,7 @@ def mock_generate_pdf(role, output_path):
     printer = QPrinter(QPrinter.PrinterResolution)
     printer.setOutputFormat(QPrinter.PdfFormat)
     printer.setOutputFileName(output_path)
-    printer.setPageMargins(15, 15, 15, 15, QPrinter.Millimeter)
+    printer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout.Unit.Millimeter)
     
     doc = QTextDocument()
     doc.setHtml(html_content)
