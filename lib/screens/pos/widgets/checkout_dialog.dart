@@ -130,7 +130,9 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
 
     return Dialog(
@@ -153,11 +155,11 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                     style: GoogleFonts.inter(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: kTextPrimary,
+                      color: cs.onSurface,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: kTextSecondary),
+                    icon: Icon(Icons.close, color: cs.onSurface.withOpacity(0.6)),
                     onPressed: () => Navigator.of(context).pop(),
                   )
                 ],
@@ -208,12 +210,12 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                 style: GoogleFonts.inter(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: kTextPrimary,
+                  color: cs.onSurface,
                 ),
                 decoration: InputDecoration(
                   labelText: 'Amount Paid (Cash)',
                   labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w500),
-                  prefixIcon: const Icon(Icons.payments_outlined, color: kPrimaryColor),
+                  prefixIcon: Icon(Icons.payments_outlined, color: cs.primary),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear),
                     onPressed: () => _cashController.clear(),
@@ -248,13 +250,13 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: _amountPaid >= widget.total 
-                        ? kSuccessColor.withOpacity(0.1) 
-                        : kErrorColor.withOpacity(0.1),
+                        ? (isDark ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFD1FAE5)) 
+                        : (isDark ? const Color(0xFFEF4444).withOpacity(0.15) : const Color(0xFFFEF2F2)),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: _amountPaid >= widget.total 
-                          ? kSuccessColor.withOpacity(0.3) 
-                          : kErrorColor.withOpacity(0.3),
+                          ? (isDark ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFFA7F3D0)) 
+                          : (isDark ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFFFCA5A5)),
                     ),
                   ),
                   child: Row(
@@ -265,7 +267,9 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
-                          color: _amountPaid >= widget.total ? kSuccessColor : kErrorColor,
+                          color: _amountPaid >= widget.total 
+                              ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)) 
+                              : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -276,7 +280,9 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w900,
                           fontSize: 18,
-                          color: _amountPaid >= widget.total ? kSuccessColor : kErrorColor,
+                          color: _amountPaid >= widget.total 
+                              ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)) 
+                              : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
                         ),
                       ),
                     ],
@@ -288,14 +294,14 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    const Icon(Icons.account_box, color: kWarningColor),
+                    Icon(Icons.account_box, color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706)),
                     const SizedBox(width: 8),
                     Text(
                       'Customer Info (Required for Balance)',
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: kTextPrimary,
+                        color: cs.onSurface,
                       ),
                     ),
                   ],
@@ -364,9 +370,9 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: kPrimaryColor.withOpacity(0.05),
+                        color: cs.primary.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: kPrimaryColor.withOpacity(0.15)),
+                        border: Border.all(color: cs.primary.withOpacity(0.2)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,11 +382,11 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                             children: [
                               Text(
                                 'Current Outstanding Debt:',
-                                style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextSecondary, fontSize: 13),
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.6), fontSize: 13),
                               ),
                               Text(
                                 formatCurrency(_existingDebtorDebt),
-                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kErrorColor, fontSize: 14),
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.error, fontSize: 14),
                               ),
                             ],
                           ),
@@ -391,11 +397,11 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                               children: [
                                 Text(
                                   'New Total Debt:',
-                                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kTextPrimary, fontSize: 13),
+                                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface, fontSize: 13),
                                 ),
                                 Text(
                                   formatCurrency(_existingDebtorDebt + _balanceDue),
-                                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: kErrorColor, fontSize: 15),
+                                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: cs.error, fontSize: 15),
                                 ),
                               ],
                             ),
@@ -443,8 +449,8 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
               ElevatedButton(
                 onPressed: _onConfirm,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryColor,
-                  foregroundColor: Colors.white,
+                  backgroundColor: cs.primary,
+                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                   minimumSize: const Size.fromHeight(50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -466,16 +472,19 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   }
 
   Widget _buildQuickCashButton(double amount, String label) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
     return ActionChip(
       label: Text(label),
       onPressed: () => _applyQuickCash(amount),
-      backgroundColor: kPrimaryColor.withOpacity(0.05),
+      backgroundColor: cs.primary.withOpacity(0.08),
       labelStyle: GoogleFonts.inter(
-        color: kPrimaryColor,
+        color: cs.primary,
         fontWeight: FontWeight.w700,
         fontSize: 13,
       ),
-      side: const BorderSide(color: kPrimaryColor),
+      side: BorderSide(color: cs.primary),
     );
   }
 }

@@ -180,11 +180,11 @@ class CartProvider extends ChangeNotifier {
         _items.indexWhere((item) => item.barcode == barcode && item.pricingMode == mode);
 
     if (existingIndex >= 0) {
-      final existing = _items[existingIndex];
+      final existing = _items.removeAt(existingIndex);
       final newQty = existing.quantity + quantity;
-      _items[existingIndex] = existing.copyWith(quantity: newQty);
+      _items.insert(0, existing.copyWith(quantity: newQty));
     } else {
-      _items.add(CartItem(
+      _items.insert(0, CartItem(
         barcode: barcode,
         name: name,
         price: mode == 'wholesale' && baseWholesale > 0 ? baseWholesale : baseRetail,

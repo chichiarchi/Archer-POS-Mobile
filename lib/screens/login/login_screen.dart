@@ -205,6 +205,9 @@ class _LoginScreenState extends State<LoginScreen>
   }) async {
     final controller = TextEditingController();
     bool localObscure = obscure;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return showDialog<String>(
       context: context,
@@ -220,24 +223,26 @@ class _LoginScreenState extends State<LoginScreen>
                 style: GoogleFonts.inter(
                     fontWeight: FontWeight.w700,
                     fontSize: 18,
-                    color: const Color(0xFF1E293B)),
+                    color: cs.onSurface),
               ),
               content: TextField(
                 controller: controller,
                 obscureText: localObscure,
                 autofocus: true,
-                style: GoogleFonts.inter(fontSize: 15),
+                style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface),
                 decoration: InputDecoration(
                   labelText: label,
+                  labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
                   hintText: hint,
-                  prefixIcon: Icon(icon, color: _primaryBlue),
+                  hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.4)),
+                  prefixIcon: Icon(icon, color: isDark ? cs.primary : _primaryBlue),
                   suffixIcon: obscure
                       ? IconButton(
                           icon: Icon(
                             localObscure
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: const Color(0xFF94A3B8),
+                            color: cs.onSurface.withOpacity(0.55),
                           ),
                           onPressed: () => setDialogState(
                               () => localObscure = !localObscure),
@@ -248,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen>
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide:
-                        const BorderSide(color: _primaryBlue, width: 2),
+                        BorderSide(color: isDark ? cs.primary : _primaryBlue, width: 2),
                   ),
                 ),
                 onSubmitted: (_) => Navigator.of(ctx).pop(controller.text),
@@ -258,19 +263,20 @@ class _LoginScreenState extends State<LoginScreen>
                   onPressed: () => Navigator.of(ctx).pop(null),
                   child: Text('Cancel',
                       style: GoogleFonts.inter(
-                          color: const Color(0xFF64748B),
+                          color: cs.onSurface.withOpacity(0.6),
                           fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryBlue,
+                    backgroundColor: cs.primary,
+                    foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: () => Navigator.of(ctx).pop(controller.text),
                   child: Text('Continue',
                       style: GoogleFonts.inter(
-                          color: Colors.white, fontWeight: FontWeight.w600)),
+                          fontWeight: FontWeight.w600)),
                 ),
               ],
             );
@@ -327,13 +333,18 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildCard([bool isLargePhone = true]) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(24),
+        border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0072FF).withOpacity(0.18),
+            color: isDark ? Colors.black.withOpacity(0.3) : const Color(0xFF0072FF).withOpacity(0.18),
             blurRadius: 40,
             offset: const Offset(0, 16),
           ),
@@ -377,7 +388,7 @@ class _LoginScreenState extends State<LoginScreen>
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 14,
-                color: const Color(0xFF94A3B8),
+                color: cs.onSurface.withOpacity(0.6),
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -388,25 +399,27 @@ class _LoginScreenState extends State<LoginScreen>
               controller: _usernameController,
               textInputAction: TextInputAction.next,
               keyboardType: TextInputType.text,
-              style: GoogleFonts.inter(fontSize: 15),
+              style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface),
               decoration: InputDecoration(
                 labelText: 'Username',
+                labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
                 hintText: 'Enter your username',
+                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.4)),
                 prefixIcon: const Icon(Icons.person_outline,
                     color: _primaryBlue),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide:
-                      const BorderSide(color: _primaryBlue, width: 2),
+                      BorderSide(color: isDark ? cs.primary : _primaryBlue, width: 2),
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF8FAFC),
+                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) {
@@ -422,11 +435,13 @@ class _LoginScreenState extends State<LoginScreen>
               controller: _passwordController,
               obscureText: _obscurePassword,
               textInputAction: TextInputAction.done,
-              style: GoogleFonts.inter(fontSize: 15),
+              style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface),
               onFieldSubmitted: (_) => _isLoading ? null : _handleLogin(),
               decoration: InputDecoration(
                 labelText: 'Password',
+                labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
                 hintText: 'Enter your password',
+                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.4)),
                 prefixIcon:
                     const Icon(Icons.lock_outline, color: _primaryBlue),
                 suffixIcon: IconButton(
@@ -434,7 +449,7 @@ class _LoginScreenState extends State<LoginScreen>
                     _obscurePassword
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
-                    color: const Color(0xFF94A3B8),
+                    color: cs.onSurface.withOpacity(0.55),
                   ),
                   onPressed: () =>
                       setState(() => _obscurePassword = !_obscurePassword),
@@ -443,15 +458,15 @@ class _LoginScreenState extends State<LoginScreen>
                     borderRadius: BorderRadius.circular(12)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide:
-                      const BorderSide(color: _primaryBlue, width: 2),
+                      BorderSide(color: isDark ? cs.primary : _primaryBlue, width: 2),
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF8FAFC),
+                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) {
@@ -471,7 +486,7 @@ class _LoginScreenState extends State<LoginScreen>
               child: TextButton(
                 onPressed: _isLoading ? null : _handleForgotPassword,
                 style: TextButton.styleFrom(
-                  foregroundColor: _primaryBlue,
+                  foregroundColor: isDark ? cs.primary : _primaryBlue,
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 8),
                 ),
@@ -480,9 +495,9 @@ class _LoginScreenState extends State<LoginScreen>
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: _primaryBlue,
+                    color: isDark ? cs.primary : _primaryBlue,
                     decoration: TextDecoration.underline,
-                    decorationColor: _primaryBlue,
+                    decorationColor: isDark ? cs.primary : _primaryBlue,
                   ),
                 ),
               ),

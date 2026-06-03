@@ -262,6 +262,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -283,7 +285,7 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                         style: GoogleFonts.inter(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: kTextPrimary,
+                          color: cs.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -292,7 +294,7 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: kPrimaryColor,
+                          color: cs.primary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -314,7 +316,7 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                   'Existing Bundles (${_bundles.length})',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w700,
-                    color: kTextSecondary,
+                    color: cs.onSurface.withOpacity(0.7),
                   ),
                 ),
                 ElevatedButton.icon(
@@ -322,8 +324,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('Add Bundle'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryColor,
-                    foregroundColor: Colors.white,
+                    backgroundColor: cs.primary,
+                    foregroundColor: cs.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -339,7 +341,7 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                       ? Center(
                           child: Text(
                             'No bundles defined for this product.',
-                            style: GoogleFonts.inter(color: kTextSecondary),
+                            style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.5)),
                           ),
                         )
                       : ListView.separated(
@@ -357,21 +359,21 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                               contentPadding: EdgeInsets.zero,
                               title: Text(
                                 name,
-                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kTextPrimary),
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface),
                               ),
                               subtitle: Text(
                                 'Qty: $qty | Retail: ${formatCurrency(price)} | Wholesale: ${formatCurrency(wholesale)}',
-                                style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+                                style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    icon: const Icon(Icons.edit_outlined, color: kPrimaryColor),
+                                    icon: Icon(Icons.edit_outlined, color: cs.primary),
                                     onPressed: () => _openBundleForm(b),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: kErrorColor),
+                                    icon: Icon(Icons.delete_outline, color: cs.error),
                                     onPressed: () => _deleteBundle(id, name),
                                   ),
                                 ],

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../core/utils/constants.dart';
 
 class QuickAddDialog extends StatefulWidget {
   const QuickAddDialog({super.key});
@@ -34,6 +33,8 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -50,7 +51,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: kTextPrimary,
+                  color: cs.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
@@ -107,7 +108,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                     'Quantity',
                     style: GoogleFonts.inter(
                       fontWeight: FontWeight.w700,
-                      color: kTextPrimary,
+                      color: cs.onSurface,
                     ),
                   ),
                   Row(
@@ -124,14 +125,14 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                             });
                           }
                         },
-                        icon: const Icon(Icons.remove_circle_outline, color: kPrimaryColor),
+                        icon: Icon(Icons.remove_circle_outline, color: cs.primary),
                       ),
                       Text(
                         _quantity.toString(),
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
-                          color: kTextPrimary,
+                          color: cs.onSurface,
                         ),
                       ),
                       IconButton(
@@ -140,7 +141,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                             _quantity = double.parse((_quantity + 1.0).toStringAsFixed(1));
                           });
                         },
-                        icon: const Icon(Icons.add_circle_outline, color: kPrimaryColor),
+                        icon: Icon(Icons.add_circle_outline, color: cs.primary),
                       ),
                     ],
                   )
@@ -158,7 +159,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                       'Cancel',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600,
-                        color: kTextSecondary,
+                        color: cs.onSurface.withOpacity(0.6),
                       ),
                     ),
                   ),
@@ -166,8 +167,8 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                   ElevatedButton(
                     onPressed: _onConfirm,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: kPrimaryColor,
-                      foregroundColor: Colors.white,
+                      backgroundColor: cs.primary,
+                      foregroundColor: cs.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),

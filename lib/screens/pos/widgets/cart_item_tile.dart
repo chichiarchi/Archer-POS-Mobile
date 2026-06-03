@@ -38,7 +38,6 @@ class CartItemTile extends StatefulWidget {
 class _CartItemTileState extends State<CartItemTile>
     with SingleTickerProviderStateMixin {
   late AnimationController _flashController;
-  late Animation<Color?> _flashAnimation;
 
   @override
   void initState() {
@@ -47,13 +46,6 @@ class _CartItemTileState extends State<CartItemTile>
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    _flashAnimation = ColorTween(
-      begin: AppColors.salesBlueTint,
-      end: Colors.transparent,
-    ).animate(CurvedAnimation(
-      parent: _flashController,
-      curve: Curves.easeOut,
-    ));
   }
 
   @override
@@ -278,6 +270,8 @@ class _CartItemTileState extends State<CartItemTile>
   }
 
   Future<void> _showLongPressMenu() async {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final choice = await showModalBottomSheet<String>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -295,7 +289,7 @@ class _CartItemTileState extends State<CartItemTile>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: theme.dividerColor,
                 borderRadius: BorderRadius.circular(AppConstants.radiusFull),
               ),
             ),
@@ -308,7 +302,7 @@ class _CartItemTileState extends State<CartItemTile>
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: cs.onSurface,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -390,8 +384,8 @@ class _CartItemTileState extends State<CartItemTile>
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 5 : 7,
-        vertical: compact ? 2 : 3,
+        horizontal: compact ? 6 : 10,
+        vertical: compact ? 3 : 5,
       ),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
@@ -401,7 +395,7 @@ class _CartItemTileState extends State<CartItemTile>
       child: Text(
         label,
         style: GoogleFonts.inter(
-          fontSize: compact ? 9 : 10,
+          fontSize: compact ? 10 : 12,
           fontWeight: FontWeight.w700,
           color: color,
           letterSpacing: 0.5,
@@ -413,7 +407,9 @@ class _CartItemTileState extends State<CartItemTile>
   // ─────────────────────────── qty controls ────────────────────────────────────
 
   Widget _qtyControls({bool compact = false}) {
-    final btnSize = compact ? 28.0 : 32.0;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final btnSize = compact ? 28.0 : 36.0;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -421,21 +417,21 @@ class _CartItemTileState extends State<CartItemTile>
           icon: Icons.remove,
           size: btnSize,
           onTap: _decrement,
-          backgroundColor: AppColors.background,
-          iconColor: AppColors.textPrimary,
+          backgroundColor: isDark ? const Color(0xFF334155) : AppColors.background,
+          iconColor: cs.onSurface,
         ),
         GestureDetector(
           onTap: _showChangeQtyDialog,
           child: Container(
-            constraints: BoxConstraints(minWidth: compact ? 32 : 40),
-            padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 6),
+            constraints: BoxConstraints(minWidth: compact ? 32 : 44),
+            padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8),
             child: Text(
               _formatQty(widget.item.quantity),
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                fontSize: compact ? 13 : 15,
+                fontSize: compact ? 14 : 17,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: cs.onSurface,
               ),
             ),
           ),
@@ -444,30 +440,44 @@ class _CartItemTileState extends State<CartItemTile>
           icon: Icons.add,
           size: btnSize,
           onTap: _increment,
-          backgroundColor: AppColors.primary.withOpacity(0.1),
-          iconColor: AppColors.primary,
+          backgroundColor: cs.primary.withOpacity(0.12),
+          iconColor: cs.primary,
         ),
       ],
+
     );
   }
 
   // ─────────────────────────── PHONE layout ────────────────────────────────────
 
   Widget _phoneLayout() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return AnimatedBuilder(
-      animation: _flashAnimation,
-      builder: (context, child) => Card(
-        color: _flashAnimation.value ?? Colors.white,
-        elevation: AppConstants.elevationCard,
-        margin: const EdgeInsets.symmetric(
-            horizontal: AppConstants.spaceSM,
-            vertical: AppConstants.spaceXS),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-          side: BorderSide(color: AppColors.border, width: 0.8),
-        ),
-        child: child,
-      ),
+      animation: _flashController,
+      builder: (context, child) {
+        final flashColor = Color.lerp(
+          cs.primary.withOpacity(isDark ? 0.35 : 0.15),
+          Colors.transparent,
+          _flashController.value,
+        );
+        return Card(
+          color: Color.alphaBlend(
+            flashColor ?? Colors.transparent,
+            isDark ? const Color(0xFF1E293B) : Colors.white,
+          ),
+          elevation: AppConstants.elevationCard,
+          margin: const EdgeInsets.symmetric(
+              horizontal: AppConstants.spaceSM,
+              vertical: AppConstants.spaceXS),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+            side: BorderSide(color: cs.onSurface.withOpacity(0.12), width: 0.8),
+          ),
+          child: child,
+        );
+      },
       child: InkWell(
         borderRadius: BorderRadius.circular(AppConstants.radiusMD),
         onLongPress: _showLongPressMenu,
@@ -476,7 +486,6 @@ class _CartItemTileState extends State<CartItemTile>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Row 1: name + total ──
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -487,21 +496,16 @@ class _CartItemTileState extends State<CartItemTile>
                         Text(
                           widget.item.name,
                           style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            fontSize: 14, fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         if (widget.item.barcode.isNotEmpty)
                           Text(
                             widget.item.barcode,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: AppColors.textMuted,
-                            ),
+                            style: GoogleFonts.inter(fontSize: 11, color: cs.onSurface.withOpacity(0.45)),
                           ),
                       ],
                     ),
@@ -509,16 +513,11 @@ class _CartItemTileState extends State<CartItemTile>
                   const SizedBox(width: AppConstants.spaceSM),
                   Text(
                     formatCurrency(widget.item.subtotal),
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                    ),
+                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: cs.primary),
                   ),
                 ],
               ),
               const SizedBox(height: AppConstants.spaceSM),
-              // ── Row 2: badge + unit price ──
               Row(
                 children: [
                   _pricingBadge(),
@@ -526,20 +525,15 @@ class _CartItemTileState extends State<CartItemTile>
                   if (widget.item.manuallyDiscounted)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: Icon(Icons.local_offer,
-                          size: 13, color: AppColors.warning),
+                      child: Icon(Icons.local_offer, size: 13, color: AppColors.warning),
                     ),
                   Text(
                     '${formatCurrency(widget.item.price)} / unit',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
-                    ),
+                    style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.5)),
                   ),
                 ],
               ),
               const SizedBox(height: AppConstants.spaceSM),
-              // ── Row 3: qty controls + delete ──
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -551,10 +545,7 @@ class _CartItemTileState extends State<CartItemTile>
                     iconSize: 20,
                     tooltip: 'Remove',
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                   ),
                 ],
               ),
@@ -568,122 +559,103 @@ class _CartItemTileState extends State<CartItemTile>
   // ─────────────────────────── TABLET layout ───────────────────────────────────
 
   Widget _tabletLayout() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return AnimatedBuilder(
-      animation: _flashAnimation,
-      builder: (context, child) => Container(
-        color: _flashAnimation.value ?? Colors.transparent,
-        child: child,
-      ),
-      child: InkWell(
-        onLongPress: _showLongPressMenu,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppConstants.spaceMD,
-            vertical: 10,
-          ),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: AppColors.border, width: 0.8),
+      animation: _flashController,
+      builder: (context, child) {
+        final flashColor = Color.lerp(
+          cs.primary.withOpacity(isDark ? 0.35 : 0.15),
+          Colors.transparent,
+          _flashController.value,
+        );
+        return InkWell(
+          onLongPress: _showLongPressMenu,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppConstants.spaceMD, vertical: 16,
             ),
-          ),
-          child: Row(
-            children: [
-              // Product name + barcode (flex 3)
-              Expanded(
-                flex: 3,
-                child: Column(
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                flashColor ?? Colors.transparent,
+                isDark ? const Color(0xFF1E293B) : Colors.white,
+              ),
+              border: Border(bottom: BorderSide(color: cs.onSurface.withOpacity(0.1), width: 0.8)),
+            ),
+            child: Row(
+              children: [
+                Expanded(flex: 3, child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       widget.item.name,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: cs.onSurface),
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 4),
                     if (widget.item.barcode.isNotEmpty)
                       Text(
                         widget.item.barcode,
+                        style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.45)),
+                      ),
+                  ],
+                )),
+                Expanded(
+                  flex: 2,
+                  child: Center(child: _pricingBadge(compact: false)),
+                ),
+                // Price (flex 1.5)
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formatCurrency(widget.item.price),
                         style: GoogleFonts.inter(
-                          fontSize: 10,
-                          color: AppColors.textMuted,
+                          fontSize: 15, fontWeight: FontWeight.w600,
+                          color: cs.onSurface.withOpacity(0.65),
                         ),
                       ),
-                  ],
-                ),
-              ),
-              // Pricing badge (flex 1.5)
-              Expanded(
-                flex: 2,
-                child: Center(child: _pricingBadge(compact: true)),
-              ),
-              // Price (flex 1.5)
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatCurrency(widget.item.price),
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    if (widget.item.manuallyDiscounted)
-                      Icon(Icons.local_offer,
-                          size: 11, color: AppColors.warning),
-                  ],
-                ),
-              ),
-              // Qty controls (flex 2)
-              Expanded(
-                flex: 2,
-                child: Center(child: _qtyControls(compact: true)),
-              ),
-              // Total (flex 1.5)
-              Expanded(
-                flex: 2,
-                child: Text(
-                  formatCurrency(widget.item.subtotal),
-                  textAlign: TextAlign.end,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
+                      if (widget.item.manuallyDiscounted)
+                        Icon(Icons.local_offer, size: 13, color: AppColors.warning),
+                    ],
                   ),
                 ),
-              ),
-              // Actions (flex 1)
-              Expanded(
-                flex: 1,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    _SmallIconButton(
-                      icon: Icons.local_offer_outlined,
-                      color: AppColors.warning,
-                      tooltip: 'Discount',
-                      onTap: _showDiscountDialog,
-                    ),
-                    const SizedBox(width: 4),
-                    _SmallIconButton(
-                      icon: Icons.delete_outline,
-                      color: AppColors.error,
-                      tooltip: 'Remove',
-                      onTap: _confirmDelete,
-                    ),
-                  ],
+                Expanded(flex: 2, child: Center(child: _qtyControls(compact: false))),
+                Expanded(flex: 2, child: Text(
+                  formatCurrency(widget.item.subtotal),
+                  textAlign: TextAlign.end,
+                  style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: cs.primary),
+                )),
+                // Actions (flex 1)
+                Expanded(
+                  flex: 1,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _SmallIconButton(
+                        icon: Icons.local_offer_outlined,
+                        color: AppColors.warning,
+                        tooltip: 'Discount',
+                        onTap: _showDiscountDialog,
+                      ),
+                      const SizedBox(width: 8),
+                      _SmallIconButton(
+                        icon: Icons.delete_outline,
+                        color: AppColors.error,
+                        tooltip: 'Remove',
+                        onTap: _confirmDelete,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -750,8 +722,8 @@ class _SmallIconButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
         child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 18, color: color),
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 22, color: color),
         ),
       ),
     );

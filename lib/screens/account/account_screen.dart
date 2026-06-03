@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import '../../core/database/database_helper.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/theme_provider.dart';
 import '../../core/utils/constants.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -441,16 +442,24 @@ class AccountScreenState extends State<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     final roleDisplay = widget.userRole.toLowerCase() == 'admin' ? 'Administrator' : 'Staff Cashier';
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final sectionTitleStyle = GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: cs.onSurface);
+    final sectionSubStyle = GoogleFonts.inter(fontSize: 14, color: cs.onSurface.withOpacity(0.6));
 
     return Scaffold(
-      backgroundColor: kBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           'My Account Settings',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: kTextPrimary),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 22, color: cs.onSurface),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: cardColor,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -459,23 +468,23 @@ class AccountScreenState extends State<AccountScreen> {
             padding: EdgeInsets.all(isPhone ? 14 : 24),
             child: Center(
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 550),
+                constraints: const BoxConstraints(maxWidth: 580),
                 child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Profile Information Card
                 Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cardBorder)),
+                  elevation: 0,
+                  color: cardColor,
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Row(
                       children: [
                         CircleAvatar(
-                          radius: 36,
-                          backgroundColor: kPrimaryColor.withOpacity(0.1),
-                          child: const Icon(Icons.person, size: 40, color: kPrimaryColor),
+                          radius: 38,
+                          backgroundColor: cs.primary.withOpacity(0.12),
+                          child: Icon(Icons.person, size: 42, color: cs.primary),
                         ),
                         const SizedBox(width: 20),
                         Expanded(
@@ -484,26 +493,18 @@ class AccountScreenState extends State<AccountScreen> {
                             children: [
                               Text(
                                 widget.username.toUpperCase(),
-                                style: GoogleFonts.inter(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: kTextPrimary,
-                                ),
+                                style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w900, color: cs.onSurface),
                               ),
                               const SizedBox(height: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: kPrimaryColor.withOpacity(0.1),
+                                  color: cs.primary.withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
                                   roleDisplay,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: kPrimaryColor,
-                                  ),
+                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: cs.primary),
                                 ),
                               ),
                             ],
@@ -517,9 +518,9 @@ class AccountScreenState extends State<AccountScreen> {
 
                 // Change Password Form Card
                 Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cardBorder)),
+                  elevation: 0,
+                  color: cardColor,
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Form(
@@ -527,22 +528,10 @@ class AccountScreenState extends State<AccountScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Change Account Password',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: kTextPrimary,
-                            ),
-                          ),
+                          Text('Change Account Password', style: sectionTitleStyle),
                           const SizedBox(height: 4),
-                          Text(
-                            'Keep your account secure by periodically updating your credentials.',
-                            style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
-                          ),
+                          Text('Keep your account secure by periodically updating your credentials.', style: sectionSubStyle),
                           const Divider(height: 32),
-
-                          // Current Password
                           TextFormField(
                             controller: _currentPasswordController,
                             obscureText: _obscureCurrent,
@@ -561,8 +550,6 @@ class AccountScreenState extends State<AccountScreen> {
                             },
                           ),
                           const SizedBox(height: 16),
-
-                          // New Password
                           TextFormField(
                             controller: _newPasswordController,
                             obscureText: _obscureNew,
@@ -582,8 +569,6 @@ class AccountScreenState extends State<AccountScreen> {
                             },
                           ),
                           const SizedBox(height: 16),
-
-                          // Confirm Password
                           TextFormField(
                             controller: _confirmPasswordController,
                             obscureText: _obscureConfirm,
@@ -603,69 +588,101 @@ class AccountScreenState extends State<AccountScreen> {
                             },
                           ),
                           const SizedBox(height: 24),
-
-                          // Save Button
                           ElevatedButton(
                             onPressed: _isLoading ? null : _updatePassword,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimaryColor,
-                              foregroundColor: Colors.white,
-                              minimumSize: const Size.fromHeight(50),
+                              backgroundColor: cs.primary,
+                              foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                              minimumSize: const Size.fromHeight(52),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             child: _isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                  )
-                                : Text(
-                                    'UPDATE PASSWORD',
-                                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, letterSpacing: 0.8),
-                                  ),
+                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : Text('UPDATE PASSWORD', style: GoogleFonts.inter(fontWeight: FontWeight.w800, letterSpacing: 0.8)),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
+
+                // Appearance Card (Dark / Light Mode toggle)
+                Consumer<ThemeProvider>(
+                  builder: (ctx, tp, _) => Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cardBorder)),
+                    elevation: 0,
+                    color: cardColor,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Appearance', style: sectionTitleStyle),
+                          const SizedBox(height: 4),
+                          Text('Switch between light and dark interface themes.', style: sectionSubStyle),
+                          const Divider(height: 28),
+                          Row(
+                            children: [
+                              Container(
+                                width: 44, height: 44,
+                                decoration: BoxDecoration(
+                                  color: (tp.isDarkMode ? const Color(0xFF60A5FA) : const Color(0xFFD97706)).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  tp.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                                  color: tp.isDarkMode ? const Color(0xFF60A5FA) : const Color(0xFFD97706),
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(tp.isDarkMode ? 'Dark Mode' : 'Light Mode',
+                                        style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15, color: cs.onSurface)),
+                                    Text(tp.isDarkMode ? 'Dark background, light text' : 'White background, dark text',
+                                        style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.55))),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: tp.isDarkMode,
+                                onChanged: (val) => tp.setDarkMode(val),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
 
                 // Device & Scanner Settings Card
                 Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cardBorder)),
+                  elevation: 0,
+                  color: cardColor,
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Device & Scanner Settings',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: kTextPrimary,
-                          ),
-                        ),
+                        Text('Device & Scanner Settings', style: sectionTitleStyle),
                         const SizedBox(height: 4),
-                        Text(
-                          'Configure scanning preferences and hardware controls for this device.',
-                          style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
-                        ),
-                        const Divider(height: 32),
+                        Text('Configure scanning preferences and hardware controls for this device.', style: sectionSubStyle),
+                        const Divider(height: 28),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            'Camera Barcode Scanner',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14, color: kTextPrimary),
-                          ),
+                          title: Text('Camera Barcode Scanner',
+                              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15, color: cs.onSurface)),
                           subtitle: Text(
-                            'Show live camera preview in the POS screen to scan barcodes using the front or rear device camera.',
-                            style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+                            'Show live camera preview in the POS screen to scan barcodes using the device camera.',
+                            style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
                           ),
-                          activeColor: kPrimaryColor,
                           value: _cameraScannerMode,
                           onChanged: _toggleCameraScannerMode,
                         ),
@@ -673,14 +690,14 @@ class AccountScreenState extends State<AccountScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // User Accounts Management Card (Admins Only)
                 if (widget.userRole.toLowerCase() == 'admin') ...[
                   Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 2,
-                    color: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cardBorder)),
+                    elevation: 0,
+                    color: cardColor,
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Column(
@@ -689,28 +706,25 @@ class AccountScreenState extends State<AccountScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Manage User Accounts',
-                                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary),
-                              ),
+                              Text('Manage User Accounts', style: sectionTitleStyle),
                               ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: kPrimaryColor,
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: cs.primary,
+                                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                 ),
                                 onPressed: _showAddUserDialog,
-                                icon: const Icon(Icons.add, size: 16),
-                                label: Text('Add User', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12)),
+                                icon: const Icon(Icons.add, size: 18),
+                                label: Text('Add User', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
                               ),
                             ],
                           ),
-                          const Divider(height: 32),
+                          const Divider(height: 28),
                           if (_loadingUsers)
                             const Center(child: CircularProgressIndicator())
                           else if (_users.isEmpty)
-                            Text('No additional users found.', style: GoogleFonts.inter(color: kTextSecondary))
+                            Text('No additional users found.', style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.5), fontSize: 15))
                           else
                             ListView.separated(
                               shrinkWrap: true,
@@ -726,31 +740,27 @@ class AccountScreenState extends State<AccountScreen> {
                                 return ListTile(
                                   contentPadding: EdgeInsets.zero,
                                   leading: CircleAvatar(
-                                    backgroundColor: urole == 'admin' ? Colors.purple.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                                    backgroundColor: urole == 'admin' ? const Color(0xFF7C3AED).withOpacity(0.15) : const Color(0xFFD97706).withOpacity(0.15),
                                     child: Icon(
                                       urole == 'admin' ? Icons.admin_panel_settings : Icons.person,
-                                      color: urole == 'admin' ? Colors.purple : Colors.orange,
+                                      color: urole == 'admin' ? const Color(0xFF7C3AED) : const Color(0xFFD97706),
                                     ),
                                   ),
-                                  title: Text(
-                                    uname.toUpperCase(),
-                                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14, color: kTextPrimary),
-                                  ),
-                                  subtitle: Text(
-                                    urole == 'admin' ? 'Administrator' : 'Staff Cashier',
-                                    style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
-                                  ),
+                                  title: Text(uname.toUpperCase(),
+                                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15, color: cs.onSurface)),
+                                  subtitle: Text(urole == 'admin' ? 'Administrator' : 'Staff Cashier',
+                                      style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.55))),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.lock_open, color: kPrimaryColor, size: 20),
+                                        icon: Icon(Icons.lock_open, color: cs.primary, size: 22),
                                         onPressed: () => _showChangeUserPasswordDialog(uname),
                                         tooltip: 'Change Password',
                                       ),
                                       if (!isCurrent)
                                         IconButton(
-                                          icon: const Icon(Icons.delete_outline, color: kErrorColor, size: 20),
+                                          icon: const Icon(Icons.delete_outline, color: Color(0xFFDC2626), size: 22),
                                           onPressed: () => _deleteUser(uid, uname),
                                           tooltip: 'Delete User',
                                         ),
@@ -763,60 +773,50 @@ class AccountScreenState extends State<AccountScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                 ],
 
                 // Database Management Card
                 Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cardBorder)),
+                  elevation: 0,
+                  color: cardColor,
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Database Backup & Restore',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: kTextPrimary,
-                          ),
-                        ),
+                        Text('Database Backup & Restore', style: sectionTitleStyle),
                         const SizedBox(height: 4),
-                        Text(
-                          'Export your database to back up your data, or import a database file (e.g. from your web app) to pre-populate products.',
-                          style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
-                        ),
-                        const Divider(height: 32),
+                        Text('Export your database to back up your data, or import a database file to pre-populate products.', style: sectionSubStyle),
+                        const Divider(height: 28),
                         Row(
                           children: [
                             Expanded(
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: kPrimaryColor,
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: cs.primary,
+                                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   padding: const EdgeInsets.symmetric(vertical: 14),
                                 ),
                                 onPressed: _importDatabase,
                                 icon: const Icon(Icons.file_upload, size: 20),
-                                label: Text('IMPORT DATABASE', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13)),
+                                label: Text('IMPORT', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14)),
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: kPrimaryColor,
-                                  side: const BorderSide(color: kPrimaryColor, width: 2),
+                                  foregroundColor: cs.primary,
+                                  side: BorderSide(color: cs.primary, width: 2),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   padding: const EdgeInsets.symmetric(vertical: 14),
                                 ),
                                 onPressed: _exportDatabase,
                                 icon: const Icon(Icons.file_download, size: 20),
-                                label: Text('EXPORT DATABASE', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13)),
+                                label: Text('EXPORT', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14)),
                               ),
                             ),
                           ],
@@ -825,17 +825,17 @@ class AccountScreenState extends State<AccountScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Sign Out Button
                 ElevatedButton.icon(
                   onPressed: _handleSignOut,
                   icon: const Icon(Icons.exit_to_app, size: 20),
-                  label: Text('SIGN OUT OF ARCHER POS', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+                  label: Text('SIGN OUT OF ARCHER POS', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kErrorColor,
+                    backgroundColor: const Color(0xFFDC2626),
                     foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(52),
+                    minimumSize: const Size.fromHeight(54),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),

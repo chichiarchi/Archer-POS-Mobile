@@ -19,8 +19,14 @@ import 'widgets/add_product_dialog.dart';
 class POSScreen extends StatefulWidget {
   final String userRole;
   final String username;
+  final bool isActive;
 
-  const POSScreen({super.key, required this.userRole, required this.username});
+  const POSScreen({
+    super.key,
+    required this.userRole,
+    required this.username,
+    this.isActive = true,
+  });
 
   @override
   State<POSScreen> createState() => POSScreenState();
@@ -53,15 +59,43 @@ class POSScreenState extends State<POSScreen> {
     super.initState();
     _qtyController.text = '$_quantity';
     _qtyFocus.addListener(_onQtyFocusChange);
+    _searchFocus.addListener(_onSearchFocusChange);
     _loadSuggestions();
     _loadCameraSettings();
+  }
+
+  void _onSearchFocusChange() {
+    // Pause scanner and hide preview during search keyboard focus to optimize CPU/GPU and keyboard layout
+    if (_searchFocus.hasFocus) {
+      if (_cameraScannerMode && _cameraController != null) {
+        try {
+          _cameraController!.stop();
+        } catch (_) {}
+      }
+    } else {
+      if (_cameraScannerMode && _cameraController != null) {
+        try {
+          _cameraController!.start();
+        } catch (_) {}
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(POSScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive != oldWidget.isActive) {
+      _loadCameraSettings();
+    }
   }
 
   void _loadCameraSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool('camera_scanner_mode') ?? false;
-    if (enabled != _cameraScannerMode) {
-      if (enabled) {
+    
+    if (enabled && widget.isActive) {
+      if (_cameraController == null || !_cameraScannerMode) {
         setState(() {
           _cameraScannerMode = true;
           _cameraController = MobileScannerController(
@@ -81,7 +115,9 @@ class POSScreenState extends State<POSScreen> {
             ],
           );
         });
-      } else {
+      }
+    } else {
+      if (_cameraScannerMode || _cameraController != null) {
         setState(() {
           _cameraScannerMode = false;
           _cameraController?.dispose();
@@ -116,6 +152,7 @@ class POSScreenState extends State<POSScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocus.removeListener(_onSearchFocusChange);
     _searchFocus.dispose();
     _qtyController.dispose();
     _qtyFocus.removeListener(_onQtyFocusChange);
@@ -463,7 +500,7 @@ class POSScreenState extends State<POSScreen> {
 
   Widget _buildPhoneLayout() {
     return Scaffold(
-      backgroundColor: kBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildSearchBar(),
@@ -476,13 +513,14 @@ class POSScreenState extends State<POSScreen> {
   }
 
   Widget _buildTabletLayout(BoxConstraints constraints) {
-    // Use 35% of screen width for summary panel, clamped between 285 and 360px
-    final summaryWidth = (constraints.maxWidth * 0.35).clamp(285.0, 360.0);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final summaryWidth = (constraints.maxWidth * 0.38).clamp(340.0, 440.0);
     return Scaffold(
-      backgroundColor: kBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Row(
         children: [
-          // Left: Cart
           Expanded(
             child: Column(
               children: [
@@ -493,12 +531,11 @@ class POSScreenState extends State<POSScreen> {
               ],
             ),
           ),
-          // Right: Order Summary
           Container(
             width: summaryWidth,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(left: BorderSide(color: Color(0xFFE2E8F0))),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              border: Border(left: BorderSide(color: cs.onSurface.withOpacity(0.08))),
             ),
             child: _buildOrderSummaryPanel(),
           ),
@@ -508,7 +545,8 @@ class POSScreenState extends State<POSScreen> {
   }
 
   Widget _buildCameraPreview() {
-    if (!_cameraScannerMode || _cameraController == null) {
+    // Hide camera preview during typing/focusing on search to improve typing performance and keyboard animations
+    if (!_cameraScannerMode || _cameraController == null || _searchFocus.hasFocus) {
       return const SizedBox.shrink();
     }
 
@@ -581,194 +619,207 @@ class POSScreenState extends State<POSScreen> {
   }
 
   Widget _buildSearchBar() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final screenWidth = constraints.maxWidth;
-        // Switch to 2-row layout if screen/column width is narrow to prevent horizontal overflow
-        final isNarrowLayout = screenWidth < 550;
-        final isNarrow = screenWidth < 900;
+    return StatefulBuilder(
+      builder: (context, setStateSearchBar) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final screenWidth = constraints.maxWidth;
+            // Switch to 2-row layout if screen/column width is narrow to prevent horizontal overflow
+            final isNarrowLayout = screenWidth < 550;
+            final isNarrow = screenWidth < 900;
 
-        final searchField = TextField(
-          controller: _searchController,
-          focusNode: _searchFocus,
-          decoration: InputDecoration(
-            hintText: isNarrow
-                ? 'Scan or search...'
-                : 'Scan barcode or type product name...',
-            prefixIcon: const Icon(Icons.qr_code_scanner, color: kPrimaryColor),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _showSuggestions = false);
-                    },
-                  )
-                : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kBorderColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kPrimaryColor, width: 2),
-            ),
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-          ),
-          onChanged: (val) {
-            setState(() => _showSuggestions = val.isNotEmpty);
-          },
-          onSubmitted: _addItemByBarcode,
-          style: GoogleFonts.inter(fontSize: 16),
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_.*]'))],
-        );
+            final theme = Theme.of(context);
+            final cs = theme.colorScheme;
+            final isDark = theme.brightness == Brightness.dark;
 
-        final qtySelector = Container(
-          width: isNarrowLayout ? double.infinity : 120,
-          height: 50,
-          decoration: BoxDecoration(
-            border: Border.all(color: kBorderColor),
-            borderRadius: BorderRadius.circular(10),
-            color: Colors.white,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _updateQuantity(_quantity - 1),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                  child: Icon(Icons.remove, size: 16, color: kTextPrimary),
+            final searchField = TextField(
+              controller: _searchController,
+              focusNode: _searchFocus,
+              decoration: InputDecoration(
+                hintText: isNarrow
+                    ? 'Scan or search...'
+                    : 'Scan barcode or type product name...',
+                prefixIcon: Icon(Icons.qr_code_scanner, color: cs.primary),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setStateSearchBar(() {
+                            _showSuggestions = false;
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                 ),
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _qtyController,
-                  focusNode: _qtyFocus,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (val) {
-                    final parsed = int.tryParse(val);
-                    if (parsed != null && parsed > 0) {
-                      _quantity = parsed.clamp(1, 9999);
-                    }
-                  },
-                  onSubmitted: (val) {
-                    final parsed = int.tryParse(val) ?? 1;
-                    _updateQuantity(parsed);
-                  },
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: cs.primary, width: 2),
                 ),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _updateQuantity(_quantity + 1),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                  child: Icon(Icons.add, size: 16, color: kTextPrimary),
-                ),
-              ),
-            ],
-          ),
-        );
-
-        final pricingToggle = Consumer<CartProvider>(
-          builder: (ctx, cart, _) {
-            final label = cart.pricingMode == 'retail'
-                ? 'RETAIL'
-                : (isNarrow ? 'WHL' : 'WHOLESALE');
-            return ElevatedButton.icon(
-              onPressed: () {
-                cart.toggleGlobalPricing();
-                setState(() {});
+              onChanged: (val) {
+                // Rebuild only the search bar to avoid full-screen and camera preview rebuild lag while typing
+                setStateSearchBar(() {
+                  _showSuggestions = val.isNotEmpty;
+                });
               },
-              icon: const Icon(Icons.swap_horiz, size: 18),
-              label: Text(
-                label,
-                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
-                overflow: TextOverflow.ellipsis,
+              onSubmitted: _addItemByBarcode,
+              style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_.*]'))],
+            );
+
+            final qtySelector = Container(
+              width: isNarrowLayout ? double.infinity : 120,
+              height: 50,
+              decoration: BoxDecoration(
+                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                borderRadius: BorderRadius.circular(10),
+                color: cs.surface,
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: cart.pricingMode == 'retail'
-                    ? const Color(0xFF0284C7)
-                    : const Color(0xFFF59E0B),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(80, 50),
-                maximumSize: const Size(130, 50),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _updateQuantity(_quantity - 1),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Icon(Icons.remove, size: 16, color: cs.onSurface),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _qtyController,
+                      focusNode: _qtyFocus,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: cs.onSurface),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      onChanged: (val) {
+                        final parsed = int.tryParse(val);
+                        if (parsed != null && parsed > 0) {
+                          _quantity = parsed.clamp(1, 9999);
+                        }
+                      },
+                      onSubmitted: (val) {
+                        final parsed = int.tryParse(val) ?? 1;
+                        _updateQuantity(parsed);
+                      },
+                    ),
+                  ),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _updateQuantity(_quantity + 1),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Icon(Icons.add, size: 16, color: cs.onSurface),
+                    ),
+                  ),
+                ],
+              ),
+            );
+
+            final pricingToggle = Consumer<CartProvider>(
+              builder: (ctx, cart, _) {
+                final label = cart.pricingMode == 'retail'
+                    ? 'RETAIL'
+                    : (isNarrow ? 'WHL' : 'WHOLESALE');
+                return ElevatedButton.icon(
+                  onPressed: () {
+                    cart.toggleGlobalPricing();
+                    setStateSearchBar(() {});
+                  },
+                  icon: const Icon(Icons.swap_horiz, size: 18),
+                  label: Text(
+                    label,
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: cart.pricingMode == 'retail'
+                        ? const Color(0xFF0284C7)
+                        : const Color(0xFFF59E0B),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(80, 50),
+                    maximumSize: const Size(130, 50),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+            );
+
+            return Container(
+              padding: const EdgeInsets.all(12),
+              color: cs.surface,
+              child: Column(
+                children: [
+                  if (isNarrowLayout) ...[
+                    searchField,
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: qtySelector),
+                        const SizedBox(width: 8),
+                        Expanded(child: pricingToggle),
+                      ],
+                    ),
+                  ] else ...[
+                    Row(
+                      children: [
+                        Expanded(child: searchField),
+                        const SizedBox(width: 8),
+                        qtySelector,
+                        const SizedBox(width: 8),
+                        pricingToggle,
+                      ],
+                    ),
+                  ],
+                  // Suggestions overlay
+                  if (_showSuggestions && _filteredSuggestions.isNotEmpty)
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.1), blurRadius: 8, offset: const Offset(0, 4))],
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _filteredSuggestions.length,
+                        itemBuilder: (ctx, i) {
+                          final p = _filteredSuggestions[i];
+                          return ListTile(
+                            dense: true,
+                            leading: Icon(Icons.inventory_2, size: 18, color: cs.primary),
+                            title: Text(p['name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
+                            subtitle: Text('${p['id']}', style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.55), fontSize: 12)),
+                            trailing: Text(formatCurrency((p['price'] as num).toDouble()),
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.primary)),
+                            onTap: () {
+                              _searchController.text = p['id'] as String;
+                              setState(() => _showSuggestions = false);
+                              _addItemByBarcode(p['id'] as String);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
               ),
             );
           },
-        );
-
-        return Container(
-          padding: const EdgeInsets.all(12),
-          color: Colors.white,
-          child: Column(
-            children: [
-              if (isNarrowLayout) ...[
-                searchField,
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(child: qtySelector),
-                    const SizedBox(width: 8),
-                    Expanded(child: pricingToggle),
-                  ],
-                ),
-              ] else ...[
-                Row(
-                  children: [
-                    Expanded(child: searchField),
-                    const SizedBox(width: 8),
-                    qtySelector,
-                    const SizedBox(width: 8),
-                    pricingToggle,
-                  ],
-                ),
-              ],
-              // Suggestions overlay
-              if (_showSuggestions && _filteredSuggestions.isNotEmpty)
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 200),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: kBorderColor),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))],
-                  ),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _filteredSuggestions.length,
-                    itemBuilder: (ctx, i) {
-                      final p = _filteredSuggestions[i];
-                      return ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.inventory_2, size: 18, color: kPrimaryColor),
-                        title: Text(p['name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
-                        subtitle: Text('${p['id']}', style: GoogleFonts.inter(color: kTextSecondary, fontSize: 12)),
-                        trailing: Text(formatCurrency((p['price'] as num).toDouble()),
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kPrimaryColor)),
-                        onTap: () {
-                          _searchController.text = p['id'] as String;
-                          setState(() => _showSuggestions = false);
-                          _addItemByBarcode(p['id'] as String);
-                        },
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
         );
       },
     );
@@ -840,9 +891,12 @@ class POSScreenState extends State<POSScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey[300]),
+                Icon(Icons.shopping_cart_outlined, size: 80,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2)),
                 const SizedBox(height: 16),
-                Text('Cart is empty', style: GoogleFonts.inter(color: kTextSecondary, fontSize: 20)),
+                Text('Cart is empty',
+                    style: GoogleFonts.inter(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4), fontSize: 20)),
               ],
             ),
           );
@@ -851,8 +905,8 @@ class POSScreenState extends State<POSScreen> {
           children: [
             // Table header
             Container(
-              color: const Color(0xFFF1F5F9),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   Expanded(flex: 3, child: _headerCell('Product')),
@@ -903,13 +957,17 @@ class POSScreenState extends State<POSScreen> {
   Widget _headerCell(String text, {TextAlign textAlign = TextAlign.start}) => Text(
         text,
         textAlign: textAlign,
-        style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: kTextSecondary),
+        style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700, fontSize: 15,
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
       );
 
   Widget _buildCartActionButtons() {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(8),
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
@@ -949,24 +1007,30 @@ class POSScreenState extends State<POSScreen> {
   Widget _buildOrderSummaryPanel() {
     return Consumer<CartProvider>(
       builder: (ctx, cart, _) {
+        final theme = Theme.of(context);
+        final cs = theme.colorScheme;
+        final isDark = theme.brightness == Brightness.dark;
         return Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Order Summary', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: kTextPrimary)),
+              Text('Order Summary',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 24, color: cs.onSurface)),
               const SizedBox(height: 4),
-              Text('${cart.items.length} item(s)', style: GoogleFonts.inter(color: kTextSecondary, fontSize: 14)),
+              Text('${cart.items.length} item(s)',
+                  style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.55), fontSize: 16)),
               const Divider(height: 24),
               Expanded(
                 child: cart.items.isEmpty
-                    ? Center(child: Text('No items', style: GoogleFonts.inter(color: kTextSecondary)))
+                    ? Center(child: Text('No items',
+                        style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.4), fontSize: 16)))
                     : ListView.builder(
                         itemCount: cart.items.length,
                         itemBuilder: (ctx, i) {
                           final item = cart.items[i];
                           return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.symmetric(vertical: 6),
                             child: Row(
                               children: [
                                 Expanded(
@@ -974,56 +1038,77 @@ class POSScreenState extends State<POSScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(item.name,
-                                          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis),
+                                          style: GoogleFonts.inter(fontWeight: FontWeight.w600,
+                                              fontSize: 16, color: cs.onSurface),
+                                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                                      const SizedBox(height: 2),
                                       Text('${item.quantity.toStringAsFixed(item.quantity.truncate() == item.quantity ? 0 : 2)} × ${formatCurrency(item.price)}',
-                                          style: GoogleFonts.inter(color: kTextSecondary, fontSize: 12)),
+                                          style: GoogleFonts.inter(
+                                              color: cs.onSurface.withOpacity(0.55), fontSize: 14)),
                                     ],
                                   ),
                                 ),
+                                const SizedBox(width: 8),
                                 Text(formatCurrency(item.price * item.quantity),
-                                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: kPrimaryColor)),
+                                    style: GoogleFonts.inter(
+                                        fontWeight: FontWeight.w700, fontSize: 16, color: cs.primary)),
                               ],
                             ),
                           );
                         },
                       ),
               ),
-              const Divider(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('TOTAL', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 18, color: kTextPrimary)),
-                  Text(formatCurrency(cart.total),
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 24, color: kPrimaryColor)),
-                ],
+              const Divider(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+                decoration: BoxDecoration(
+                  color: cs.primary.withOpacity(isDark ? 0.15 : 0.07),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: cs.primary.withOpacity(0.2)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('TOTAL',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w900, fontSize: 22,
+                            color: cs.onSurface, letterSpacing: 0.5)),
+                    Flexible(
+                      child: Text(formatCurrency(cart.total),
+                          textAlign: TextAlign.end,
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w900, fontSize: 38, color: cs.primary)),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: _checkout,
-                icon: const Icon(Icons.point_of_sale, size: 22),
-                label: Text('CHECKOUT', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: 1)),
+                icon: const Icon(Icons.point_of_sale, size: 24),
+                label: Text('CHECKOUT',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 1)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimaryColor,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(60),
+                  backgroundColor: cs.primary,
+                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  minimumSize: const Size.fromHeight(68),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _parkSale,
                       icon: const Icon(Icons.pause, size: 18),
-                      label: Text('Park', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      label: Text('Park', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF0284C7),
                         side: const BorderSide(color: Color(0xFF0284C7)),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
@@ -1032,11 +1117,12 @@ class POSScreenState extends State<POSScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _recallSale,
                       icon: const Icon(Icons.play_arrow, size: 18),
-                      label: Text('Recall', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      label: Text('Recall', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: kSuccessColor,
                         side: const BorderSide(color: kSuccessColor),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
@@ -1049,11 +1135,12 @@ class POSScreenState extends State<POSScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _quickAdd,
                       icon: const Icon(Icons.add, size: 18),
-                      label: Text('Quick Add', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      label: Text('Quick Add', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF6366F1),
                         side: const BorderSide(color: Color(0xFF6366F1)),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
@@ -1070,11 +1157,12 @@ class POSScreenState extends State<POSScreen> {
                         }
                       },
                       icon: const Icon(Icons.clear_all, size: 18),
-                      label: Text('Clear', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      label: Text('Clear', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: kErrorColor,
                         side: const BorderSide(color: kErrorColor),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),
@@ -1089,25 +1177,30 @@ class POSScreenState extends State<POSScreen> {
 
   Widget _buildBottomBar() {
     return Consumer<CartProvider>(
-      builder: (ctx, cart, _) => Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, -2))],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('TOTAL', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 16, color: kTextPrimary)),
-                  Text(formatCurrency(cart.total),
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 22, color: kPrimaryColor)),
-                ],
-              ),
+      builder: (ctx, cart, _) {
+        final theme = Theme.of(context);
+        final cs = theme.colorScheme;
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.08), blurRadius: 8, offset: const Offset(0, -2))],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('TOTAL', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 16, color: cs.onSurface)),
+                    Text(formatCurrency(cart.total),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 22, color: cs.primary)),
+                  ],
+                ),
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
@@ -1120,8 +1213,8 @@ class POSScreenState extends State<POSScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryColor,
-                    foregroundColor: Colors.white,
+                    backgroundColor: cs.primary,
+                    foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                     minimumSize: const Size.fromHeight(54),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -1175,9 +1268,10 @@ class POSScreenState extends State<POSScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
+}
 
   Widget _phoneActionBtn({
     required IconData icon,

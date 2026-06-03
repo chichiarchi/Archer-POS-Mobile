@@ -1,25 +1,45 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// A simple theme provider for future dark/light mode support.
-///
-/// Currently holds a single [isDarkMode] flag (always false by default).
-/// Call [toggleTheme] to flip between modes.
+/// Theme provider that persists dark/light mode preference across app restarts.
 class ThemeProvider extends ChangeNotifier {
+  static const String _prefKey = 'dark_mode';
+
   bool _isDarkMode = false;
 
-  /// Whether the app is currently in dark mode.
-  bool get isDarkMode => _isDarkMode;
-
-  /// Toggles between dark and light mode.
-  void toggleTheme() {
-    _isDarkMode = !_isDarkMode;
-    notifyListeners();
+  ThemeProvider() {
+    _loadFromPrefs();
   }
 
-  /// Explicitly sets the dark mode state.
-  void setDarkMode(bool value) {
+  bool get isDarkMode => _isDarkMode;
+
+  Future<void> _loadFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getBool(_prefKey) ?? false;
+      if (saved != _isDarkMode) {
+        _isDarkMode = saved;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> toggleTheme() async {
+    _isDarkMode = !_isDarkMode;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefKey, _isDarkMode);
+    } catch (_) {}
+  }
+
+  Future<void> setDarkMode(bool value) async {
     if (_isDarkMode == value) return;
     _isDarkMode = value;
     notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefKey, value);
+    } catch (_) {}
   }
 }

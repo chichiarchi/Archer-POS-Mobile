@@ -52,6 +52,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -69,7 +71,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: kTextPrimary,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -205,7 +207,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
                         'Cancel',
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
-                          color: kTextSecondary,
+                          color: cs.onSurface.withOpacity(0.6),
                         ),
                       ),
                     ),
@@ -213,8 +215,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
                     ElevatedButton(
                       onPressed: _onSave,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimaryColor,
-                        foregroundColor: Colors.white,
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),

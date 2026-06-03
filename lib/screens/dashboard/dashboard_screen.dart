@@ -203,9 +203,10 @@ class DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width >= AppConstants.tabletBreakpoint;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF2F7),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: RefreshIndicator(
         onRefresh: _loadStats,
         color: AppColors.primary,
@@ -478,6 +479,10 @@ class DashboardScreenState extends State<DashboardScreen>
 
   // ── Welcome section ────────────────────────────────────────────────────────
   Widget _buildWelcomeSection(bool isTablet) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return FadeTransition(
       opacity: _fadeAnim,
       child: Padding(
@@ -490,11 +495,12 @@ class DashboardScreenState extends State<DashboardScreen>
         child: Container(
           padding: EdgeInsets.all(isTablet ? 24 : 18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cs.surface,
             borderRadius: BorderRadius.circular(18),
+            border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0072FF).withOpacity(0.06),
+                color: isDark ? Colors.black.withOpacity(0.2) : const Color(0xFF0072FF).withOpacity(0.06),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
@@ -538,7 +544,7 @@ class DashboardScreenState extends State<DashboardScreen>
                       style: GoogleFonts.inter(
                         fontSize: isTablet ? 13 : 12,
                         fontWeight: FontWeight.w500,
-                        color: const Color(0xFF94A3B8),
+                        color: cs.onSurface.withOpacity(0.55),
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -548,7 +554,7 @@ class DashboardScreenState extends State<DashboardScreen>
                       style: GoogleFonts.inter(
                         fontSize: isTablet ? 22 : 18,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1E293B),
+                        color: cs.onSurface,
                         letterSpacing: -0.3,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -570,7 +576,7 @@ class DashboardScreenState extends State<DashboardScreen>
                           style: GoogleFonts.inter(
                             fontSize: isTablet ? 12 : 11,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B),
+                            color: cs.onSurface.withOpacity(0.5),
                           ),
                         ),
                       ],
@@ -584,7 +590,7 @@ class DashboardScreenState extends State<DashboardScreen>
                     ? Icons.admin_panel_settings_rounded
                     : Icons.badge_rounded,
                 size: isTablet ? 36 : 30,
-                color: AppColors.primary.withOpacity(0.15),
+                color: cs.primary.withOpacity(0.15),
               ),
             ],
           ),
@@ -722,14 +728,19 @@ class DashboardScreenState extends State<DashboardScreen>
     required String value,
     required bool isTablet,
   }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: EdgeInsets.all(isTablet ? 14 : 11),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(14),
+        border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -742,7 +753,7 @@ class DashboardScreenState extends State<DashboardScreen>
             width: isTablet ? 36 : 30,
             height: isTablet ? 36 : 30,
             decoration: BoxDecoration(
-              color: bgColor,
+              color: isDark ? iconColor.withOpacity(0.15) : bgColor,
               borderRadius: BorderRadius.circular(9),
             ),
             child: Icon(icon, color: iconColor, size: isTablet ? 20 : 16),
@@ -753,7 +764,7 @@ class DashboardScreenState extends State<DashboardScreen>
             style: GoogleFonts.inter(
               fontSize: isTablet ? 10 : 9,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF94A3B8),
+              color: cs.onSurface.withOpacity(0.55),
               letterSpacing: 0.5,
             ),
           ),
@@ -763,7 +774,7 @@ class DashboardScreenState extends State<DashboardScreen>
             style: GoogleFonts.inter(
               fontSize: isTablet ? 14 : 12,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF1E293B),
+              color: cs.onSurface,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -796,7 +807,7 @@ class DashboardScreenState extends State<DashboardScreen>
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF1E293B),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 6),
@@ -804,7 +815,7 @@ class DashboardScreenState extends State<DashboardScreen>
             _error ?? '',
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: const Color(0xFF64748B),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
             textAlign: TextAlign.center,
           ),
@@ -901,19 +912,24 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(18),
+        border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: config.accentColor.withOpacity(0.12),
+            color: isDark ? Colors.black.withOpacity(0.1) : config.accentColor.withOpacity(0.12),
             blurRadius: 18,
             offset: const Offset(0, 6),
             spreadRadius: 0,
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -944,7 +960,7 @@ class _StatCard extends StatelessWidget {
                 width: isTablet ? 90 : 72,
                 height: isTablet ? 90 : 72,
                 decoration: BoxDecoration(
-                  color: config.accentColor.withOpacity(0.07),
+                  color: isDark ? Colors.white.withOpacity(0.02) : config.accentColor.withOpacity(0.07),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -956,7 +972,7 @@ class _StatCard extends StatelessWidget {
                 width: isTablet ? 52 : 40,
                 height: isTablet ? 52 : 40,
                 decoration: BoxDecoration(
-                  color: config.accentColor.withOpacity(0.1),
+                  color: isDark ? Colors.white.withOpacity(0.03) : config.accentColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -1053,7 +1069,7 @@ class _StatCard extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: isTablet ? 10 : 9,
                           fontWeight: FontWeight.w700,
-                          color: const Color(0xFF94A3B8),
+                          color: cs.onSurface.withOpacity(0.55),
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -1066,7 +1082,7 @@ class _StatCard extends StatelessWidget {
                           style: GoogleFonts.inter(
                             fontSize: isTablet ? 26 : 20,
                             fontWeight: FontWeight.w900,
-                            color: config.accentColor,
+                            color: isDark ? config.gradientColors.first : config.accentColor,
                             letterSpacing: -0.5,
                             fontFeatures: const [FontFeature('tnum')],
                           ),
@@ -1113,7 +1129,7 @@ class _LoadingOverlay extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: const Color(0xFF64748B),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
         ],

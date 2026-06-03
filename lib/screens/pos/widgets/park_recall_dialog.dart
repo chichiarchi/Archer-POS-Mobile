@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/database/database_helper.dart';
-import '../../../core/utils/constants.dart';
 import '../../../core/utils/formatters.dart';
 
 class ParkRecallDialog extends StatefulWidget {
@@ -39,6 +38,8 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
@@ -56,11 +57,11 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: kTextPrimary,
+                    color: cs.onSurface,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: kTextSecondary),
+                  icon: Icon(Icons.close, color: cs.onSurface.withOpacity(0.6)),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -72,12 +73,12 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.pause_presentation_outlined, size: 48, color: kTextSecondary),
+                      Icon(Icons.pause_presentation_outlined, size: 48, color: cs.onSurface.withOpacity(0.4)),
                       const SizedBox(height: 12),
                       Text(
                         'No parked sales found.',
                         style: GoogleFonts.inter(
-                          color: kTextSecondary,
+                          color: cs.onSurface.withOpacity(0.6),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -104,7 +105,7 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                         label,
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w700,
-                          color: kTextPrimary,
+                          color: cs.onSurface,
                         ),
                       ),
                       subtitle: Column(
@@ -113,7 +114,7 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                           const SizedBox(height: 4),
                           Text(
                             formatDateTime(timestamp),
-                            style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+                            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.55)),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -121,7 +122,7 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: kPrimaryColor,
+                              color: cs.primary,
                             ),
                           ),
                         ],
@@ -130,17 +131,16 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.delete_outline, color: kErrorColor),
+                            icon: Icon(Icons.delete_outline, color: cs.error),
                             onPressed: () => _deleteSale(id, index),
                           ),
                           const SizedBox(width: 4),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimaryColor,
-                              foregroundColor: Colors.white,
+                              backgroundColor: cs.primary,
+                              foregroundColor: cs.onPrimary,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                                  borderRadius: BorderRadius.circular(8)),
                             ),
                             onPressed: () => widget.onRecall(sale),
                             child: Text(

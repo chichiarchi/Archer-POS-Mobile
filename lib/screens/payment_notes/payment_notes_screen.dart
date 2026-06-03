@@ -140,73 +140,83 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Admin Verification Required', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Please enter the master recovery code or an admin password to delete this payout record.',
-                style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: obscureText,
-                decoration: InputDecoration(
-                  labelText: 'Master Code or Admin Password',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () {
-                      setDialogState(() {
-                        obscureText = !obscureText;
-                      });
-                    },
+        builder: (context, setDialogState) {
+          final theme = Theme.of(context);
+          final cs = theme.colorScheme;
+          final isDark = theme.brightness == Brightness.dark;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text('Admin Verification Required', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Please enter the master recovery code or an admin password to delete this payout record.',
+                  style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscureText,
+                  decoration: InputDecoration(
+                    labelText: 'Master Code or Admin Password',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () {
+                        setDialogState(() {
+                          obscureText = !obscureText;
+                        });
+                      },
+                    ),
                   ),
                 ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('Cancel', style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.6))),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: cs.primary,
+                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                ),
+                onPressed: () async {
+                  final input = passwordController.text.trim();
+                  if (input == kMasterRecoveryCode) {
+                    verified = true;
+                    Navigator.of(ctx).pop();
+                    return;
+                  }
+
+                  // Verify admin login
+                  final db = await DatabaseHelper.instance.database;
+                  final admins = await db.query('users', where: 'role = ?', whereArgs: ['admin']);
+                  for (final admin in admins) {
+                    final adminUser = admin['username'] as String;
+                    final verifiedUser = await DatabaseHelper.instance.verifyLogin(adminUser, input);
+                    if (verifiedUser != null) {
+                      verified = true;
+                      break;
+                    }
+                  }
+
+                  if (verified) {
+                    Navigator.of(ctx).pop();
+                  } else {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: const Text('Invalid code or admin password.'), backgroundColor: cs.error),
+                    );
+                  }
+                },
+                child: Text('Verify', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
-              onPressed: () async {
-                final input = passwordController.text.trim();
-                if (input == kMasterRecoveryCode) {
-                  verified = true;
-                  Navigator.of(ctx).pop();
-                  return;
-                }
-
-                // Verify admin login
-                final db = await DatabaseHelper.instance.database;
-                final admins = await db.query('users', where: 'role = ?', whereArgs: ['admin']);
-                for (final admin in admins) {
-                  final adminUser = admin['username'] as String;
-                  final verifiedUser = await DatabaseHelper.instance.verifyLogin(adminUser, input);
-                  if (verifiedUser != null) {
-                    verified = true;
-                    break;
-                  }
-                }
-
-                if (verified) {
-                  Navigator.of(ctx).pop();
-                } else {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Invalid code or admin password.'), backgroundColor: kErrorColor),
-                  );
-                }
-              },
-              child: Text('Verify', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
 
@@ -228,9 +238,9 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: kErrorColor),
+            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            child: Text('Delete', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : Colors.white)),
           ),
         ],
       ),
@@ -285,6 +295,10 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return LayoutBuilder(
       builder: (context, outerConstraints) {
         final isTablet = outerConstraints.maxWidth >= 768;
@@ -308,9 +322,12 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
         // ──────────────────────── Form Widget ────────────────────────
         Widget buildForm() {
       return Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: Colors.white,
-        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
+        color: cs.surface,
+        elevation: 0,
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Form(
@@ -323,7 +340,7 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                   children: [
                     Text(
                       'Record Cash Outflow',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: kTextPrimary),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: cs.onSurface),
                     ),
                     if (!useSideBySide)
                   IconButton(
@@ -380,7 +397,7 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       labelText: 'Amount (₱) *',
-                      prefixIcon: const Icon(Icons.payments_outlined, color: kErrorColor),
+                      prefixIcon: Icon(Icons.payments_outlined, color: cs.error),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     validator: (val) {
@@ -408,9 +425,9 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                   ListTile(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: kBorderColor),
+                      side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                     ),
-                    leading: const Icon(Icons.calendar_today, color: kPrimaryColor),
+                    leading: Icon(Icons.calendar_today, color: cs.primary),
                     title: Text(
                       'Payment Date: ${DateFormat('MMM dd, yyyy').format(_paymentDate)}',
                       style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
@@ -437,8 +454,8 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimaryColor,
-                            foregroundColor: Colors.white,
+                            backgroundColor: cs.primary,
+                            foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
@@ -463,9 +480,12 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
         children: [
           // Filter & Summary Header
           Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            color: Colors.white,
-            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            ),
+            color: cs.surface,
+            elevation: 0,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -475,7 +495,7 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                     children: [
                       Text(
                         'Range: ${DateFormat('MMM dd').format(_historyFrom)} - ${DateFormat('MMM dd').format(_historyTo)}',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kTextPrimary),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface),
                       ),
                       TextButton.icon(
                         icon: const Icon(Icons.date_range, size: 16),
@@ -490,11 +510,11 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                     children: [
                       Text(
                         'Total Cash Outflow:',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextSecondary),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.6)),
                       ),
                       Text(
                         formatCurrency(totalPayout),
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 18, color: kErrorColor),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 18, color: cs.error),
                       ),
                     ],
                   ),
@@ -510,11 +530,15 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
             decoration: InputDecoration(
               hintText: 'Search past payouts by payee or notes...',
               prefixIcon: const Icon(Icons.search),
-              fillColor: Colors.white,
+              fillColor: cs.surface,
               filled: true,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+                borderSide: isDark ? const BorderSide(color: Color(0xFF334155)) : BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: isDark ? const BorderSide(color: Color(0xFF334155)) : BorderSide.none,
               ),
             ),
           ),
@@ -528,7 +552,7 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                     ? Center(
                         child: Text(
                           'No cash outflows recorded in this range.',
-                          style: GoogleFonts.inter(color: kTextSecondary),
+                          style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.5)),
                         ),
                       )
                     : ListView.builder(
@@ -543,12 +567,16 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            color: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            ),
+                            color: cs.surface,
+                            elevation: 0,
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: kErrorColor.withOpacity(0.1),
-                                child: const Icon(Icons.trending_down, color: kErrorColor),
+                                backgroundColor: cs.error.withOpacity(0.12),
+                                child: Icon(Icons.trending_down, color: cs.error),
                               ),
                               title: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -556,14 +584,14 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                                   Expanded(
                                     child: Text(
                                       recipient,
-                                      style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: kTextPrimary),
+                                      style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: cs.onSurface),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   Text(
                                     formatCurrency(amount),
-                                    style: GoogleFonts.inter(fontWeight: FontWeight.w900, color: kErrorColor),
+                                    style: GoogleFonts.inter(fontWeight: FontWeight.w900, color: cs.error),
                                   ),
                                 ],
                               ),
@@ -573,17 +601,17 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                                   const SizedBox(height: 4),
                                   Text(
                                     purpose,
-                                    style: GoogleFonts.inter(color: kTextSecondary, fontSize: 13),
+                                    style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.6), fontSize: 13),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     formatDateTime(timestamp),
-                                    style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500),
+                                    style: GoogleFonts.inter(fontSize: 11, color: cs.onSurface.withOpacity(0.5), fontWeight: FontWeight.w500),
                                   ),
                                 ],
                               ),
                               trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline, color: kTextSecondary),
+                                icon: Icon(Icons.delete_outline, color: cs.onSurface.withOpacity(0.5)),
                                 onPressed: () => _deleteNote(id, amount, recipient),
                               ),
                             ),
@@ -597,13 +625,13 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
 
         // ──────────────────────── Adaptive Layout ────────────────────────
         return Scaffold(
-          backgroundColor: kBackgroundColor,
+          backgroundColor: theme.scaffoldBackgroundColor,
           appBar: AppBar(
             title: Text(
               'Payout Manager',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: kTextPrimary),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: cs.onSurface),
             ),
-            backgroundColor: Colors.white,
+            backgroundColor: cs.surface,
             elevation: 0,
           ),
           body: Padding(

@@ -340,15 +340,16 @@ class InventoryScreenState extends State<InventoryScreen> {
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: kBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildHeader(),
           _buildSearchBar(),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
+                ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
                 : _products.isEmpty
                     ? _buildEmptyState()
                     : _buildProductList(),
@@ -356,57 +357,54 @@ class InventoryScreenState extends State<InventoryScreen> {
           if (_totalCount > 0) _buildPaginationBar(),
         ],
       ),
-      floatingActionButton: _isAdmin
-          ? FloatingActionButton.extended(
-              onPressed: _addProduct,
-              backgroundColor: kPrimaryColor,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.add),
-              label: Text(
-                'Add Product',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
-              ),
-              elevation: 4,
-            )
-          : null,
     );
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 44, height: 44,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [kPrimaryColor, Color(0xFF00C6FF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+              gradient: LinearGradient(
+                colors: [cs.primary, cs.secondary],
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 22),
+            child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 24),
           ),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Product Manager',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: kTextPrimary),
-              ),
-              Text(
-                '$_totalCount product${_totalCount == 1 ? '' : 's'} total',
-                style: GoogleFonts.inter(color: kTextSecondary, fontSize: 13),
-              ),
+              Text('Product Manager',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 22, color: cs.onSurface)),
+              Text('$_totalCount product${_totalCount == 1 ? '' : 's'} total',
+                  style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.55), fontSize: 14)),
             ],
           ),
           const Spacer(),
-          if (!_isAdmin)
+          if (_isAdmin)
+            ElevatedButton.icon(
+              onPressed: _addProduct,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text('Add Product', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                elevation: 0,
+              ),
+            )
+          else
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -419,14 +417,8 @@ class InventoryScreenState extends State<InventoryScreen> {
                 children: [
                   const Icon(Icons.visibility_outlined, size: 14, color: kWarningColor),
                   const SizedBox(width: 4),
-                  Text(
-                    'View Only',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      color: kWarningColor,
-                    ),
-                  ),
+                  Text('View Only',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: kWarningColor)),
                 ],
               ),
             ),
@@ -436,20 +428,23 @@ class InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildSearchBar() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: TextField(
         controller: _searchController,
         onChanged: _onSearchChanged,
-        style: GoogleFonts.inter(fontSize: 15),
+        style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
         decoration: InputDecoration(
           hintText: 'Search by barcode or product name...',
-          hintStyle: GoogleFonts.inter(color: kTextSecondary, fontSize: 14),
-          prefixIcon: const Icon(Icons.search, color: kPrimaryColor),
+          hintStyle: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.4), fontSize: 15),
+          prefixIcon: Icon(Icons.search, color: cs.primary),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, color: kTextSecondary),
+                  icon: Icon(Icons.clear, color: cs.onSurface.withOpacity(0.5)),
                   onPressed: () {
                     _searchController.clear();
                     _onSearchChanged('');
@@ -457,44 +452,45 @@ class InventoryScreenState extends State<InventoryScreen> {
                 )
               : null,
           filled: true,
-          fillColor: const Color(0xFFF8FAFC),
+          fillColor: isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFC),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: kBorderColor),
+            borderSide: BorderSide(color: cs.onSurface.withOpacity(0.15)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: kBorderColor),
+            borderSide: BorderSide(color: cs.onSurface.withOpacity(0.15)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: kPrimaryColor, width: 2),
+            borderSide: BorderSide(color: cs.primary, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         ),
       ),
     );
   }
 
   Widget _buildEmptyState() {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.inventory_2_outlined, size: 72, color: Colors.grey[300]),
+          Icon(Icons.inventory_2_outlined, size: 80, color: cs.onSurface.withOpacity(0.2)),
           const SizedBox(height: 16),
           Text(
             _searchQuery.isNotEmpty ? 'No products match your search' : 'No products yet',
-            style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: kTextSecondary),
+            style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.5)),
           ),
           const SizedBox(height: 8),
           Text(
             _searchQuery.isNotEmpty
                 ? 'Try a different keyword or barcode'
                 : _isAdmin
-                    ? 'Tap the + button to add your first product'
+                    ? 'Tap "Add Product" to add your first product'
                     : 'Products will appear here once added by an admin',
-            style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
+            style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface.withOpacity(0.4)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -502,31 +498,12 @@ class InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  // ── Product List — phone: card list | tablet: table rows ─────────────────
   Widget _buildProductList() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        final isTablet = w >= 768;
-        if (isTablet) {
-          // Determine column count based on available width
-          final cols = w >= 1100 ? 3 : 2;
-          // Compute card height: name (2 lines) + barcode + prices (3 chips) + actions
-          // ~190px content; aspect = width / height
-          final cardW = (w - 16 * 2 - 12.0 * (cols - 1)) / cols;
-          final cardH = 190.0;
-          final ratio = (cardW / cardH).clamp(1.0, 2.2);
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: cols,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: ratio,
-            ),
-            itemCount: _products.length,
-            itemBuilder: (ctx, i) => _buildProductCard(_products[i]),
-          );
-        }
+        final isTablet = constraints.maxWidth >= 768;
+        if (isTablet) return _buildProductTable();
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
           itemCount: _products.length,
@@ -539,7 +516,150 @@ class InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  // ── Tablet: table-style list ──────────────────────────────────────────────
+  Widget _buildProductTable() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final headerBg = isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+    final rowBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
+    final headerStyle = GoogleFonts.inter(
+      fontWeight: FontWeight.w700, fontSize: 13, color: cs.onSurface.withOpacity(0.55),
+      letterSpacing: 0.5,
+    );
+
+    return Column(
+      children: [
+        // Table header
+        Container(
+          color: headerBg,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(flex: 1, child: Text('#', style: headerStyle, textAlign: TextAlign.center)),
+              Expanded(flex: 3, child: Text('PRODUCT', style: headerStyle)),
+              Expanded(flex: 2, child: Text('BARCODE', style: headerStyle)),
+              Expanded(flex: 2, child: Text('RETAIL', style: headerStyle, textAlign: TextAlign.end)),
+              Expanded(flex: 2, child: Text('WHOLESALE', style: headerStyle, textAlign: TextAlign.end)),
+              if (_isAdmin)
+                Expanded(flex: 2, child: Text('COST', style: headerStyle, textAlign: TextAlign.end)),
+              if (_isAdmin)
+                Expanded(flex: 2, child: Text('ACTIONS', style: headerStyle, textAlign: TextAlign.center)),
+            ],
+          ),
+        ),
+        Container(height: 1, color: rowBorder),
+        // Table rows
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.only(bottom: 80),
+            itemCount: _products.length,
+            separatorBuilder: (_, __) => Container(height: 1, color: rowBorder),
+            itemBuilder: (ctx, i) => _buildTableRow(_products[i], i + 1 + (_currentPage * _pageSize)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTableRow(Map<String, dynamic> product, int rowNum) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final hasBundle = (product['has_bundle'] as int? ?? 0) == 1;
+    final name = product['name'] as String? ?? '';
+    final barcode = product['id'] as String? ?? '';
+    final retailPrice = (product['price'] as num?)?.toDouble() ?? 0.0;
+    final wholesalePrice = (product['wholesale_price'] as num?)?.toDouble() ?? 0.0;
+    final cost = (product['cost'] as num?)?.toDouble() ?? 0.0;
+
+    return InkWell(
+      onTap: _isAdmin ? () => _editProduct(product) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        child: Row(
+          children: [
+            Expanded(flex: 1, child: Text(
+              '$rowNum',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.4)),
+            )),
+            Expanded(flex: 3, child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: cs.onSurface),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                if (hasBundle)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7C3AED).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text('Bundle', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF7C3AED), fontWeight: FontWeight.w700)),
+                  ),
+              ],
+            )),
+            Expanded(flex: 2, child: Row(
+              children: [
+                Icon(Icons.qr_code, size: 13, color: cs.onSurface.withOpacity(0.3)),
+                const SizedBox(width: 4),
+                Flexible(child: Text(barcode,
+                    style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.55)),
+                    overflow: TextOverflow.ellipsis)),
+              ],
+            )),
+            Expanded(flex: 2, child: Text(formatCurrency(retailPrice),
+                textAlign: TextAlign.end,
+                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: cs.primary))),
+            Expanded(flex: 2, child: Text(formatCurrency(wholesalePrice),
+                textAlign: TextAlign.end,
+                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: kSuccessColor))),
+            if (_isAdmin)
+              Expanded(flex: 2, child: Text(formatCurrency(cost),
+                  textAlign: TextAlign.end,
+                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: kWarningColor))),
+            if (_isAdmin)
+              Expanded(flex: 2, child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _tableActionBtn(Icons.edit_outlined, cs.primary, () => _editProduct(product)),
+                  const SizedBox(width: 8),
+                  _tableActionBtn(Icons.inventory_outlined, const Color(0xFF7C3AED), () => _manageBundles(product)),
+                  const SizedBox(width: 8),
+                  _tableActionBtn(Icons.delete_outline, const Color(0xFFDC2626), () => _deleteProduct(product)),
+                ],
+              )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tableActionBtn(IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: color, size: 19),
+      ),
+    );
+  }
+
+  // ── Phone card (kept for phone layout) ───────────────────────────────────
   Widget _buildProductCard(Map<String, dynamic> product) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final hasBundle = (product['has_bundle'] as int? ?? 0) == 1;
     final name = product['name'] as String? ?? '';
     final barcode = product['id'] as String? ?? '';
@@ -552,9 +672,9 @@ class InventoryScreenState extends State<InventoryScreen> {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: kBorderColor.withOpacity(0.8)),
+        side: BorderSide(color: cs.onSurface.withOpacity(isDark ? 0.12 : 0.15)),
       ),
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -569,36 +689,19 @@ class InventoryScreenState extends State<InventoryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Barcode label
                       Row(
                         children: [
-                          Icon(Icons.qr_code, size: 13, color: kTextSecondary.withOpacity(0.7)),
+                          Icon(Icons.qr_code, size: 13, color: cs.onSurface.withOpacity(0.4)),
                           const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              barcode,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: kTextSecondary,
-                                letterSpacing: 0.5,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                          Flexible(child: Text(barcode,
+                              style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.55), letterSpacing: 0.5),
+                              overflow: TextOverflow.ellipsis)),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      // Product name
-                      Text(
-                        name,
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          color: kTextPrimary,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      Text(name,
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: cs.onSurface),
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -631,7 +734,7 @@ class InventoryScreenState extends State<InventoryScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            Divider(height: 1, color: cs.onSurface.withOpacity(0.1)),
             const SizedBox(height: 10),
             // ── Price row ─────────────────────────────────────────────────
             Row(
@@ -669,36 +772,24 @@ class InventoryScreenState extends State<InventoryScreen> {
             // ── Action buttons (admin only) ────────────────────────────────
             if (_isAdmin) ...[
               const SizedBox(height: 10),
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              Divider(height: 1, color: cs.onSurface.withOpacity(0.1)),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    child: _buildActionButton(
-                      label: 'Edit',
-                      icon: Icons.edit_outlined,
-                      color: kPrimaryColor,
+                   Expanded(child: _buildActionButton(
+                      label: 'Edit', icon: Icons.edit_outlined, color: cs.primary,
                       onTap: () => _editProduct(product),
-                    ),
-                  ),
+                    )),
                   const SizedBox(width: 6),
-                  Expanded(
-                    child: _buildActionButton(
-                      label: 'Bundles',
-                      icon: Icons.inventory_outlined,
-                      color: const Color(0xFF6366F1),
+                  Expanded(child: _buildActionButton(
+                      label: 'Bundles', icon: Icons.inventory_outlined, color: const Color(0xFF7C3AED),
                       onTap: () => _manageBundles(product),
-                    ),
-                  ),
+                    )),
                   const SizedBox(width: 6),
-                  Expanded(
-                    child: _buildActionButton(
-                      label: 'Delete',
-                      icon: Icons.delete_outline,
-                      color: kErrorColor,
+                  Expanded(child: _buildActionButton(
+                      label: 'Delete', icon: Icons.delete_outline, color: const Color(0xFFDC2626),
                       onTap: () => _deleteProduct(product),
-                    ),
-                  ),
+                    )),
                 ],
               ),
             ],
@@ -783,6 +874,9 @@ class InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildPaginationBar() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final totalPages = (_totalCount / _pageSize).ceil();
     final startItem = _currentPage * _pageSize + 1;
     final endItem = ((_currentPage + 1) * _pageSize).clamp(0, _totalCount);
@@ -792,49 +886,29 @@ class InventoryScreenState extends State<InventoryScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: kBorderColor.withOpacity(0.5))),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(top: BorderSide(color: cs.onSurface.withOpacity(0.1))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             'Showing $startItem–$endItem of $_totalCount',
-            style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+            style: GoogleFonts.inter(fontSize: 14, color: cs.onSurface.withOpacity(0.55)),
           ),
           Row(
             children: [
-              _paginationBtn(
-                icon: Icons.chevron_left,
-                enabled: hasPrev,
-                onTap: () {
-                  if (hasPrev) {
-                    setState(() => _currentPage--);
-                    _loadProducts();
-                  }
-                },
-              ),
+              _paginationBtn(icon: Icons.chevron_left, enabled: hasPrev, cs: cs, onTap: () {
+                if (hasPrev) { setState(() => _currentPage--); _loadProducts(); }
+              }),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'Page ${_currentPage + 1} / $totalPages',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary,
-                  ),
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Text('Page ${_currentPage + 1} / $totalPages',
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
               ),
-              _paginationBtn(
-                icon: Icons.chevron_right,
-                enabled: hasNext,
-                onTap: () {
-                  if (hasNext) {
-                    setState(() => _currentPage++);
-                    _loadProducts();
-                  }
-                },
-              ),
+              _paginationBtn(icon: Icons.chevron_right, enabled: hasNext, cs: cs, onTap: () {
+                if (hasNext) { setState(() => _currentPage++); _loadProducts(); }
+              }),
             ],
           ),
         ],
@@ -845,26 +919,23 @@ class InventoryScreenState extends State<InventoryScreen> {
   Widget _paginationBtn({
     required IconData icon,
     required bool enabled,
+    required ColorScheme cs,
     required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: enabled ? onTap : null,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        width: 36,
-        height: 36,
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
-          color: enabled ? kPrimaryColor.withOpacity(0.08) : Colors.transparent,
+          color: enabled ? cs.primary.withOpacity(0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: enabled ? kPrimaryColor.withOpacity(0.3) : kBorderColor,
+            color: enabled ? cs.primary.withOpacity(0.3) : cs.onSurface.withOpacity(0.1),
           ),
         ),
-        child: Icon(
-          icon,
-          size: 20,
-          color: enabled ? kPrimaryColor : kTextSecondary.withOpacity(0.4),
-        ),
+        child: Icon(icon, size: 22, color: enabled ? cs.primary : cs.onSurface.withOpacity(0.3)),
       ),
     );
   }

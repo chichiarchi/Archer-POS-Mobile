@@ -343,6 +343,37 @@ class LogsScreenState extends State<LogsScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx3) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                title: Text(
+                                  'Void Sale',
+                                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kErrorColor),
+                                ),
+                                content: Text(
+                                  'Are you sure you want to void sale #$saleId? This action cannot be undone.',
+                                  style: GoogleFonts.inter(fontSize: 14),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(ctx3).pop(false),
+                                    child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: kErrorColor,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () => Navigator.of(ctx3).pop(true),
+                                    child: Text('Void', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm != true) return;
+
                             final verify = await _verifyAdminPermission();
                             if (verify) {
                               final success = await DatabaseHelper.instance.voidSale(saleId, widget.username);
@@ -399,22 +430,20 @@ class LogsScreenState extends State<LogsScreen> {
     final paginatedLogs = _logs.sublist(startIndex, endIndex);
 
     return Scaffold(
-      backgroundColor: kBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           'System Activity Logs',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: kTextPrimary),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 22),
         ),
-        backgroundColor: Colors.white,
-        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.date_range, color: kPrimaryColor),
+            icon: Icon(Icons.date_range, color: Theme.of(context).colorScheme.primary),
             onPressed: _selectDateRange,
             tooltip: 'Filter Date Range',
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: kPrimaryColor),
+            icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),
             onPressed: _loadLogs,
             tooltip: 'Refresh Logs',
           ),
@@ -424,21 +453,22 @@ class LogsScreenState extends State<LogsScreen> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            color: Colors.white,
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Flexible(
                   child: Text(
                     'Range: ${DateFormat('MMM dd, yyyy').format(_dateFrom)} – ${DateFormat('MMM dd, yyyy').format(_dateTo)}',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextSecondary, fontSize: 12),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '${_logs.length} logs',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kPrimaryColor, fontSize: 13),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary, fontSize: 14),
                 ),
               ],
             ),
@@ -486,6 +516,7 @@ class LogsScreenState extends State<LogsScreen> {
                                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                   onTap: () => _handleRowTap(log),
                                   leading: CircleAvatar(
                                     backgroundColor: actionColor.withOpacity(0.1),
@@ -497,14 +528,14 @@ class LogsScreenState extends State<LogsScreen> {
                                       Flexible(
                                         child: Text(
                                           action,
-                                          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: actionColor),
+                                          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14, color: actionColor),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
                                         formatDateTime(timestamp),
-                                        style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary),
+                                        style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                                       ),
                                     ],
                                   ),
@@ -514,17 +545,17 @@ class LogsScreenState extends State<LogsScreen> {
                                       const SizedBox(height: 4),
                                       Text(
                                         details,
-                                        style: GoogleFonts.inter(color: kTextPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                                        style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         'User: $user',
-                                        style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w600),
+                                        style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55), fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ),
                                   trailing: (action == 'POS_SALE' || action == 'VOID_SALE')
-                                      ? const Icon(Icons.receipt, color: kTextSecondary)
+                                      ? Icon(Icons.receipt, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))
                                       : null,
                                 ),
                               );
@@ -544,33 +575,25 @@ class LogsScreenState extends State<LogsScreen> {
           ),
           if (_logs.length > _pageSize)
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              color: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_ios, size: 16),
+                    icon: const Icon(Icons.arrow_back_ios, size: 18),
                     onPressed: _currentPage > 0
-                        ? () {
-                            setState(() {
-                              _currentPage--;
-                            });
-                          }
+                        ? () => setState(() => _currentPage--)
                         : null,
                   ),
                   Text(
                     'Page ${_currentPage + 1} of ${(_logs.length / _pageSize).ceil()}',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                    icon: const Icon(Icons.arrow_forward_ios, size: 18),
                     onPressed: (_currentPage + 1) * _pageSize < _logs.length
-                        ? () {
-                            setState(() {
-                              _currentPage++;
-                            });
-                          }
+                        ? () => setState(() => _currentPage++)
                         : null,
                   ),
                 ],
