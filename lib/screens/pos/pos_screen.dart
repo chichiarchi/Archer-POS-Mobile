@@ -527,7 +527,6 @@ class POSScreenState extends State<POSScreen> {
                 _buildSearchBar(),
                 _buildCameraPreview(),
                 Expanded(child: _buildCartTable()),
-                _buildCartActionButtons(),
               ],
             ),
           ),
@@ -906,15 +905,14 @@ class POSScreenState extends State<POSScreen> {
             // Table header
             Container(
               color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.only(left: 16, right: 24, top: 12, bottom: 12),
               child: Row(
                 children: [
-                  Expanded(flex: 3, child: _headerCell('Product')),
-                  Expanded(flex: 2, child: _headerCell('Pricing', textAlign: TextAlign.center)),
-                  Expanded(flex: 2, child: _headerCell('Price', textAlign: TextAlign.end)),
-                  Expanded(flex: 2, child: _headerCell('Qty', textAlign: TextAlign.center)),
-                  Expanded(flex: 2, child: _headerCell('Total', textAlign: TextAlign.end)),
-                  Expanded(flex: 1, child: _headerCell('')),
+                  Expanded(flex: 8, child: _headerCell('Product')),
+                  Expanded(flex: 4, child: _headerCell('Price', textAlign: TextAlign.end)),
+                  Expanded(flex: 5, child: _headerCell('Qty', textAlign: TextAlign.center)),
+                  Expanded(flex: 5, child: _headerCell('Total', textAlign: TextAlign.end)),
+                  Expanded(flex: 4, child: _headerCell('')),
                 ],
               ),
             ),
@@ -961,48 +959,6 @@ class POSScreenState extends State<POSScreen> {
             fontWeight: FontWeight.w700, fontSize: 15,
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
       );
-
-  Widget _buildCartActionButtons() {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(8),
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          _actionBtn('Quick Add', Icons.add_circle_outline, const Color(0xFF6366F1), _quickAdd),
-          _actionBtn('Park Sale', Icons.pause_circle_outline, const Color(0xFF0284C7), _parkSale),
-          _actionBtn('Recall', Icons.play_circle_outline, const Color(0xFF10B981), _recallSale),
-          _actionBtn('Clear Cart', Icons.clear_all, kErrorColor, () async {
-            final cart = context.read<CartProvider>();
-            if (cart.items.isEmpty) return;
-            if (await _confirmClearCart()) {
-              if (await _verifyAdmin()) {
-                cart.clearCart();
-                await DatabaseHelper.instance.logAction('POS_VOID_CART',
-                    details: 'Cart cleared', userId: widget.username);
-              }
-            }
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _actionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, color: color, size: 18),
-      label: Text(label, style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(color: color.withOpacity(0.4)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      ),
-    );
-  }
 
   Widget _buildOrderSummaryPanel() {
     return Consumer<CartProvider>(

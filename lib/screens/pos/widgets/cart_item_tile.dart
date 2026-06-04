@@ -573,8 +573,11 @@ class _CartItemTileState extends State<CartItemTile>
         return InkWell(
           onLongPress: _showLongPressMenu,
           child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.spaceMD, vertical: 16,
+            padding: const EdgeInsets.only(
+              left: AppConstants.spaceMD,
+              right: 24,
+              top: 16,
+              bottom: 16,
             ),
             decoration: BoxDecoration(
               color: Color.alphaBlend(
@@ -585,7 +588,7 @@ class _CartItemTileState extends State<CartItemTile>
             ),
             child: Row(
               children: [
-                Expanded(flex: 3, child: Column(
+                Expanded(flex: 8, child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -594,20 +597,23 @@ class _CartItemTileState extends State<CartItemTile>
                       maxLines: 2, overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    if (widget.item.barcode.isNotEmpty)
-                      Text(
-                        widget.item.barcode,
-                        style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.45)),
-                      ),
+                    Row(
+                      children: [
+                        _pricingBadge(compact: true),
+                        if (widget.item.barcode.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            widget.item.barcode,
+                            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.45)),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 )),
+                // Price (flex 4)
                 Expanded(
-                  flex: 2,
-                  child: Center(child: _pricingBadge(compact: false)),
-                ),
-                // Price (flex 1.5)
-                Expanded(
-                  flex: 2,
+                  flex: 4,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -623,15 +629,15 @@ class _CartItemTileState extends State<CartItemTile>
                     ],
                   ),
                 ),
-                Expanded(flex: 2, child: Center(child: _qtyControls(compact: false))),
-                Expanded(flex: 2, child: Text(
+                Expanded(flex: 5, child: Center(child: _qtyControls(compact: false))),
+                Expanded(flex: 5, child: Text(
                   formatCurrency(widget.item.subtotal),
                   textAlign: TextAlign.end,
                   style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: cs.primary),
                 )),
-                // Actions (flex 1)
+                // Actions (flex 4)
                 Expanded(
-                  flex: 1,
+                  flex: 4,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
