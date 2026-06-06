@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/providers/cart_provider.dart';
 import '../../core/providers/auth_provider.dart';
@@ -42,8 +41,6 @@ class POSScreenState extends State<POSScreen> {
   final TextEditingController _qtyController = TextEditingController();
   final FocusNode _qtyFocus = FocusNode();
 
-  bool _cameraScannerMode = false;
-  MobileScannerController? _cameraController;
   DateTime? _lastScanTime;
   static const _beepChannel = MethodChannel('com.example.archer_pos/beep');
 
@@ -62,71 +59,13 @@ class POSScreenState extends State<POSScreen> {
     _qtyFocus.addListener(_onQtyFocusChange);
     _searchFocus.addListener(_onSearchFocusChange);
     _loadSuggestions();
-    _loadCameraSettings();
   }
 
   void _onSearchFocusChange() {
-    // Pause scanner and hide preview during search keyboard focus to optimize CPU/GPU and keyboard layout
-    if (_searchFocus.hasFocus) {
-      if (_cameraScannerMode && _cameraController != null) {
-        try {
-          _cameraController!.stop();
-        } catch (_) {}
-      }
-    } else {
-      if (_cameraScannerMode && _cameraController != null) {
-        try {
-          _cameraController!.start();
-        } catch (_) {}
-      }
-    }
     if (mounted) setState(() {});
   }
 
-  @override
-  void didUpdateWidget(POSScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isActive != oldWidget.isActive) {
-      _loadCameraSettings();
-    }
-  }
 
-  void _loadCameraSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool('camera_scanner_mode') ?? false;
-    
-    if (enabled && widget.isActive) {
-      if (_cameraController == null || !_cameraScannerMode) {
-        setState(() {
-          _cameraScannerMode = true;
-          _cameraController = MobileScannerController(
-            detectionSpeed: DetectionSpeed.noDuplicates,
-            detectionTimeoutMs: 500,
-            autoStart: true,
-            formats: const [
-              BarcodeFormat.code128,
-              BarcodeFormat.code39,
-              BarcodeFormat.code93,
-              BarcodeFormat.codabar,
-              BarcodeFormat.ean13,
-              BarcodeFormat.ean8,
-              BarcodeFormat.itf,
-              BarcodeFormat.upcA,
-              BarcodeFormat.upcE,
-            ],
-          );
-        });
-      }
-    } else {
-      if (_cameraScannerMode || _cameraController != null) {
-        setState(() {
-          _cameraScannerMode = false;
-          _cameraController?.dispose();
-          _cameraController = null;
-        });
-      }
-    }
-  }
 
   void _onQtyFocusChange() {
     if (!_qtyFocus.hasFocus) {
@@ -158,13 +97,11 @@ class POSScreenState extends State<POSScreen> {
     _qtyController.dispose();
     _qtyFocus.removeListener(_onQtyFocusChange);
     _qtyFocus.dispose();
-    _cameraController?.dispose();
     super.dispose();
   }
 
   void refresh() {
     _loadSuggestions();
-    _loadCameraSettings();
   }
 
   Future<void> _loadSuggestions() async {
@@ -575,7 +512,6 @@ class POSScreenState extends State<POSScreen> {
       body: Column(
         children: [
           _buildSearchBar(),
-          _buildCameraPreview(),
           _buildCartList(flex: 1),
           _buildBottomBar(),
         ],
@@ -596,7 +532,6 @@ class POSScreenState extends State<POSScreen> {
             child: Column(
               children: [
                 _buildSearchBar(),
-                _buildCameraPreview(),
                 Expanded(child: _buildCartTable()),
               ],
             ),
@@ -614,79 +549,7 @@ class POSScreenState extends State<POSScreen> {
     );
   }
 
-  Widget _buildCameraPreview() {
-    // Hide camera preview during typing/focusing on search to improve typing performance and keyboard animations
-    if (!_cameraScannerMode || _cameraController == null || _searchFocus.hasFocus) {
-      return const SizedBox.shrink();
-    }
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Card(
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 2,
-          child: SizedBox(
-            width: 240,
-            height: 130,
-            child: Stack(
-              children: [
-                MobileScanner(
-                  controller: _cameraController!,
-                  onDetect: (capture) {
-                    final now = DateTime.now();
-                    if (_lastScanTime != null && now.difference(_lastScanTime!) < const Duration(milliseconds: 1000)) {
-                      return; // Throttle scans to prevent duplicate fast adding
-                    }
-                    final List<Barcode> barcodes = capture.barcodes;
-                    for (final barcode in barcodes) {
-                      if (barcode.rawValue != null) {
-                        _lastScanTime = now;
-                        final code = barcode.rawValue!;
-                        HapticFeedback.lightImpact();
-                        _playBeep();
-                        _addItemByBarcode(code);
-                        break;
-                      }
-                    }
-                  },
-                ),
-                // Guide border
-                Center(
-                  child: Container(
-                    width: 180,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: kPrimaryColor, width: 2),
-                      borderRadius: BorderRadius.circular(10),
-                      color: Colors.transparent,
-                    ),
-                  ),
-                ),
-                // Label
-                Positioned(
-                  bottom: 6,
-                  left: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Scan Barcode',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildSearchBar() {
     return StatefulBuilder(
