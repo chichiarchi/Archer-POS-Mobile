@@ -10,6 +10,7 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/utils/constants.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/print_helper.dart';
 import 'widgets/cart_item_tile.dart';
 import 'widgets/checkout_dialog.dart';
 import 'widgets/park_recall_dialog.dart';
@@ -348,6 +349,64 @@ class POSScreenState extends State<POSScreen> {
           details: 'Sale #$saleId - Total: ${formatCurrency(cart.total)} - Paid: ${formatCurrency(result['amount_paid'] as double)}',
           userId: widget.username,
         );
+
+        final customerName = await () async {
+          final custId = result['customer_id'] as int?;
+          if (custId != null) {
+            final c = await DatabaseHelper.instance.getCustomerById(custId);
+            return c?['name'] as String?;
+          }
+          return null;
+        }();
+
+        if (mounted) {
+          final bool? shouldPrint = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(
+                'Print Receipt',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w800),
+              ),
+              content: Text(
+                'Do you want to print the receipt for Sale #$saleId?',
+                style: GoogleFonts.inter(fontSize: 15),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text('No', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextSecondary)),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('Yes', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldPrint == true) {
+            try {
+              await ReceiptPrinter.printReceipt(
+                saleId: saleId,
+                timestamp: DateTime.now().toIso8601String(),
+                cashier: widget.username,
+                totalAmount: cart.total,
+                amountPaid: result['amount_paid'] as double,
+                balanceDue: result['balance_due'] as double,
+                customerName: customerName,
+                items: saleItems,
+              );
+            } catch (pe) {
+              _showSnackBar('Printing error: $pe', isError: true);
+            }
+          }
+        }
 
         cart.clearCart();
         _showSnackBar('Sale #$saleId completed successfully! 🎉');

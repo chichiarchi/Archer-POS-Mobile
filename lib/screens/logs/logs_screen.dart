@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/utils/constants.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/print_helper.dart';
 
 class LogsScreen extends StatefulWidget {
   final String userRole;
@@ -404,9 +405,27 @@ class LogsScreenState extends State<LogsScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.of(ctx).pop();
-                          _showSnackBar('Sent receipt details to thermal printer! 🖨️');
+                          try {
+                            await ReceiptPrinter.printReceipt(
+                              saleId: saleId,
+                              timestamp: sale['timestamp'] as String? ?? DateTime.now().toIso8601String(),
+                              cashier: sale['created_by'] as String? ?? 'admin',
+                              totalAmount: total,
+                              amountPaid: paid,
+                              balanceDue: balance,
+                              customerName: customerName,
+                              items: items.map((i) => {
+                                'product_id': i['product_id'] ?? '',
+                                'product_name': i['product_name'] ?? '',
+                                'quantity': i['quantity'] ?? 0.0,
+                                'price': i['price'] ?? 0.0,
+                              }).toList(),
+                            );
+                          } catch (pe) {
+                            _showSnackBar('Printing error: $pe', isError: true);
+                          }
                         },
                         icon: const Icon(Icons.print, size: 18),
                         label: Text('REPRINT RECEIPT', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
