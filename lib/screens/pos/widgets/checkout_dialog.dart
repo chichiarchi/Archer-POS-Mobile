@@ -181,7 +181,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'TOTAL DUE',
+                      'TOTAL',
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -189,12 +189,19 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                         letterSpacing: 1.0,
                       ),
                     ),
-                    Text(
-                      formatCurrency(widget.total),
-                      style: GoogleFonts.inter(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatCurrency(widget.total),
+                          style: GoogleFonts.inter(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                        ),
                       ),
                     ),
                   ],
@@ -273,16 +280,23 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                           letterSpacing: 0.8,
                         ),
                       ),
-                      Text(
-                        _amountPaid >= widget.total 
-                            ? formatCurrency(_change) 
-                            : formatCurrency(_balanceDue),
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                          color: _amountPaid >= widget.total 
-                              ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)) 
-                              : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            _amountPaid >= widget.total 
+                                ? formatCurrency(_change) 
+                                : formatCurrency(_balanceDue),
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              color: _amountPaid >= widget.total 
+                                  ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)) 
+                                  : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                            ),
+                            maxLines: 1,
+                          ),
                         ),
                       ),
                     ],
@@ -384,9 +398,16 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                                 'Current Outstanding Debt:',
                                 style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.6), fontSize: 13),
                               ),
-                              Text(
-                                formatCurrency(_existingDebtorDebt),
-                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.error, fontSize: 14),
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    formatCurrency(_existingDebtorDebt),
+                                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.error, fontSize: 14),
+                                    maxLines: 1,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -399,9 +420,16 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                                   'New Total Debt:',
                                   style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface, fontSize: 13),
                                 ),
-                                Text(
-                                  formatCurrency(_existingDebtorDebt + _balanceDue),
-                                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: cs.error, fontSize: 15),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      formatCurrency(_existingDebtorDebt + _balanceDue),
+                                      style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: cs.error, fontSize: 15),
+                                      maxLines: 1,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),

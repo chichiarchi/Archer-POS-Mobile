@@ -511,9 +511,16 @@ class _CartItemTileState extends State<CartItemTile>
                     ),
                   ),
                   const SizedBox(width: AppConstants.spaceSM),
-                  Text(
-                    formatCurrency(widget.item.subtotal),
-                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: cs.primary),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        formatCurrency(widget.item.subtotal),
+                        style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: cs.primary),
+                        maxLines: 1,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -617,11 +624,16 @@ class _CartItemTileState extends State<CartItemTile>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        formatCurrency(widget.item.price),
-                        style: GoogleFonts.inter(
-                          fontSize: 15, fontWeight: FontWeight.w600,
-                          color: cs.onSurface.withOpacity(0.65),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatCurrency(widget.item.price),
+                          style: GoogleFonts.inter(
+                            fontSize: 15, fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withOpacity(0.65),
+                          ),
+                          maxLines: 1,
                         ),
                       ),
                       if (widget.item.manuallyDiscounted)
@@ -630,11 +642,19 @@ class _CartItemTileState extends State<CartItemTile>
                   ),
                 ),
                 Expanded(flex: 5, child: Center(child: _qtyControls(compact: false))),
-                Expanded(flex: 5, child: Text(
-                  formatCurrency(widget.item.subtotal),
-                  textAlign: TextAlign.end,
-                  style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: cs.primary),
-                )),
+                Expanded(
+                  flex: 5,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      formatCurrency(widget.item.subtotal),
+                      textAlign: TextAlign.end,
+                      style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: cs.primary),
+                      maxLines: 1,
+                    ),
+                  ),
+                ),
                 // Actions (flex 4)
                 Expanded(
                   flex: 4,

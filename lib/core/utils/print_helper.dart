@@ -71,7 +71,6 @@ class ReceiptPrinter {
     gen.line('--------------------------------', align: 1); // 32 characters
 
     // Metadata
-    gen.line('Sale ID: #$saleId');
     String dateStr = timestamp;
     try {
       dateStr = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(timestamp));
@@ -84,8 +83,14 @@ class ReceiptPrinter {
     gen.line('--------------------------------', align: 1);
 
     // Items Header
-    gen.line('Qty  Item                  Price', bold: true);
+    final headerQty = 'Qty '.padRight(4);
+    final headerPrice = 'Price'.padLeft(10);
+    final headerName = 'Item'.padRight(18);
+    gen.line('$headerQty$headerName$headerPrice', bold: true);
     gen.line('--------------------------------', align: 1);
+
+    final commaFormatter = NumberFormat('#,##0.00', 'en_PH');
+    String formatPrice(double amount) => commaFormatter.format(amount);
 
     // Items
     for (final item in items) {
@@ -94,17 +99,17 @@ class ReceiptPrinter {
       final name = item['product_name'] as String;
 
       // Layout columns:
-      // Qty is 4 chars (e.g. "1x  ")
-      // Price is 8 chars (e.g. "  500.00")
-      // Name gets remaining 20 chars
-      final qtyStr = '${qty.toStringAsFixed(0)}x  '.padRight(4);
-      final priceStr = (qty * price).toStringAsFixed(2).padLeft(8);
+      // Qty is 4 chars (e.g. "1   ")
+      // Price is 10 chars (e.g. "    500.00")
+      // Name gets remaining 18 chars
+      final qtyStr = qty.toStringAsFixed(0).padRight(4);
+      final priceStr = formatPrice(qty * price).padLeft(10);
       
       String nameStr = name;
-      if (nameStr.length > 20) {
-        nameStr = nameStr.substring(0, 17) + '...';
+      if (nameStr.length > 18) {
+        nameStr = nameStr.substring(0, 15) + '...';
       } else {
-        nameStr = nameStr.padRight(20);
+        nameStr = nameStr.padRight(18);
       }
       
       gen.line('$qtyStr$nameStr$priceStr');
@@ -114,13 +119,17 @@ class ReceiptPrinter {
     // Totals
     final change = amountPaid > totalAmount ? amountPaid - totalAmount : 0.0;
     
-    // Total line bold
-    gen.line('TOTAL DUE:      ${totalAmount.toStringAsFixed(2).padLeft(16)}', bold: true);
-    gen.line('Amount Paid:    ${amountPaid.toStringAsFixed(2).padLeft(16)}');
+    final totalStr = formatPrice(totalAmount);
+    final paidStr = formatPrice(amountPaid);
+    final balanceStr = formatPrice(balanceDue);
+    final changeStr = formatPrice(change);
+
+    gen.line('TOTAL: ${totalStr.padLeft(25)}', bold: true);
+    gen.line('Amount Paid: ${paidStr.padLeft(19)}');
     if (balanceDue > 0) {
-      gen.line('Balance Due:    ${balanceDue.toStringAsFixed(2).padLeft(16)}', bold: true);
+      gen.line('Balance Due: ${balanceStr.padLeft(19)}', bold: true);
     } else {
-      gen.line('Change:         ${change.toStringAsFixed(2).padLeft(16)}');
+      gen.line('Change: ${changeStr.padLeft(24)}');
     }
     
     gen.line('--------------------------------', align: 1);
@@ -129,6 +138,12 @@ class ReceiptPrinter {
     gen.cut();
 
     final bytes = Uint8List.fromList(gen.bytes);
-    await _printerChannel.invokeMethod('printRaw', {'bytes': bytes});
+    try {
+      await _printerChannel.invokeMethod('printRaw', {'bytes': bytes});
+    } on PlatformException catch (e) {
+      throw e.message ?? e.toString();
+    } catch (e) {
+      throw 'An unexpected print error occurred: $e';
+    }
   }
 }

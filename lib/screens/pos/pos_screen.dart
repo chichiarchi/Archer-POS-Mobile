@@ -172,15 +172,22 @@ class POSScreenState extends State<POSScreen> {
     if (mounted) setState(() => _searchSuggestions = products);
   }
 
-  List<Map<String, dynamic>> get _filteredSuggestions {
-    final q = _searchController.text.toLowerCase();
+  List<Map<String, dynamic>> _getFilteredSuggestionsForQuery(String query) {
+    final q = query.toLowerCase().trim();
     if (q.isEmpty) return [];
+    final terms = q.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    if (terms.isEmpty) return [];
     return _searchSuggestions
-        .where((p) =>
-            (p['id'] as String).toLowerCase().contains(q) ||
-            (p['name'] as String).toLowerCase().contains(q))
-        .take(8)
+        .where((p) {
+          final id = (p['id'] as String).toLowerCase();
+          final name = (p['name'] as String).toLowerCase();
+          return terms.every((term) => id.contains(term) || name.contains(term));
+        })
         .toList();
+  }
+
+  List<Map<String, dynamic>> get _filteredSuggestions {
+    return _getFilteredSuggestionsForQuery(_searchController.text).take(8).toList();
   }
 
   Future<void> _addItemByBarcode(String input) async {
@@ -213,7 +220,12 @@ class POSScreenState extends State<POSScreen> {
       if (byName.isNotEmpty) {
         await _addProductToCart(byName.first, qty.toDouble());
       } else {
-        await _handleProductNotFound(barcode);
+        final suggestions = _getFilteredSuggestionsForQuery(barcode);
+        if (suggestions.isNotEmpty) {
+          await _addProductToCart(suggestions.first, qty.toDouble());
+        } else {
+          await _handleProductNotFound(barcode);
+        }
       }
     } else {
       await _addProductToCart(product, qty.toDouble());
@@ -728,7 +740,6 @@ class POSScreenState extends State<POSScreen> {
               },
               onSubmitted: _addItemByBarcode,
               style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_.*]'))],
             );
 
             final qtySelector = Container(
@@ -1064,9 +1075,18 @@ class POSScreenState extends State<POSScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(formatCurrency(item.price * item.quantity),
-                                    style: GoogleFonts.inter(
-                                        fontWeight: FontWeight.w700, fontSize: 16, color: cs.primary)),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      formatCurrency(item.price * item.quantity),
+                                      style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.w700, fontSize: 16, color: cs.primary),
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           );
@@ -1089,10 +1109,17 @@ class POSScreenState extends State<POSScreen> {
                             fontWeight: FontWeight.w900, fontSize: 22,
                             color: cs.onSurface, letterSpacing: 0.5)),
                     Flexible(
-                      child: Text(formatCurrency(cart.total),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatCurrency(cart.total),
                           textAlign: TextAlign.end,
                           style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w900, fontSize: 38, color: cs.primary)),
+                              fontWeight: FontWeight.w900, fontSize: 38, color: cs.primary),
+                          maxLines: 1,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -1212,8 +1239,17 @@ class POSScreenState extends State<POSScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('TOTAL', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 16, color: cs.onSurface)),
-                    Text(formatCurrency(cart.total),
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 22, color: cs.primary)),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatCurrency(cart.total),
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 22, color: cs.primary),
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               const SizedBox(height: 8),
