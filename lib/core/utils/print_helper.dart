@@ -66,8 +66,8 @@ class ReceiptPrinter {
 
     // 58mm printer has 32 columns wide using Font A (standard)
     
-    // Title centered, double size
-    gen.line('ARCHER POS', bold: true, align: 1, doubleWidth: true, doubleHeight: true);
+    // Title centered, bold, tall size (no double-width to avoid wrapping on 58mm paper)
+    gen.line('ARCHERMART', bold: true, align: 1, doubleHeight: true);
     gen.line('--------------------------------', align: 1); // 32 characters
 
     // Metadata
