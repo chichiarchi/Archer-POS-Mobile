@@ -42,145 +42,147 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Quick Add Custom Item',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: cs.onSurface,
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Name field
-              TextFormField(
-                controller: _nameController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Item Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Quick Add Custom Item',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: cs.onSurface,
                   ),
-                  prefixIcon: const Icon(Icons.shopping_bag_outlined),
                 ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Please enter an item name.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // Price field
-              TextFormField(
-                controller: _priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'Price (₱)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: const Icon(Icons.payments_outlined),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'Please enter a price.';
-                  }
-                  final price = double.tryParse(val);
-                  if (price == null || price < 0) {
-                    return 'Please enter a valid price.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Quantity Selector
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Quantity',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
+                const SizedBox(height: 16),
+                
+                // Name field
+                TextFormField(
+                  controller: _nameController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Item Name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    prefixIcon: const Icon(Icons.shopping_bag_outlined),
                   ),
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          if (_quantity > 1) {
-                            setState(() {
-                              _quantity -= 1.0;
-                            });
-                          } else if (_quantity > 0.1) {
-                            setState(() {
-                              _quantity = double.parse((_quantity - 0.1).toStringAsFixed(1));
-                            });
-                          }
-                        },
-                        icon: Icon(Icons.remove_circle_outline, color: cs.primary),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please enter an item name.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Price field
+                TextFormField(
+                  controller: _priceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Price (₱)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please enter a price.';
+                    }
+                    final price = double.tryParse(val);
+                    if (price == null || price < 0) {
+                      return 'Please enter a valid price.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Quantity Selector
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Quantity',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
                       ),
-                      Text(
-                        _quantity.toString(),
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            if (_quantity > 1) {
+                              setState(() {
+                                _quantity -= 1.0;
+                              });
+                            } else if (_quantity > 0.1) {
+                              setState(() {
+                                _quantity = double.parse((_quantity - 0.1).toStringAsFixed(1));
+                              });
+                            }
+                          },
+                          icon: Icon(Icons.remove_circle_outline, color: cs.primary),
+                        ),
+                        Text(
+                          _quantity.toString(),
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _quantity = double.parse((_quantity + 1.0).toStringAsFixed(1));
+                            });
+                          },
+                          icon: Icon(Icons.add_circle_outline, color: cs.primary),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(
+                        'Cancel',
                         style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: cs.onSurface,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface.withOpacity(0.6),
                         ),
                       ),
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _quantity = double.parse((_quantity + 1.0).toStringAsFixed(1));
-                          });
-                        },
-                        icon: Icon(Icons.add_circle_outline, color: cs.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: _onConfirm,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ],
-                  )
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      'Cancel',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface.withOpacity(0.6),
+                      child: Text(
+                        'Add to Cart',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w700),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: _onConfirm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: cs.primary,
-                      foregroundColor: cs.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Text(
-                      'Add to Cart',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              )
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

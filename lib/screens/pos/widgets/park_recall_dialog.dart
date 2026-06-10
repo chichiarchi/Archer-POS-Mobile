@@ -43,7 +43,10 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 450, maxHeight: 500),
+        constraints: BoxConstraints(
+          maxWidth: 450,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+        ),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
