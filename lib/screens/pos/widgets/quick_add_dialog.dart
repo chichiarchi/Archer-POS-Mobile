@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'numeric_keypad.dart';
 
 class QuickAddDialog extends StatefulWidget {
   const QuickAddDialog({super.key});
@@ -12,12 +13,21 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  double _quantity = 1.0;
+  final TextEditingController _qtyController = TextEditingController(text: '1.0');
+  
+  late TextEditingController _activeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeController = _priceController;
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _qtyController.dispose();
     super.dispose();
   }
 
@@ -26,7 +36,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
       Navigator.of(context).pop({
         'name': _nameController.text.trim(),
         'price': double.tryParse(_priceController.text.trim()) ?? 0.0,
-        'quantity': _quantity,
+        'quantity': double.tryParse(_qtyController.text.trim()) ?? 1.0,
       });
     }
   }
@@ -80,11 +90,24 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                 // Price field
                 TextFormField(
                   controller: _priceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  readOnly: true,
+                  showCursor: true,
+                  onTap: () {
+                    setState(() {
+                      _activeController = _priceController;
+                    });
+                  },
                   decoration: InputDecoration(
                     labelText: 'Price (₱)',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: _activeController == _priceController ? cs.primary : cs.onSurface.withOpacity(0.2),
+                        width: _activeController == _priceController ? 2 : 1,
+                      ),
                     ),
                     prefixIcon: const Icon(Icons.payments_outlined),
                   ),
@@ -99,54 +122,93 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
-                // Quantity Selector
+                // Quantity Selector Row
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Quantity',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
+                    Expanded(
+                      child: TextFormField(
+                        controller: _qtyController,
+                        readOnly: true,
+                        showCursor: true,
+                        onTap: () {
+                          setState(() {
+                            _activeController = _qtyController;
+                          });
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Quantity',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: _activeController == _qtyController ? cs.primary : cs.onSurface.withOpacity(0.2),
+                              width: _activeController == _qtyController ? 2 : 1,
+                            ),
+                          ),
+                          prefixIcon: const Icon(Icons.production_quantity_limits),
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) {
+                            return 'Please enter a quantity.';
+                          }
+                          final qty = double.tryParse(val);
+                          if (qty == null || qty <= 0) {
+                            return 'Enter a valid quantity.';
+                          }
+                          return null;
+                        },
                       ),
                     ),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () {
-                            if (_quantity > 1) {
-                              setState(() {
-                                _quantity -= 1.0;
-                              });
-                            } else if (_quantity > 0.1) {
-                              setState(() {
-                                _quantity = double.parse((_quantity - 0.1).toStringAsFixed(1));
-                              });
-                            }
-                          },
-                          icon: Icon(Icons.remove_circle_outline, color: cs.primary),
-                        ),
-                        Text(
-                          _quantity.toString(),
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: cs.onSurface,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _quantity = double.parse((_quantity + 1.0).toStringAsFixed(1));
-                            });
-                          },
-                          icon: Icon(Icons.add_circle_outline, color: cs.primary),
-                        ),
-                      ],
-                    )
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () {
+                        final q = double.tryParse(_qtyController.text) ?? 1.0;
+                        if (q > 1) {
+                          setState(() {
+                            final newVal = q - 1.0;
+                            _qtyController.text = newVal.toString();
+                          });
+                        } else if (q > 0.1) {
+                          setState(() {
+                            final newVal = double.parse((q - 0.1).toStringAsFixed(1));
+                            _qtyController.text = newVal.toString();
+                          });
+                        }
+                      },
+                      icon: Icon(Icons.remove_circle_outline, color: cs.primary),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        final q = double.tryParse(_qtyController.text) ?? 1.0;
+                        setState(() {
+                          final newVal = double.parse((q + 1.0).toStringAsFixed(1));
+                          _qtyController.text = newVal.toString();
+                        });
+                      },
+                      icon: Icon(Icons.add_circle_outline, color: cs.primary),
+                    ),
                   ],
+                ),
+                const SizedBox(height: 16),
+
+                // Virtual Keypad
+                Text(
+                  'Editing: ${_activeController == _priceController ? "Price" : "Quantity"}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: cs.primary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                NumericKeypad(
+                  controller: _activeController,
+                  isDecimal: true,
                 ),
                 const SizedBox(height: 24),
 

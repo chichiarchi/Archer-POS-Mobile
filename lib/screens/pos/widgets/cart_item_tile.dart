@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/cart_provider.dart';
 import '../../../core/utils/constants.dart';
 import '../../../core/utils/formatters.dart';
+import 'numeric_keypad.dart';
 
 /// A single cart item row, adapts between phone and tablet layouts.
 class CartItemTile extends StatefulWidget {
@@ -136,23 +137,39 @@ class _CartItemTileState extends State<CartItemTile>
           'Change Quantity',
           style: GoogleFonts.inter(fontWeight: FontWeight.w700),
         ),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,3}')),
-          ],
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'Quantity',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              readOnly: true,
+              showCursor: true,
+              decoration: InputDecoration(
+                labelText: 'Quantity',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+                ),
+              ),
             ),
-          ),
-          onSubmitted: (_) {
-            final v = double.tryParse(controller.text);
-            if (v != null && v >= 0.1) Navigator.pop(ctx, v);
-          },
+            const SizedBox(height: 16),
+            NumericKeypad(
+              controller: controller,
+              isDecimal: true,
+              onSubmit: () {
+                final v = double.tryParse(controller.text);
+                if (v != null && v >= 0.1) {
+                  Navigator.pop(ctx, v);
+                } else {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text('Minimum quantity is 0.1'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -204,36 +221,51 @@ class _CartItemTileState extends State<CartItemTile>
           'Apply Discount',
           style: GoogleFonts.inter(fontWeight: FontWeight.w700),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Current price: ${formatCurrency(widget.item.price)}',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: AppColors.textMuted,
-              ),
-            ),
-            const SizedBox(height: AppConstants.spaceSM),
-            TextField(
-              controller: controller,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d+\.?\d{0,2}')),
-              ],
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'New Unit Price',
-                prefixText: '₱ ',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Current price: ${formatCurrency(widget.item.price)}',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: AppConstants.spaceSM),
+              TextField(
+                controller: controller,
+                readOnly: true,
+                showCursor: true,
+                decoration: InputDecoration(
+                  labelText: 'New Unit Price',
+                  prefixText: '₱ ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              NumericKeypad(
+                controller: controller,
+                isDecimal: true,
+                onSubmit: () {
+                  final v = double.tryParse(controller.text);
+                  if (v != null && v >= 0) {
+                    Navigator.pop(ctx, v);
+                  } else {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Enter a valid price (≥ 0)'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(

@@ -32,6 +32,25 @@ double parseAmount(String text) {
   return double.tryParse(clean) ?? 0.0;
 }
 
+/// Format raw input text (possibly with decimal point) with thousand separators
+String formatInputWithCommas(String text) {
+  if (text.isEmpty) return '';
+  final clean = text.replaceAll(',', '');
+  final parts = clean.split('.');
+  if (parts.isEmpty) return '';
+
+  final intPart = int.tryParse(parts[0]);
+  if (intPart == null && parts[0].isNotEmpty) return text;
+
+  final formatter = NumberFormat('#,##0', 'en_PH');
+  final formattedInt = parts[0].isEmpty ? '' : formatter.format(intPart ?? 0);
+
+  if (parts.length > 1) {
+    return '$formattedInt.${parts[1]}';
+  }
+  return formattedInt;
+}
+
 /// Get current Philippines time (UTC+8) formatted for DB storage
 String nowPHTimestamp() {
   final now = DateTime.now().toUtc().add(const Duration(hours: 8));

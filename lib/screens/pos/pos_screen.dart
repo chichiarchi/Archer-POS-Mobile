@@ -15,6 +15,7 @@ import 'widgets/checkout_dialog.dart';
 import 'widgets/park_recall_dialog.dart';
 import 'widgets/quick_add_dialog.dart';
 import 'widgets/add_product_dialog.dart';
+import 'widgets/numeric_keypad.dart';
 
 class POSScreen extends StatefulWidget {
   final String userRole;
@@ -87,6 +88,68 @@ class POSScreenState extends State<POSScreen> {
       _quantity = clamped;
       _qtyController.text = '$clamped';
     });
+  }
+
+  Future<void> _showMainQtyDialog() async {
+    final ctrl = TextEditingController(text: '$_quantity');
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Set Quantity',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: ctrl,
+              readOnly: true,
+              showCursor: true,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            NumericKeypad(
+              controller: ctrl,
+              isDecimal: false,
+              onSubmit: () {
+                final parsed = int.tryParse(ctrl.text);
+                if (parsed != null && parsed >= 1) {
+                  Navigator.of(ctx).pop(parsed);
+                } else {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Minimum quantity is 1')),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final parsed = int.tryParse(ctrl.text);
+              if (parsed != null && parsed >= 1) {
+                Navigator.of(ctx).pop(parsed);
+              }
+            },
+            child: const Text('Set'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      _updateQuantity(result);
+    }
   }
 
   @override
@@ -628,7 +691,9 @@ class POSScreenState extends State<POSScreen> {
                     child: TextField(
                       controller: _qtyController,
                       focusNode: _qtyFocus,
-                      keyboardType: TextInputType.number,
+                      readOnly: true,
+                      showCursor: true,
+                      onTap: _showMainQtyDialog,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: cs.onSurface),
                       decoration: const InputDecoration(
@@ -636,17 +701,6 @@ class POSScreenState extends State<POSScreen> {
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      onChanged: (val) {
-                        final parsed = int.tryParse(val);
-                        if (parsed != null && parsed > 0) {
-                          _quantity = parsed.clamp(1, 9999);
-                        }
-                      },
-                      onSubmitted: (val) {
-                        final parsed = int.tryParse(val) ?? 1;
-                        _updateQuantity(parsed);
-                      },
                     ),
                   ),
                   GestureDetector(
