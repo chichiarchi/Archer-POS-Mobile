@@ -1,10 +1,10 @@
-# Archer POS v2 — Flutter Mobile App
+# EmmaSarmingStore v2 — Flutter Mobile App
 
 A full-featured Point of Sale (POS) system for Android phones and tablets, converted from the original Python/PySide6 desktop application.
 
 ## 📱 Overview
 
-Archer POS v2 is a mobile-first POS system built with Flutter, targeting Android phones and tablets. It maintains the same business logic and system flow as the original desktop version.
+EmmaSarmingStore v2 is a mobile-first POS system built with Flutter, targeting Android phones and tablets. It maintains the same business logic and system flow as the original desktop version.
 
 ## ✨ Features
 

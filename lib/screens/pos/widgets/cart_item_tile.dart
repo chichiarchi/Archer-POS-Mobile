@@ -342,8 +342,8 @@ class _CartItemTileState extends State<CartItemTile>
             ),
             const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.edit_outlined,
-                  color: AppColors.primary),
+              leading:
+                  const Icon(Icons.edit_outlined, color: AppColors.primary),
               title: Text('Change Qty',
                   style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
               onTap: () => Navigator.pop(ctx, 'qty'),
@@ -371,8 +371,8 @@ class _CartItemTileState extends State<CartItemTile>
                   style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
               subtitle: Text(
                 'Switch to ${widget.item.pricingMode == 'retail' ? 'Wholesale' : 'Retail'}',
-                style: GoogleFonts.inter(
-                    fontSize: 11, color: AppColors.textMuted),
+                style:
+                    GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted),
               ),
               onTap: () => Navigator.pop(ctx, 'pricing'),
             ),
@@ -381,8 +381,7 @@ class _CartItemTileState extends State<CartItemTile>
               leading: const Icon(Icons.delete_outline, color: AppColors.error),
               title: Text('Delete',
                   style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.error)),
+                      fontWeight: FontWeight.w500, color: AppColors.error)),
               onTap: () => Navigator.pop(ctx, 'delete'),
             ),
             const SizedBox(height: AppConstants.spaceSM),
@@ -420,9 +419,9 @@ class _CartItemTileState extends State<CartItemTile>
         vertical: compact ? 3 : 5,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppConstants.radiusFull),
-        border: Border.all(color: color.withOpacity(0.35), width: 0.8),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 0.8),
       ),
       child: Text(
         label,
@@ -449,7 +448,8 @@ class _CartItemTileState extends State<CartItemTile>
           icon: Icons.remove,
           size: btnSize,
           onTap: _decrement,
-          backgroundColor: isDark ? const Color(0xFF334155) : AppColors.background,
+          backgroundColor:
+              isDark ? const Color(0xFF334155) : AppColors.background,
           iconColor: cs.onSurface,
         ),
         GestureDetector(
@@ -472,11 +472,10 @@ class _CartItemTileState extends State<CartItemTile>
           icon: Icons.add,
           size: btnSize,
           onTap: _increment,
-          backgroundColor: cs.primary.withOpacity(0.12),
+          backgroundColor: cs.primary.withValues(alpha: 0.12),
           iconColor: cs.primary,
         ),
       ],
-
     );
   }
 
@@ -490,7 +489,7 @@ class _CartItemTileState extends State<CartItemTile>
       animation: _flashController,
       builder: (context, child) {
         final flashColor = Color.lerp(
-          cs.primary.withOpacity(isDark ? 0.35 : 0.15),
+          cs.primary.withValues(alpha: isDark ? 0.35 : 0.15),
           Colors.transparent,
           _flashController.value,
         );
@@ -501,11 +500,11 @@ class _CartItemTileState extends State<CartItemTile>
           ),
           elevation: AppConstants.elevationCard,
           margin: const EdgeInsets.symmetric(
-              horizontal: AppConstants.spaceSM,
-              vertical: AppConstants.spaceXS),
+              horizontal: AppConstants.spaceSM, vertical: AppConstants.spaceXS),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-            side: BorderSide(color: cs.onSurface.withOpacity(0.12), width: 0.8),
+            side: BorderSide(
+                color: cs.onSurface.withValues(alpha: 0.12), width: 0.8),
           ),
           child: child,
         );
@@ -528,16 +527,20 @@ class _CartItemTileState extends State<CartItemTile>
                         Text(
                           widget.item.name,
                           style: GoogleFonts.inter(
-                            fontSize: 14, fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
                             color: cs.onSurface,
                           ),
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         if (widget.item.barcode.isNotEmpty)
                           Text(
                             widget.item.barcode,
-                            style: GoogleFonts.inter(fontSize: 11, color: cs.onSurface.withOpacity(0.45)),
+                            style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: cs.onSurface.withValues(alpha: 0.45)),
                           ),
                       ],
                     ),
@@ -549,7 +552,10 @@ class _CartItemTileState extends State<CartItemTile>
                       alignment: Alignment.centerRight,
                       child: Text(
                         formatCurrency(widget.item.subtotal),
-                        style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: cs.primary),
+                        style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: cs.primary),
                         maxLines: 1,
                       ),
                     ),
@@ -562,13 +568,16 @@ class _CartItemTileState extends State<CartItemTile>
                   _pricingBadge(),
                   const SizedBox(width: AppConstants.spaceSM),
                   if (widget.item.manuallyDiscounted)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Icon(Icons.local_offer, size: 13, color: AppColors.warning),
+                    const Padding(
+                      padding: EdgeInsets.only(right: 6),
+                      child: Icon(Icons.local_offer,
+                          size: 13, color: AppColors.warning),
                     ),
                   Text(
                     '${formatCurrency(widget.item.price)} / unit',
-                    style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.5)),
+                    style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.5)),
                   ),
                 ],
               ),
@@ -584,7 +593,8 @@ class _CartItemTileState extends State<CartItemTile>
                     iconSize: 20,
                     tooltip: 'Remove',
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    constraints:
+                        const BoxConstraints(minWidth: 36, minHeight: 36),
                   ),
                 ],
               ),
@@ -605,7 +615,7 @@ class _CartItemTileState extends State<CartItemTile>
       animation: _flashController,
       builder: (context, child) {
         final flashColor = Color.lerp(
-          cs.primary.withOpacity(isDark ? 0.35 : 0.15),
+          cs.primary.withValues(alpha: isDark ? 0.35 : 0.15),
           Colors.transparent,
           _flashController.value,
         );
@@ -623,33 +633,44 @@ class _CartItemTileState extends State<CartItemTile>
                 flashColor ?? Colors.transparent,
                 isDark ? const Color(0xFF1E293B) : Colors.white,
               ),
-              border: Border(bottom: BorderSide(color: cs.onSurface.withOpacity(0.1), width: 0.8)),
+              border: Border(
+                  bottom: BorderSide(
+                      color: cs.onSurface.withValues(alpha: 0.1), width: 0.8)),
             ),
             child: Row(
               children: [
-                Expanded(flex: 8, child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.item.name,
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: cs.onSurface),
-                      maxLines: 2, overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
+                Expanded(
+                    flex: 8,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _pricingBadge(compact: true),
-                        if (widget.item.barcode.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            widget.item.barcode,
-                            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.45)),
-                          ),
-                        ],
+                        Text(
+                          widget.item.name,
+                          style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurface),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            _pricingBadge(compact: true),
+                            if (widget.item.barcode.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                widget.item.barcode,
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color:
+                                        cs.onSurface.withValues(alpha: 0.45)),
+                              ),
+                            ],
+                          ],
+                        ),
                       ],
-                    ),
-                  ],
-                )),
+                    )),
                 // Price (flex 4)
                 Expanded(
                   flex: 4,
@@ -662,18 +683,22 @@ class _CartItemTileState extends State<CartItemTile>
                         child: Text(
                           formatCurrency(widget.item.price),
                           style: GoogleFonts.inter(
-                            fontSize: 15, fontWeight: FontWeight.w600,
-                            color: cs.onSurface.withOpacity(0.65),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withValues(alpha: 0.65),
                           ),
                           maxLines: 1,
                         ),
                       ),
                       if (widget.item.manuallyDiscounted)
-                        Icon(Icons.local_offer, size: 13, color: AppColors.warning),
+                        const Icon(Icons.local_offer,
+                            size: 13, color: AppColors.warning),
                     ],
                   ),
                 ),
-                Expanded(flex: 5, child: Center(child: _qtyControls(compact: false))),
+                Expanded(
+                    flex: 5,
+                    child: Center(child: _qtyControls(compact: false))),
                 Expanded(
                   flex: 5,
                   child: FittedBox(
@@ -682,7 +707,10 @@ class _CartItemTileState extends State<CartItemTile>
                     child: Text(
                       formatCurrency(widget.item.subtotal),
                       textAlign: TextAlign.end,
-                      style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: cs.primary),
+                      style: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: cs.primary),
                       maxLines: 1,
                     ),
                   ),

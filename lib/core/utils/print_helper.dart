@@ -14,10 +14,14 @@ class EscPosGenerator {
     bytes.clear();
   }
 
-  void text(String text, {bool bold = false, int align = 0, bool doubleHeight = false, bool doubleWidth = false}) {
+  void text(String text,
+      {bool bold = false,
+      int align = 0,
+      bool doubleHeight = false,
+      bool doubleWidth = false}) {
     // Alignment: 0 = Left, 1 = Center, 2 = Right
     bytes.addAll([0x1B, 0x61, align]);
-    
+
     // Bold
     bytes.addAll([0x1B, 0x45, bold ? 1 : 0]);
 
@@ -29,14 +33,22 @@ class EscPosGenerator {
 
     // Add text bytes
     bytes.addAll(utf8.encode(text));
-    
+
     // Reset styles to default
     bytes.addAll([0x1B, 0x45, 0]); // bold off
     bytes.addAll([0x1D, 0x21, 0]); // size normal
   }
 
-  void line(String text, {bool bold = false, int align = 0, bool doubleHeight = false, bool doubleWidth = false}) {
-    this.text(text + '\n', bold: bold, align: align, doubleHeight: doubleHeight, doubleWidth: doubleWidth);
+  void line(String text,
+      {bool bold = false,
+      int align = 0,
+      bool doubleHeight = false,
+      bool doubleWidth = false}) {
+    this.text('$text\n',
+        bold: bold,
+        align: align,
+        doubleHeight: doubleHeight,
+        doubleWidth: doubleWidth);
   }
 
   void feed(int lines) {
@@ -49,7 +61,8 @@ class EscPosGenerator {
 }
 
 class ReceiptPrinter {
-  static const _printerChannel = MethodChannel('com.example.archer_pos/printer');
+  static const _printerChannel =
+      MethodChannel('com.example.emma_store/printer');
 
   static Future<void> printReceipt({
     required int saleId,
@@ -65,15 +78,16 @@ class ReceiptPrinter {
     gen.init();
 
     // 58mm printer has 32 columns wide using Font A (standard)
-    
+
     // Title centered, bold, tall size (no double-width to avoid wrapping on 58mm paper)
-    gen.line('ARCHERMART', bold: true, align: 1, doubleHeight: true);
+    gen.line('EMMASARMINGSTORE', bold: true, align: 1, doubleHeight: true);
     gen.line('--------------------------------', align: 1); // 32 characters
 
     // Metadata
     String dateStr = timestamp;
     try {
-      dateStr = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(timestamp));
+      dateStr =
+          DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(timestamp));
     } catch (_) {}
     gen.line('Date: $dateStr');
     gen.line('Cashier: $cashier');
@@ -104,21 +118,21 @@ class ReceiptPrinter {
       // Name gets remaining 18 chars
       final qtyStr = qty.toStringAsFixed(0).padRight(4);
       final priceStr = formatPrice(qty * price).padLeft(10);
-      
+
       String nameStr = name;
       if (nameStr.length > 18) {
-        nameStr = nameStr.substring(0, 15) + '...';
+        nameStr = '${nameStr.substring(0, 15)}...';
       } else {
         nameStr = nameStr.padRight(18);
       }
-      
+
       gen.line('$qtyStr$nameStr$priceStr');
     }
     gen.line('--------------------------------', align: 1);
 
     // Totals
     final change = amountPaid > totalAmount ? amountPaid - totalAmount : 0.0;
-    
+
     final totalStr = formatPrice(totalAmount);
     final paidStr = formatPrice(amountPaid);
     final balanceStr = formatPrice(balanceDue);
@@ -131,7 +145,7 @@ class ReceiptPrinter {
     } else {
       gen.line('Change: ${changeStr.padLeft(24)}');
     }
-    
+
     gen.line('--------------------------------', align: 1);
     gen.line('Thank you for your purchase!', align: 1);
     gen.feed(3);

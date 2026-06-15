@@ -24,11 +24,11 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _purposeController = TextEditingController();
-  
+
   DateTime _paymentDate = DateTime.now();
   DateTime _historyFrom = DateTime.now().subtract(const Duration(days: 7));
   DateTime _historyTo = DateTime.now();
-  
+
   List<Map<String, dynamic>> _notesList = [];
   List<String> _recipientSuggestions = [];
   bool _isLoading = false;
@@ -60,7 +60,8 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
     try {
       final dfStr = DateFormat('yyyy-MM-dd').format(_historyFrom);
       final dtStr = DateFormat('yyyy-MM-dd').format(_historyTo);
-      final list = await DatabaseHelper.instance.getPaymentNotes(dateFrom: dfStr, dateTo: dtStr);
+      final list = await DatabaseHelper.instance
+          .getPaymentNotes(dateFrom: dfStr, dateTo: dtStr);
       setState(() {
         _notesList = list;
         _isLoading = false;
@@ -105,15 +106,19 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
 
     final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
     final recipient = _recipientController.text.trim();
-    final purpose = _purposeController.text.trim().isEmpty ? null : _purposeController.text.trim();
-    
+    final purpose = _purposeController.text.trim().isEmpty
+        ? null
+        : _purposeController.text.trim();
+
     final selectedDate = _paymentDate;
     final now = DateTime.now();
-    final timestamp = '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')} '
+    final timestamp =
+        '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
     try {
-      await DatabaseHelper.instance.addPaymentNote(amount, recipient, purpose, timestamp);
+      await DatabaseHelper.instance
+          .addPaymentNote(amount, recipient, purpose, timestamp);
       await DatabaseHelper.instance.logAction(
         'PAYMENT_NOTE_SAVED',
         details: 'Payout of ${formatCurrency(amount)} to $recipient',
@@ -146,14 +151,17 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
           final isDark = theme.brightness == Brightness.dark;
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Text('Admin Verification Required', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text('Admin Verification Required',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'Please enter the master recovery code or an admin password to delete this payout record.',
-                  style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: cs.onSurface.withValues(alpha: 0.6)),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -161,9 +169,12 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                   obscureText: obscureText,
                   decoration: InputDecoration(
                     labelText: 'Master Code or Admin Password',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
+                      icon: Icon(obscureText
+                          ? Icons.visibility_off
+                          : Icons.visibility),
                       onPressed: () {
                         setDialogState(() {
                           obscureText = !obscureText;
@@ -177,12 +188,15 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('Cancel', style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.6))),
+                child: Text('Cancel',
+                    style: GoogleFonts.inter(
+                        color: cs.onSurface.withValues(alpha: 0.6))),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: cs.primary,
-                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  foregroundColor:
+                      isDark ? const Color(0xFF0F172A) : Colors.white,
                 ),
                 onPressed: () async {
                   final input = passwordController.text.trim();
@@ -194,10 +208,12 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
 
                   // Verify admin login
                   final db = await DatabaseHelper.instance.database;
-                  final admins = await db.query('users', where: 'role = ?', whereArgs: ['admin']);
+                  final admins = await db
+                      .query('users', where: 'role = ?', whereArgs: ['admin']);
                   for (final admin in admins) {
                     final adminUser = admin['username'] as String;
-                    final verifiedUser = await DatabaseHelper.instance.verifyLogin(adminUser, input);
+                    final verifiedUser = await DatabaseHelper.instance
+                        .verifyLogin(adminUser, input);
                     if (verifiedUser != null) {
                       verified = true;
                       break;
@@ -208,11 +224,15 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                     Navigator.of(ctx).pop();
                   } else {
                     ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(content: const Text('Invalid code or admin password.'), backgroundColor: cs.error),
+                      SnackBar(
+                          content:
+                              const Text('Invalid code or admin password.'),
+                          backgroundColor: cs.error),
                     );
                   }
                 },
-                child: Text('Verify', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                child: Text('Verify',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
               ),
             ],
           );
@@ -230,17 +250,24 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete Payout Record', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
-        content: Text('Are you sure you want to delete the payout of ${formatCurrency(amount)} to $recipient?'),
+        title: Text('Delete Payout Record',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+        content: Text(
+            'Are you sure you want to delete the payout of ${formatCurrency(amount)} to $recipient?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Delete', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF0F172A) : Colors.white)),
+            child: Text('Delete',
+                style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF0F172A)
+                        : Colors.white)),
           ),
         ],
       ),
@@ -305,7 +332,8 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
         final isLandscape =
             MediaQuery.of(context).orientation == Orientation.landscape;
         // Show side-by-side either on tablet OR landscape phone (width >= 600)
-        final useSideBySide = isTablet || (isLandscape && outerConstraints.maxWidth >= 600);
+        final useSideBySide =
+            isTablet || (isLandscape && outerConstraints.maxWidth >= 600);
 
         final filteredNotes = _notesList.where((n) {
           final recipient = (n['recipient'] as String? ?? '').toLowerCase();
@@ -321,307 +349,381 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
 
         // ──────────────────────── Form Widget ────────────────────────
         Widget buildForm() {
-      return Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-        ),
-        color: cs.surface,
-        elevation: 0,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Record Cash Outflow',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: cs.onSurface),
-                    ),
-                    if (!useSideBySide)
-                  IconButton(
-                        icon: Icon(_isFormExpanded ? Icons.expand_less : Icons.expand_more),
-                        onPressed: () => setState(() => _isFormExpanded = !_isFormExpanded),
-                      ),
-                  ],
-                ),
-                  if (useSideBySide || _isFormExpanded) ...[
-                  const Divider(height: 24),
-                  // Recipient
-                  Autocomplete<String>(
-                    optionsBuilder: (TextEditingValue textEditingValue) {
-                      if (textEditingValue.text.isEmpty) {
-                        return const Iterable<String>.empty();
-                      }
-                      return _recipientSuggestions.where((option) {
-                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                      });
-                    },
-                    onSelected: (selection) {
-                      _recipientController.text = selection;
-                    },
-                    fieldViewBuilder: (ctx, ctrl, focusNode, onFieldSubmitted) {
-                      // Synchronize Autocomplete controller with our state controller
-                      ctrl.addListener(() {
-                        if (_recipientController.text != ctrl.text) {
-                          _recipientController.text = ctrl.text;
-                        }
-                      });
-                      _recipientController.addListener(() {
-                        if (ctrl.text != _recipientController.text) {
-                          ctrl.text = _recipientController.text;
-                        }
-                      });
-
-                      return TextFormField(
-                        controller: ctrl,
-                        focusNode: focusNode,
-                        decoration: InputDecoration(
-                          labelText: 'Payee / Recipient *',
-                          prefixIcon: const Icon(Icons.person_outline),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Amount
-                  TextFormField(
-                    controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: 'Amount (₱) *',
-                      prefixIcon: Icon(Icons.payments_outlined, color: cs.error),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) return 'Required';
-                      final a = double.tryParse(val);
-                      if (a == null || a <= 0) return 'Must be greater than 0';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Purpose
-                  TextFormField(
-                    controller: _purposeController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: 'Notes / Purpose',
-                      prefixIcon: const Icon(Icons.sticky_note_2_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Date Selector
-                  ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                    ),
-                    leading: Icon(Icons.calendar_today, color: cs.primary),
-                    title: Text(
-                      'Payment Date: ${DateFormat('MMM dd, yyyy').format(_paymentDate)}',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
-                    ),
-                    trailing: const Icon(Icons.edit, size: 16),
-                    onTap: _selectPaymentDate,
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Actions
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          onPressed: _clearForm,
-                          child: const Text('Clear'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: cs.primary,
-                            foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          onPressed: _saveNote,
-                          child: Text('Save Note', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-        // ──────────────────────── History Column ────────────────────────
-        Widget buildHistory() {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Filter & Summary Header
-          Card(
+          return Card(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              side: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0)),
             ),
             color: cs.surface,
             elevation: 0,
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Range: ${DateFormat('MMM dd').format(_historyFrom)} - ${DateFormat('MMM dd').format(_historyTo)}',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface),
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.date_range, size: 16),
-                        label: const Text('Filter Date'),
-                        onPressed: _selectHistoryRange,
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Cash Outflow:',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.6)),
-                      ),
-                      Text(
-                        formatCurrency(totalPayout),
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 18, color: cs.error),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Search Field
-          TextField(
-            onChanged: (val) => setState(() => _searchQuery = val),
-            decoration: InputDecoration(
-              hintText: 'Search past payouts by payee or notes...',
-              prefixIcon: const Icon(Icons.search),
-              fillColor: cs.surface,
-              filled: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: isDark ? const BorderSide(color: Color(0xFF334155)) : BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: isDark ? const BorderSide(color: Color(0xFF334155)) : BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // History List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : filteredNotes.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No cash outflows recorded in this range.',
-                          style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.5)),
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Record Cash Outflow',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: cs.onSurface),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: filteredNotes.length,
-                        itemBuilder: (ctx, index) {
-                          final note = filteredNotes[index];
-                          final id = note['id'] as int;
-                          final amount = (note['amount'] as num?)?.toDouble() ?? 0.0;
-                          final recipient = note['recipient'] as String? ?? '';
-                          final purpose = note['purpose'] as String? ?? 'No purpose details';
-                          final timestamp = note['timestamp'] as String? ?? '';
+                        if (!useSideBySide)
+                          IconButton(
+                            icon: Icon(_isFormExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more),
+                            onPressed: () => setState(
+                                () => _isFormExpanded = !_isFormExpanded),
+                          ),
+                      ],
+                    ),
+                    if (useSideBySide || _isFormExpanded) ...[
+                      const Divider(height: 24),
+                      // Recipient
+                      Autocomplete<String>(
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return const Iterable<String>.empty();
+                          }
+                          return _recipientSuggestions.where((option) {
+                            return option
+                                .toLowerCase()
+                                .contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        onSelected: (selection) {
+                          _recipientController.text = selection;
+                        },
+                        fieldViewBuilder:
+                            (ctx, ctrl, focusNode, onFieldSubmitted) {
+                          // Synchronize Autocomplete controller with our state controller
+                          ctrl.addListener(() {
+                            if (_recipientController.text != ctrl.text) {
+                              _recipientController.text = ctrl.text;
+                            }
+                          });
+                          _recipientController.addListener(() {
+                            if (ctrl.text != _recipientController.text) {
+                              ctrl.text = _recipientController.text;
+                            }
+                          });
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          return TextFormField(
+                            controller: ctrl,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Payee / Recipient *',
+                              prefixIcon: const Icon(Icons.person_outline),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
-                            color: cs.surface,
-                            elevation: 0,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: cs.error.withOpacity(0.12),
-                                child: Icon(Icons.trending_down, color: cs.error),
-                              ),
-                              title: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      recipient,
-                                      style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: cs.onSurface),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Text(
-                                    formatCurrency(amount),
-                                    style: GoogleFonts.inter(fontWeight: FontWeight.w900, color: cs.error),
-                                  ),
-                                ],
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    purpose,
-                                    style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.6), fontSize: 13),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    formatDateTime(timestamp),
-                                    style: GoogleFonts.inter(fontSize: 11, color: cs.onSurface.withOpacity(0.5), fontWeight: FontWeight.w500),
-                                  ),
-                                ],
-                              ),
-                              trailing: IconButton(
-                                icon: Icon(Icons.delete_outline, color: cs.onSurface.withOpacity(0.5)),
-                                onPressed: () => _deleteNote(id, amount, recipient),
-                              ),
-                            ),
+                            validator: (val) =>
+                                val == null || val.trim().isEmpty
+                                    ? 'Required'
+                                    : null,
                           );
                         },
                       ),
-          ),
-        ],
-      );
-    }
+                      const SizedBox(height: 12),
+
+                      // Amount
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Amount (₱) *',
+                          prefixIcon:
+                              Icon(Icons.payments_outlined, color: cs.error),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty)
+                            return 'Required';
+                          final a = double.tryParse(val);
+                          if (a == null || a <= 0)
+                            return 'Must be greater than 0';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Purpose
+                      TextFormField(
+                        controller: _purposeController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Notes / Purpose',
+                          prefixIcon: const Icon(Icons.sticky_note_2_outlined),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Date Selector
+                      ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFCBD5E1)),
+                        ),
+                        leading: Icon(Icons.calendar_today, color: cs.primary),
+                        title: Text(
+                          'Payment Date: ${DateFormat('MMM dd, yyyy').format(_paymentDate)}',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                        trailing: const Icon(Icons.edit, size: 16),
+                        onTap: _selectPaymentDate,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Actions
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              onPressed: _clearForm,
+                              child: const Text('Clear'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: cs.primary,
+                                foregroundColor: isDark
+                                    ? const Color(0xFF0F172A)
+                                    : Colors.white,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              onPressed: _saveNote,
+                              child: Text('Save Note',
+                                  style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // ──────────────────────── History Column ────────────────────────
+        Widget buildHistory() {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Filter & Summary Header
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0)),
+                ),
+                color: cs.surface,
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Range: ${DateFormat('MMM dd').format(_historyFrom)} - ${DateFormat('MMM dd').format(_historyTo)}',
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface),
+                          ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.date_range, size: 16),
+                            label: const Text('Filter Date'),
+                            onPressed: _selectHistoryRange,
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Total Cash Outflow:',
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface.withValues(alpha: 0.6)),
+                          ),
+                          Text(
+                            formatCurrency(totalPayout),
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                color: cs.error),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Search Field
+              TextField(
+                onChanged: (val) => setState(() => _searchQuery = val),
+                decoration: InputDecoration(
+                  hintText: 'Search past payouts by payee or notes...',
+                  prefixIcon: const Icon(Icons.search),
+                  fillColor: cs.surface,
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: isDark
+                        ? const BorderSide(color: Color(0xFF334155))
+                        : BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: isDark
+                        ? const BorderSide(color: Color(0xFF334155))
+                        : BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // History List
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredNotes.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No cash outflows recorded in this range.',
+                              style: GoogleFonts.inter(
+                                  color: cs.onSurface.withValues(alpha: 0.5)),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: filteredNotes.length,
+                            itemBuilder: (ctx, index) {
+                              final note = filteredNotes[index];
+                              final id = note['id'] as int;
+                              final amount =
+                                  (note['amount'] as num?)?.toDouble() ?? 0.0;
+                              final recipient =
+                                  note['recipient'] as String? ?? '';
+                              final purpose = note['purpose'] as String? ??
+                                  'No purpose details';
+                              final timestamp =
+                                  note['timestamp'] as String? ?? '';
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                      color: isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFE2E8F0)),
+                                ),
+                                color: cs.surface,
+                                elevation: 0,
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor:
+                                        cs.error.withValues(alpha: 0.12),
+                                    child: Icon(Icons.trending_down,
+                                        color: cs.error),
+                                  ),
+                                  title: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          recipient,
+                                          style: GoogleFonts.inter(
+                                              fontWeight: FontWeight.w800,
+                                              color: cs.onSurface),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Text(
+                                        formatCurrency(amount),
+                                        style: GoogleFonts.inter(
+                                            fontWeight: FontWeight.w900,
+                                            color: cs.error),
+                                      ),
+                                    ],
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        purpose,
+                                        style: GoogleFonts.inter(
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.6),
+                                            fontSize: 13),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        formatDateTime(timestamp),
+                                        style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.5),
+                                            fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: IconButton(
+                                    icon: Icon(Icons.delete_outline,
+                                        color: cs.onSurface
+                                            .withValues(alpha: 0.5)),
+                                    onPressed: () =>
+                                        _deleteNote(id, amount, recipient),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          );
+        }
 
         // ──────────────────────── Adaptive Layout ────────────────────────
         return Scaffold(
@@ -629,7 +731,10 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
           appBar: AppBar(
             title: Text(
               'Payout Manager',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: cs.onSurface),
+              style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  color: cs.onSurface),
             ),
             backgroundColor: cs.surface,
             elevation: 0,
@@ -642,7 +747,8 @@ class PaymentNotesScreenState extends State<PaymentNotesScreen> {
                     children: [
                       // Form Column — percentage-based width clamped between 260-340px
                       SizedBox(
-                        width: (outerConstraints.maxWidth * 0.32).clamp(260.0, 340.0),
+                        width: (outerConstraints.maxWidth * 0.32)
+                            .clamp(260.0, 340.0),
                         child: SingleChildScrollView(child: buildForm()),
                       ),
                       const SizedBox(width: 20),

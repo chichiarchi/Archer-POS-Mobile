@@ -1,4 +1,4 @@
-/// Represents a customer in the Archer POS system.
+/// Represents a customer in the EmmaSarmingStore system.
 class Customer {
   final int? id;
   final String name;

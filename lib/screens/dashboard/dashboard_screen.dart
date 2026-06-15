@@ -113,8 +113,10 @@ class DashboardScreenState extends State<DashboardScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOut));
 
-    _salesTodayAnim = Tween<double>(begin: 0, end: 0).animate(_counterController);
-    _transactionsAnim = Tween<double>(begin: 0, end: 0).animate(_counterController);
+    _salesTodayAnim =
+        Tween<double>(begin: 0, end: 0).animate(_counterController);
+    _transactionsAnim =
+        Tween<double>(begin: 0, end: 0).animate(_counterController);
     _productsAnim = Tween<double>(begin: 0, end: 0).animate(_counterController);
     _balanceAnim = Tween<double>(begin: 0, end: 0).animate(_counterController);
   }
@@ -202,7 +204,8 @@ class DashboardScreenState extends State<DashboardScreen>
   // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final isTablet = MediaQuery.of(context).size.width >= AppConstants.tabletBreakpoint;
+    final isTablet =
+        MediaQuery.of(context).size.width >= AppConstants.tabletBreakpoint;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -230,9 +233,7 @@ class DashboardScreenState extends State<DashboardScreen>
                   isTablet ? 24 : 16,
                   isTablet ? 8 : 4,
                 ),
-                sliver: isTablet
-                    ? _buildTabletCards()
-                    : _buildPhoneCards(),
+                sliver: isTablet ? _buildTabletCards() : _buildPhoneCards(),
               ),
 
               // ── Welcome section ──
@@ -285,18 +286,23 @@ class DashboardScreenState extends State<DashboardScreen>
                           width: isTablet ? 46 : 38,
                           height: isTablet ? 46 : 38,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(
-                            Icons.point_of_sale_rounded,
-                            color: Colors.white,
-                            size: isTablet ? 26 : 22,
+                          child: Center(
+                            child: Text(
+                              'E',
+                              style: GoogleFonts.inter(
+                                fontSize: isTablet ? 24 : 20,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Archer POS',
+                         'EmmaSarmingStore',
                           style: GoogleFonts.inter(
                             fontSize: isTablet ? 22 : 18,
                             fontWeight: FontWeight.w800,
@@ -323,7 +329,7 @@ class DashboardScreenState extends State<DashboardScreen>
                       style: GoogleFonts.inter(
                         fontSize: isTablet ? 14 : 13,
                         fontWeight: FontWeight.w500,
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
                     ),
                   ],
@@ -340,7 +346,7 @@ class DashboardScreenState extends State<DashboardScreen>
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(Icons.refresh_rounded,
@@ -353,10 +359,10 @@ class DashboardScreenState extends State<DashboardScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Row(
@@ -386,7 +392,7 @@ class DashboardScreenState extends State<DashboardScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -423,14 +429,16 @@ class DashboardScreenState extends State<DashboardScreen>
         mainAxisSpacing: 12,
         // Use FittedBox inside cards so we don't need to hard-code aspect ratio;
         // 1.45 is comfortable for most phone widths.
-        childAspectRatio: (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2 / 120,
+        childAspectRatio:
+            (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2 / 120,
       ),
     );
   }
 
   // ── Stat Cards — Tablet (1×4 horizontal row) ──────────────────────────────────────────────
   Widget _buildTabletCards() {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     return SliverGrid(
       delegate: SliverChildListDelegate([
         _buildStatCard(config: _cardConfigs[0], animValue: _salesTodayAnim),
@@ -460,8 +468,8 @@ class DashboardScreenState extends State<DashboardScreen>
         child: AnimatedBuilder(
           animation: animValue,
           builder: (context, _) {
-            final isTablet =
-                MediaQuery.of(context).size.width >= AppConstants.tabletBreakpoint;
+            final isTablet = MediaQuery.of(context).size.width >=
+                AppConstants.tabletBreakpoint;
             final displayValue = config.isCurrency
                 ? Formatters.currency(animValue.value)
                 : animValue.value.toInt().toString();
@@ -500,7 +508,9 @@ class DashboardScreenState extends State<DashboardScreen>
             border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
             boxShadow: [
               BoxShadow(
-                color: isDark ? Colors.black.withOpacity(0.2) : const Color(0xFF0072FF).withOpacity(0.06),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.2)
+                    : const Color(0xFF0072FF).withValues(alpha: 0.06),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
@@ -544,7 +554,7 @@ class DashboardScreenState extends State<DashboardScreen>
                       style: GoogleFonts.inter(
                         fontSize: isTablet ? 13 : 12,
                         fontWeight: FontWeight.w500,
-                        color: cs.onSurface.withOpacity(0.55),
+                        color: cs.onSurface.withValues(alpha: 0.55),
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -576,7 +586,7 @@ class DashboardScreenState extends State<DashboardScreen>
                           style: GoogleFonts.inter(
                             fontSize: isTablet ? 12 : 11,
                             fontWeight: FontWeight.w500,
-                            color: cs.onSurface.withOpacity(0.5),
+                            color: cs.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
                       ],
@@ -590,7 +600,7 @@ class DashboardScreenState extends State<DashboardScreen>
                     ? Icons.admin_panel_settings_rounded
                     : Icons.badge_rounded,
                 size: isTablet ? 36 : 30,
-                color: cs.primary.withOpacity(0.15),
+                color: cs.primary.withValues(alpha: 0.15),
               ),
             ],
           ),
@@ -668,7 +678,8 @@ class DashboardScreenState extends State<DashboardScreen>
                           iconColor: const Color(0xFFF59E0B),
                           bgColor: const Color(0xFFFEF3C7),
                           label: 'Date',
-                          value: DateFormat('MMMM d, yyyy').format(DateTime.now()),
+                          value:
+                              DateFormat('MMMM d, yyyy').format(DateTime.now()),
                           isTablet: isTablet,
                         ),
                       ),
@@ -719,7 +730,6 @@ class DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-
   Widget _buildInfoTile({
     required IconData icon,
     required Color iconColor,
@@ -740,7 +750,9 @@ class DashboardScreenState extends State<DashboardScreen>
         border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -753,7 +765,7 @@ class DashboardScreenState extends State<DashboardScreen>
             width: isTablet ? 36 : 30,
             height: isTablet ? 36 : 30,
             decoration: BoxDecoration(
-              color: isDark ? iconColor.withOpacity(0.15) : bgColor,
+              color: isDark ? iconColor.withValues(alpha: 0.15) : bgColor,
               borderRadius: BorderRadius.circular(9),
             ),
             child: Icon(icon, color: iconColor, size: isTablet ? 20 : 16),
@@ -764,7 +776,7 @@ class DashboardScreenState extends State<DashboardScreen>
             style: GoogleFonts.inter(
               fontSize: isTablet ? 10 : 9,
               fontWeight: FontWeight.w600,
-              color: cs.onSurface.withOpacity(0.55),
+              color: cs.onSurface.withValues(alpha: 0.55),
               letterSpacing: 0.5,
             ),
           ),
@@ -815,7 +827,10 @@ class DashboardScreenState extends State<DashboardScreen>
             _error ?? '',
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
             textAlign: TextAlign.center,
           ),
@@ -832,39 +847,39 @@ class DashboardScreenState extends State<DashboardScreen>
 
   // ── Card config list ───────────────────────────────────────────────────────
   List<_StatCardConfig> get _cardConfigs => [
-        _StatCardConfig(
+        const _StatCardConfig(
           title: 'TODAY\'S SALES',
           icon: Icons.payments_rounded,
-          gradientColors: const [Color(0xFF0072FF), Color(0xFF338FFF)],
-          accentColor: const Color(0xFF0072FF),
+          gradientColors: [Color(0xFF0072FF), Color(0xFF338FFF)],
+          accentColor: Color(0xFF0072FF),
           isCurrency: true,
           prefix: '₱',
           trend: null,
           trendUp: true,
         ),
-        _StatCardConfig(
+        const _StatCardConfig(
           title: 'TRANSACTIONS',
           icon: Icons.shopping_cart_rounded,
-          gradientColors: const [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-          accentColor: const Color(0xFF6366F1),
+          gradientColors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+          accentColor: Color(0xFF6366F1),
           isCurrency: false,
           trend: null,
           trendUp: true,
         ),
-        _StatCardConfig(
+        const _StatCardConfig(
           title: 'TOTAL PRODUCTS',
           icon: Icons.inventory_2_rounded,
-          gradientColors: const [Color(0xFF10B981), Color(0xFF34D399)],
-          accentColor: const Color(0xFF10B981),
+          gradientColors: [Color(0xFF10B981), Color(0xFF34D399)],
+          accentColor: Color(0xFF10B981),
           isCurrency: false,
           trend: 'Active',
           trendUp: true,
         ),
-        _StatCardConfig(
+        const _StatCardConfig(
           title: 'OVERALL BALANCE',
           icon: Icons.account_balance_wallet_rounded,
-          gradientColors: const [Color(0xFFF59E0B), Color(0xFFFBBF24)],
-          accentColor: const Color(0xFFF59E0B),
+          gradientColors: [Color(0xFFF59E0B), Color(0xFFFBBF24)],
+          accentColor: Color(0xFFF59E0B),
           isCurrency: true,
           prefix: '₱',
           trend: 'Pending',
@@ -923,13 +938,17 @@ class _StatCard extends StatelessWidget {
         border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.1) : config.accentColor.withOpacity(0.12),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.1)
+                : config.accentColor.withValues(alpha: 0.12),
             blurRadius: 18,
             offset: const Offset(0, 6),
             spreadRadius: 0,
           ),
           BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -960,7 +979,9 @@ class _StatCard extends StatelessWidget {
                 width: isTablet ? 90 : 72,
                 height: isTablet ? 90 : 72,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.02) : config.accentColor.withOpacity(0.07),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.02)
+                      : config.accentColor.withValues(alpha: 0.07),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -972,7 +993,9 @@ class _StatCard extends StatelessWidget {
                 width: isTablet ? 52 : 40,
                 height: isTablet ? 52 : 40,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.03) : config.accentColor.withOpacity(0.1),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.03)
+                      : config.accentColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -1007,7 +1030,7 @@ class _StatCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                           boxShadow: [
                             BoxShadow(
-                              color: config.accentColor.withOpacity(0.35),
+                              color: config.accentColor.withValues(alpha: 0.35),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
@@ -1069,7 +1092,7 @@ class _StatCard extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: isTablet ? 10 : 9,
                           fontWeight: FontWeight.w700,
-                          color: cs.onSurface.withOpacity(0.55),
+                          color: cs.onSurface.withValues(alpha: 0.55),
                           letterSpacing: 0.8,
                         ),
                       ),
@@ -1082,7 +1105,9 @@ class _StatCard extends StatelessWidget {
                           style: GoogleFonts.inter(
                             fontSize: isTablet ? 26 : 20,
                             fontWeight: FontWeight.w900,
-                            color: isDark ? config.gradientColors.first : config.accentColor,
+                            color: isDark
+                                ? config.gradientColors.first
+                                : config.accentColor,
                             letterSpacing: -0.5,
                             fontFeatures: const [FontFeature('tnum')],
                           ),
@@ -1120,7 +1145,7 @@ class _LoadingOverlay extends StatelessWidget {
             child: CircularProgressIndicator(
               strokeWidth: 3,
               valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-              backgroundColor: AppColors.primary.withOpacity(0.1),
+              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
             ),
           ),
           const SizedBox(height: 16),
@@ -1129,7 +1154,10 @@ class _LoadingOverlay extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
           ),
         ],

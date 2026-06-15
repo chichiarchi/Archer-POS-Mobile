@@ -17,7 +17,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _costController = TextEditingController();
   final TextEditingController _retailPriceController = TextEditingController();
-  final TextEditingController _wholesalePriceController = TextEditingController();
+  final TextEditingController _wholesalePriceController =
+      TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
 
   bool get _isEditMode => widget.initialProduct != null;
@@ -30,10 +31,15 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     );
     if (_isEditMode) {
       _nameController.text = widget.initialProduct!['name'] as String? ?? '';
-      _costController.text = (widget.initialProduct!['cost'] as num?)?.toString() ?? '0.0';
-      _retailPriceController.text = (widget.initialProduct!['price'] as num?)?.toString() ?? '0.0';
-      _wholesalePriceController.text = (widget.initialProduct!['wholesale_price'] as num?)?.toString() ?? '0.0';
-      _categoryController.text = widget.initialProduct!['category'] as String? ?? '';
+      _costController.text =
+          (widget.initialProduct!['cost'] as num?)?.toString() ?? '0.0';
+      _retailPriceController.text =
+          (widget.initialProduct!['price'] as num?)?.toString() ?? '0.0';
+      _wholesalePriceController.text =
+          (widget.initialProduct!['wholesale_price'] as num?)?.toString() ??
+              '0.0';
+      _categoryController.text =
+          widget.initialProduct!['category'] as String? ?? '';
     }
   }
 
@@ -55,8 +61,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         'name': _nameController.text.trim(),
         'cost': double.tryParse(_costController.text.trim()) ?? 0.0,
         'price': double.tryParse(_retailPriceController.text.trim()) ?? 0.0,
-        'wholesale_price': double.tryParse(_wholesalePriceController.text.trim()) ?? 0.0,
-        'category': _categoryController.text.trim().isEmpty ? null : _categoryController.text.trim(),
+        'wholesale_price':
+            double.tryParse(_wholesalePriceController.text.trim()) ?? 0.0,
+        'category': _categoryController.text.trim().isEmpty
+            ? null
+            : _categoryController.text.trim(),
       });
     }
   }
@@ -84,7 +93,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Barcode
                 TextFormField(
                   controller: _barcodeController,
@@ -95,7 +104,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     prefixIcon: const Icon(Icons.qr_code),
-                    fillColor: _isEditMode ? Colors.grey.withOpacity(0.1) : null,
+                    fillColor:
+                        _isEditMode ? Colors.grey.withValues(alpha: 0.1) : null,
                     filled: _isEditMode,
                   ),
                   validator: (val) {
@@ -142,7 +152,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                 // Cost Price
                 TextFormField(
                   controller: _costController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Cost Price (₱)',
                     border: OutlineInputBorder(
@@ -165,7 +176,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                 // Retail Price
                 TextFormField(
                   controller: _retailPriceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Retail Price (₱) *',
                     border: OutlineInputBorder(
@@ -189,7 +201,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                 // Wholesale Price
                 TextFormField(
                   controller: _wholesalePriceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Wholesale Price (₱) (Optional)',
                     border: OutlineInputBorder(

@@ -5,7 +5,7 @@ $zipPath = "$env:USERPROFILE\Downloads\flutter_sdk.zip"
 $destDir = "$env:USERPROFILE\flutter"
 $binPath = "$destDir\flutter\bin"
 
-Write-Host "=== Archer POS v2: Automated Flutter SDK Setup ===" -ForegroundColor Cyan
+Write-Host "=== EmmaSarmingStore v2: Automated Flutter SDK Setup ===" -ForegroundColor Cyan
 
 # 1. Wait for the download to complete
 if (Test-Path $zipPath) {

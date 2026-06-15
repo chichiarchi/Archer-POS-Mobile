@@ -81,7 +81,8 @@ class BalanceScreenState extends State<BalanceScreen> {
           final theme = Theme.of(context);
           final cs = theme.colorScheme;
           final isDark = theme.brightness == Brightness.dark;
-          final successColor = isDark ? const Color(0xFF34D399) : const Color(0xFF059669);
+          final successColor =
+              isDark ? const Color(0xFF34D399) : const Color(0xFF059669);
 
           amountController.addListener(() {
             final amt = parseAmount(amountController.text);
@@ -92,7 +93,8 @@ class BalanceScreenState extends State<BalanceScreen> {
           });
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Text(
               'Resolve Balance',
               style: GoogleFonts.inter(fontWeight: FontWeight.w800),
@@ -112,15 +114,16 @@ class BalanceScreenState extends State<BalanceScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Unpaid Transactions: $salesCount',
-                  style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: cs.onSurface.withValues(alpha: 0.6)),
                 ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: cs.error.withOpacity(0.12),
+                    color: cs.error.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: cs.error.withOpacity(0.3)),
+                    border: Border.all(color: cs.error.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -149,11 +152,14 @@ class BalanceScreenState extends State<BalanceScreen> {
                 TextField(
                   controller: amountController,
                   autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Payment Amount (₱) *',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: Icon(Icons.payments_outlined, color: successColor),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    prefixIcon:
+                        Icon(Icons.payments_outlined, color: successColor),
                   ),
                 ),
                 if (paymentAmount > 0) ...[
@@ -161,15 +167,18 @@ class BalanceScreenState extends State<BalanceScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: successColor.withOpacity(0.12),
+                      color: successColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: successColor.withOpacity(0.3)),
+                      border: Border.all(
+                          color: successColor.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          paymentAmount >= currentBalance ? 'CHANGE' : 'NEW BALANCE',
+                          paymentAmount >= currentBalance
+                              ? 'CHANGE'
+                              : 'NEW BALANCE',
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
@@ -177,8 +186,8 @@ class BalanceScreenState extends State<BalanceScreen> {
                           ),
                         ),
                         Text(
-                          paymentAmount >= currentBalance 
-                              ? formatCurrency(change) 
+                          paymentAmount >= currentBalance
+                              ? formatCurrency(change)
                               : formatCurrency(currentBalance - paymentAmount),
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.w900,
@@ -195,22 +204,29 @@ class BalanceScreenState extends State<BalanceScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('Cancel', style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.6), fontWeight: FontWeight.w600)),
+                child: Text('Cancel',
+                    style: GoogleFonts.inter(
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                        fontWeight: FontWeight.w600)),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: cs.primary,
-                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  foregroundColor:
+                      isDark ? const Color(0xFF0F172A) : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () async {
                   if (paymentAmount <= 0) {
-                    _showSnackBar('Please enter a valid payment amount.', isError: true);
+                    _showSnackBar('Please enter a valid payment amount.',
+                        isError: true);
                     return;
                   }
 
                   try {
-                    final success = await DatabaseHelper.instance.resolveCustomerBalance(
+                    final success =
+                        await DatabaseHelper.instance.resolveCustomerBalance(
                       customerId,
                       paymentAmount,
                     );
@@ -218,7 +234,8 @@ class BalanceScreenState extends State<BalanceScreen> {
                     if (success) {
                       await DatabaseHelper.instance.logAction(
                         'BALANCE_RESOLVE',
-                        details: 'Resolved balance. Customer: $customerName. Paid: ${formatCurrency(paymentAmount)}',
+                        details:
+                            'Resolved balance. Customer: $customerName. Paid: ${formatCurrency(paymentAmount)}',
                         userId: widget.username,
                       );
                       Navigator.of(ctx).pop();
@@ -235,7 +252,8 @@ class BalanceScreenState extends State<BalanceScreen> {
                     _showSnackBar('Error resolving balance: $e', isError: true);
                   }
                 },
-                child: Text('Confirm', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                child: Text('Confirm',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
               ),
             ],
           );
@@ -249,7 +267,8 @@ class BalanceScreenState extends State<BalanceScreen> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final successColor = isDark ? const Color(0xFF34D399) : const Color(0xFF059669);
+    final successColor =
+        isDark ? const Color(0xFF34D399) : const Color(0xFF059669);
 
     final filteredDebtors = _debtors.where((d) {
       final name = (d['name'] as String? ?? '').toLowerCase();
@@ -263,7 +282,8 @@ class BalanceScreenState extends State<BalanceScreen> {
       appBar: AppBar(
         title: Text(
           'Debtor Balances',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: cs.onSurface),
+          style: GoogleFonts.inter(
+              fontWeight: FontWeight.w800, fontSize: 20, color: cs.onSurface),
         ),
         backgroundColor: cs.surface,
         elevation: 0,
@@ -280,12 +300,17 @@ class BalanceScreenState extends State<BalanceScreen> {
               },
               decoration: InputDecoration(
                 hintText: 'Search by Customer Name or Phone...',
-                prefixIcon: Icon(Icons.search, color: cs.onSurface.withOpacity(0.6)),
+                prefixIcon: Icon(Icons.search,
+                    color: cs.onSurface.withValues(alpha: 0.6)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFCBD5E1)),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
             ),
           ),
@@ -298,12 +323,13 @@ class BalanceScreenState extends State<BalanceScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.assignment_turned_in_outlined, size: 64, color: cs.onSurface.withOpacity(0.4)),
+                      Icon(Icons.assignment_turned_in_outlined,
+                          size: 64, color: cs.onSurface.withValues(alpha: 0.4)),
                       const SizedBox(height: 16),
                       Text(
                         'No outstanding balances found.',
                         style: GoogleFonts.inter(
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -323,13 +349,18 @@ class BalanceScreenState extends State<BalanceScreen> {
                         final phone = debtor['phone'] as String? ?? 'No phone';
                         final salesCount = debtor['sales_count'] as int? ?? 0;
                         final date = debtor['created_at'] as String? ?? '';
-                        final balance = (debtor['balance_amount'] as num?)?.toDouble() ?? 0.0;
+                        final balance =
+                            (debtor['balance_amount'] as num?)?.toDouble() ??
+                                0.0;
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            side: BorderSide(
+                                color: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFE2E8F0)),
                           ),
                           elevation: 0,
                           color: cs.surface,
@@ -342,7 +373,8 @@ class BalanceScreenState extends State<BalanceScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Text(
@@ -367,11 +399,17 @@ class BalanceScreenState extends State<BalanceScreen> {
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      Icon(Icons.phone, size: 14, color: cs.onSurface.withOpacity(0.6)),
+                                      Icon(Icons.phone,
+                                          size: 14,
+                                          color: cs.onSurface
+                                              .withValues(alpha: 0.6)),
                                       const SizedBox(width: 4),
                                       Text(
                                         phone,
-                                        style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
+                                        style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.6)),
                                       ),
                                       const Spacer(),
                                       Text(
@@ -386,11 +424,15 @@ class BalanceScreenState extends State<BalanceScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         'Last Activity: ${formatDateTime(date)}',
-                                        style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.5)),
+                                        style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            color: cs.onSurface
+                                                .withValues(alpha: 0.5)),
                                       ),
                                       Text(
                                         'Tap to resolve',

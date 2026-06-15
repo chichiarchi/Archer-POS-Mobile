@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:archer_pos/core/providers/cart_provider.dart';
+import 'package:emma_store/core/providers/cart_provider.dart';
 
 void main() {
   group('CartProvider Tests', () {

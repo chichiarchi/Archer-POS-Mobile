@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../database/database_helper.dart';
 
 /// Represents a single item in the shopping cart.
 class CartItem {
@@ -74,7 +73,7 @@ class CartItem {
 class CartProvider extends ChangeNotifier {
   final List<CartItem> _items = [];
   String _pricingMode = 'retail';
-  
+
   // Store bundle definitions for each product in the cart
   final Map<String, List<Map<String, dynamic>>> _productBundles = {};
 
@@ -111,7 +110,8 @@ class CartProvider extends ChangeNotifier {
       final prodItems = entry.value;
 
       // Sum up total quantity of this barcode in the cart
-      final totalQty = prodItems.fold<double>(0.0, (sum, item) => sum + item.quantity);
+      final totalQty =
+          prodItems.fold<double>(0.0, (sum, item) => sum + item.quantity);
 
       // Get bundles for this barcode
       final bundles = _productBundles[barcode] ?? [];
@@ -119,9 +119,10 @@ class CartProvider extends ChangeNotifier {
       for (final item in prodItems) {
         if (item.manuallyDiscounted) continue;
 
-        final basePrice = item.pricingMode == 'wholesale' && item.wholesalePrice > 0
-            ? item.wholesalePrice
-            : item.retailPrice;
+        final basePrice =
+            item.pricingMode == 'wholesale' && item.wholesalePrice > 0
+                ? item.wholesalePrice
+                : item.retailPrice;
 
         if (bundles.isEmpty) {
           item.price = basePrice;
@@ -137,8 +138,9 @@ class CartProvider extends ChangeNotifier {
             final bPrice = item.pricingMode == 'wholesale'
                 ? ((b['wholesale_price'] as num?)?.toDouble() ?? 0.0)
                 : ((b['price'] as num?)?.toDouble() ?? 0.0);
-            
-            final finalBPrice = bPrice > 0 ? bPrice : ((b['price'] as num?)?.toDouble() ?? 0.0);
+
+            final finalBPrice =
+                bPrice > 0 ? bPrice : ((b['price'] as num?)?.toDouble() ?? 0.0);
             unlockedRates.add(finalBPrice / qty);
           }
         }
@@ -165,35 +167,42 @@ class CartProvider extends ChangeNotifier {
     String mode, {
     List<dynamic>? bundles,
   }) {
-    final barcode = product['barcode'] as String? ?? product['id'] as String? ?? '';
+    final barcode =
+        product['barcode'] as String? ?? product['id'] as String? ?? '';
     final name = product['name'] as String? ?? 'Unknown';
     final baseRetail = (product['price'] as num?)?.toDouble() ?? 0.0;
-    final baseWholesale =
-        (product['wholesale_price'] as num? ?? product['wholesalePrice'] as num?)?.toDouble() ?? baseRetail;
+    final baseWholesale = (product['wholesale_price'] as num? ??
+                product['wholesalePrice'] as num?)
+            ?.toDouble() ??
+        baseRetail;
 
     if (bundles != null) {
       _productBundles[barcode] = List<Map<String, dynamic>>.from(bundles);
     }
 
     // Check if this barcode already exists in cart with matching mode.
-    final existingIndex =
-        _items.indexWhere((item) => item.barcode == barcode && item.pricingMode == mode);
+    final existingIndex = _items.indexWhere(
+        (item) => item.barcode == barcode && item.pricingMode == mode);
 
     if (existingIndex >= 0) {
       final existing = _items.removeAt(existingIndex);
       final newQty = existing.quantity + quantity;
       _items.insert(0, existing.copyWith(quantity: newQty));
     } else {
-      _items.insert(0, CartItem(
-        barcode: barcode,
-        name: name,
-        price: mode == 'wholesale' && baseWholesale > 0 ? baseWholesale : baseRetail,
-        quantity: quantity,
-        pricingMode: mode,
-        manuallyDiscounted: false,
-        retailPrice: baseRetail,
-        wholesalePrice: baseWholesale,
-      ));
+      _items.insert(
+          0,
+          CartItem(
+            barcode: barcode,
+            name: name,
+            price: mode == 'wholesale' && baseWholesale > 0
+                ? baseWholesale
+                : baseRetail,
+            quantity: quantity,
+            pricingMode: mode,
+            manuallyDiscounted: false,
+            retailPrice: baseRetail,
+            wholesalePrice: baseWholesale,
+          ));
     }
 
     _recalculatePrices();
@@ -205,12 +214,12 @@ class CartProvider extends ChangeNotifier {
     if (index < 0 || index >= _items.length) return;
     final item = _items[index];
     _items.removeAt(index);
-    
+
     // If no more items with this barcode exist in cart, clear the bundle configuration
     if (_items.where((i) => i.barcode == item.barcode).isEmpty) {
       _productBundles.remove(item.barcode);
     }
-    
+
     _recalculatePrices();
     notifyListeners();
   }
@@ -257,8 +266,7 @@ class CartProvider extends ChangeNotifier {
     final item = _items[index];
     if (item.manuallyDiscounted) return; // Respect manual discount
 
-    final newMode =
-        item.pricingMode == 'retail' ? 'wholesale' : 'retail';
+    final newMode = item.pricingMode == 'retail' ? 'wholesale' : 'retail';
 
     _items[index] = item.copyWith(
       pricingMode: newMode,

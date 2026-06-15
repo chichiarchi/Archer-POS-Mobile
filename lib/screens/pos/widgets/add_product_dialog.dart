@@ -17,7 +17,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _costController = TextEditingController();
   final TextEditingController _retailPriceController = TextEditingController();
-  final TextEditingController _wholesalePriceController = TextEditingController();
+  final TextEditingController _wholesalePriceController =
+      TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
 
   @override
@@ -44,8 +45,11 @@ class _AddProductDialogState extends State<AddProductDialog> {
         'name': _nameController.text.trim(),
         'cost': double.tryParse(_costController.text.trim()) ?? 0.0,
         'price': double.tryParse(_retailPriceController.text.trim()) ?? 0.0,
-        'wholesale_price': double.tryParse(_wholesalePriceController.text.trim()) ?? 0.0,
-        'category': _categoryController.text.trim().isEmpty ? null : _categoryController.text.trim(),
+        'wholesale_price':
+            double.tryParse(_wholesalePriceController.text.trim()) ?? 0.0,
+        'category': _categoryController.text.trim().isEmpty
+            ? null
+            : _categoryController.text.trim(),
       });
     }
   }
@@ -75,7 +79,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Barcode
                 TextFormField(
                   controller: _barcodeController,
@@ -130,7 +134,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
                 // Cost Price
                 TextFormField(
                   controller: _costController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Cost Price (₱)',
                     border: OutlineInputBorder(
@@ -153,7 +158,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
                 // Retail Price
                 TextFormField(
                   controller: _retailPriceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Retail Price (₱) *',
                     border: OutlineInputBorder(
@@ -177,7 +183,8 @@ class _AddProductDialogState extends State<AddProductDialog> {
                 // Wholesale Price
                 TextFormField(
                   controller: _wholesalePriceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Wholesale Price (₱) (Optional)',
                     border: OutlineInputBorder(
@@ -207,7 +214,7 @@ class _AddProductDialogState extends State<AddProductDialog> {
                         'Cancel',
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ),

@@ -1,4 +1,4 @@
-package com.example.archer_pos
+package com.example.emma_store
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -20,9 +20,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val BEEP_CHANNEL = "com.example.archer_pos/beep"
-    private val PRINTER_CHANNEL = "com.example.archer_pos/printer"
-    private val ACTION_USB_PERMISSION = "com.example.archer_pos.USB_PERMISSION"
+    private val BEEP_CHANNEL = "com.example.emma_store/beep"
+    private val PRINTER_CHANNEL = "com.example.emma_store/printer"
+    private val ACTION_USB_PERMISSION = "com.example.emma_store.USB_PERMISSION"
     
     private var toneGen: ToneGenerator? = null
     private var pendingPrintBytes: ByteArray? = null

@@ -29,7 +29,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _wholesalePriceController = TextEditingController();
+  final TextEditingController _wholesalePriceController =
+      TextEditingController();
   final TextEditingController _costController = TextEditingController();
 
   Map<String, dynamic>? _editingBundle;
@@ -53,7 +54,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
   Future<void> _loadBundles() async {
     setState(() => _isLoading = true);
     try {
-      final list = await DatabaseHelper.instance.getBundlesForProduct(widget.productId);
+      final list =
+          await DatabaseHelper.instance.getBundlesForProduct(widget.productId);
       setState(() {
         _bundles = list;
         _isLoading = false;
@@ -79,7 +81,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
       _nameController.text = bundle['bundle_name'] as String? ?? '';
       _qtyController.text = (bundle['quantity'] as num?)?.toString() ?? '1.0';
       _priceController.text = (bundle['price'] as num?)?.toString() ?? '0.0';
-      _wholesalePriceController.text = (bundle['wholesale_price'] as num?)?.toString() ?? '0.0';
+      _wholesalePriceController.text =
+          (bundle['wholesale_price'] as num?)?.toString() ?? '0.0';
       _costController.text = (bundle['cost'] as num?)?.toString() ?? '0.0';
     } else {
       _nameController.clear();
@@ -102,14 +105,18 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
               children: [
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Bundle Name (e.g., Dozen, Pack of 10) *'),
-                  validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+                  decoration: const InputDecoration(
+                      labelText: 'Bundle Name (e.g., Dozen, Pack of 10) *'),
+                  validator: (val) =>
+                      val == null || val.trim().isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _qtyController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Quantity (units in bundle) *'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Quantity (units in bundle) *'),
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) return 'Required';
                     final q = double.tryParse(val);
@@ -120,8 +127,10 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _costController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Cost Price of Bundle (₱)'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Cost Price of Bundle (₱)'),
                   validator: (val) {
                     if (val != null && val.trim().isNotEmpty) {
                       final c = double.tryParse(val);
@@ -133,8 +142,10 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _priceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Retail Price of Bundle (₱) *'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Retail Price of Bundle (₱) *'),
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) return 'Required';
                     final p = double.tryParse(val);
@@ -145,8 +156,10 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _wholesalePriceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Wholesale Price of Bundle (₱)'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Wholesale Price of Bundle (₱)'),
                   validator: (val) {
                     if (val != null && val.trim().isNotEmpty) {
                       final p = double.tryParse(val);
@@ -181,7 +194,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
       'bundle_name': _nameController.text.trim(),
       'quantity': double.parse(_qtyController.text.trim()),
       'price': double.parse(_priceController.text.trim()),
-      'wholesale_price': double.tryParse(_wholesalePriceController.text.trim()) ?? 0.0,
+      'wholesale_price':
+          double.tryParse(_wholesalePriceController.text.trim()) ?? 0.0,
       'cost': double.tryParse(_costController.text.trim()) ?? 0.0,
     };
 
@@ -192,7 +206,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
         if (success) {
           await DatabaseHelper.instance.logAction(
             kActionBundleAdded,
-            details: 'Added bundle "${bundleData['bundle_name']}" to product ${widget.productId}',
+            details:
+                'Added bundle "${bundleData['bundle_name']}" to product ${widget.productId}',
             userId: widget.username,
           );
         }
@@ -246,7 +261,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
         if (success) {
           await DatabaseHelper.instance.logAction(
             kActionBundleDeleted,
-            details: 'Deleted bundle "$id" ($name) for product ${widget.productId}',
+            details:
+                'Deleted bundle "$id" ($name) for product ${widget.productId}',
             userId: widget.username,
           );
           _showSnackBar('Bundle deleted.');
@@ -319,7 +335,7 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                   'Existing Bundles (${_bundles.length})',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w700,
-                    color: cs.onSurface.withOpacity(0.7),
+                    color: cs.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
                 ElevatedButton.icon(
@@ -344,7 +360,8 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                       ? Center(
                           child: Text(
                             'No bundles defined for this product.',
-                            style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.5)),
+                            style: GoogleFonts.inter(
+                                color: cs.onSurface.withValues(alpha: 0.5)),
                           ),
                         )
                       : ListView.separated(
@@ -353,30 +370,40 @@ class _BundleManageDialogState extends State<BundleManageDialog> {
                           itemBuilder: (ctx, index) {
                             final b = _bundles[index];
                             final name = b['bundle_name'] as String? ?? '';
-                            final qty = (b['quantity'] as num?)?.toDouble() ?? 0.0;
-                            final price = (b['price'] as num?)?.toDouble() ?? 0.0;
-                            final wholesale = (b['wholesale_price'] as num?)?.toDouble() ?? 0.0;
+                            final qty =
+                                (b['quantity'] as num?)?.toDouble() ?? 0.0;
+                            final price =
+                                (b['price'] as num?)?.toDouble() ?? 0.0;
+                            final wholesale =
+                                (b['wholesale_price'] as num?)?.toDouble() ??
+                                    0.0;
                             final id = b['id'] as int;
 
                             return ListTile(
                               contentPadding: EdgeInsets.zero,
                               title: Text(
                                 name,
-                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.onSurface),
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.onSurface),
                               ),
                               subtitle: Text(
                                 'Qty: $qty | Retail: ${formatCurrency(price)} | Wholesale: ${formatCurrency(wholesale)}',
-                                style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
+                                style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: cs.onSurface.withValues(alpha: 0.6)),
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    icon: Icon(Icons.edit_outlined, color: cs.primary),
+                                    icon: Icon(Icons.edit_outlined,
+                                        color: cs.primary),
                                     onPressed: () => _openBundleForm(b),
                                   ),
                                   IconButton(
-                                    icon: Icon(Icons.delete_outline, color: cs.error),
+                                    icon: Icon(Icons.delete_outline,
+                                        color: cs.error),
                                     onPressed: () => _deleteBundle(id, name),
                                   ),
                                 ],

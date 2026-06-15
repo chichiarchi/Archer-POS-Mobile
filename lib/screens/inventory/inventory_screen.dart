@@ -65,7 +65,8 @@ class InventoryScreenState extends State<InventoryScreen> {
         limit: _pageSize,
         offset: _currentPage * _pageSize,
       );
-      final count = await DatabaseHelper.instance.getProductCount(search: search);
+      final count =
+          await DatabaseHelper.instance.getProductCount(search: search);
       if (mounted) {
         setState(() {
           _products = results;
@@ -90,7 +91,8 @@ class InventoryScreenState extends State<InventoryScreen> {
       builder: (ctx) {
         final ctrl = TextEditingController();
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
             'Admin Required',
             style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18),
@@ -102,7 +104,8 @@ class InventoryScreenState extends State<InventoryScreen> {
             decoration: InputDecoration(
               labelText: 'Admin Password',
               prefixIcon: const Icon(Icons.lock_outline, color: kPrimaryColor),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: kPrimaryColor, width: 2),
@@ -116,7 +119,8 @@ class InventoryScreenState extends State<InventoryScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+              child: Text('Cancel',
+                  style: GoogleFonts.inter(color: kTextSecondary)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -125,16 +129,19 @@ class InventoryScreenState extends State<InventoryScreen> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text('Confirm', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+              child: Text('Confirm',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
             ),
           ],
         );
       },
     );
     if (ok == true && password != null) {
-      final user = await DatabaseHelper.instance.verifyLogin('admin', password!);
+      final user =
+          await DatabaseHelper.instance.verifyLogin('admin', password!);
       return user != null;
     }
     return false;
@@ -167,7 +174,8 @@ class InventoryScreenState extends State<InventoryScreen> {
         _currentPage = 0;
         await _loadProducts();
       } else {
-        _showSnackBar('Failed to add product. Barcode may already exist.', isError: true);
+        _showSnackBar('Failed to add product. Barcode may already exist.',
+            isError: true);
       }
     }
   }
@@ -217,7 +225,8 @@ class InventoryScreenState extends State<InventoryScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Delete Product',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 18, color: kErrorColor),
+          style: GoogleFonts.inter(
+              fontWeight: FontWeight.w700, fontSize: 18, color: kErrorColor),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -230,7 +239,10 @@ class InventoryScreenState extends State<InventoryScreen> {
             const SizedBox(height: 8),
             Text(
               product['name'] as String,
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: kTextPrimary),
+              style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: kTextPrimary),
             ),
             const SizedBox(height: 4),
             Text(
@@ -241,17 +253,19 @@ class InventoryScreenState extends State<InventoryScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: kErrorColor.withOpacity(0.08),
+                color: kErrorColor.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: kErrorColor, size: 18),
+                  const Icon(Icons.warning_amber_rounded,
+                      color: kErrorColor, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'This action cannot be undone. Associated bundles will also be deleted.',
-                      style: GoogleFonts.inter(color: kErrorColor, fontSize: 12),
+                      style:
+                          GoogleFonts.inter(color: kErrorColor, fontSize: 12),
                     ),
                   ),
                 ],
@@ -262,15 +276,18 @@ class InventoryScreenState extends State<InventoryScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+            child:
+                Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: kErrorColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+            child: Text('Delete',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -323,7 +340,8 @@ class InventoryScreenState extends State<InventoryScreen> {
   void _showSnackBar(String msg, {bool isError = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.inter(color: Colors.white, fontSize: 14)),
+      content: Text(msg,
+          style: GoogleFonts.inter(color: Colors.white, fontSize: 14)),
       backgroundColor: isError ? kErrorColor : kSuccessColor,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -349,7 +367,9 @@ class InventoryScreenState extends State<InventoryScreen> {
           _buildSearchBar(),
           Expanded(
             child: _isLoading
-                ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
+                ? Center(
+                    child: CircularProgressIndicator(
+                        color: theme.colorScheme.primary))
                 : _products.isEmpty
                     ? _buildEmptyState()
                     : _buildProductList(),
@@ -370,24 +390,32 @@ class InventoryScreenState extends State<InventoryScreen> {
       child: Row(
         children: [
           Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [cs.primary, cs.secondary],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 24),
+            child: const Icon(Icons.inventory_2_rounded,
+                color: Colors.white, size: 24),
           ),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Product Manager',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 22, color: cs.onSurface)),
+                  style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 22,
+                      color: cs.onSurface)),
               Text('$_totalCount product${_totalCount == 1 ? '' : 's'} total',
-                  style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.55), fontSize: 14)),
+                  style: GoogleFonts.inter(
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                      fontSize: 14)),
             ],
           ),
           const Spacer(),
@@ -395,12 +423,17 @@ class InventoryScreenState extends State<InventoryScreen> {
             ElevatedButton.icon(
               onPressed: _addProduct,
               icon: const Icon(Icons.add, size: 18),
-              label: Text('Add Product', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
+              label: Text('Add Product',
+                  style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700, fontSize: 15)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: cs.primary,
-                foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                foregroundColor:
+                    isDark ? const Color(0xFF0F172A) : Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 elevation: 0,
               ),
             )
@@ -408,17 +441,21 @@ class InventoryScreenState extends State<InventoryScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: kWarningColor.withOpacity(0.12),
+                color: kWarningColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: kWarningColor.withOpacity(0.4)),
+                border: Border.all(color: kWarningColor.withValues(alpha: 0.4)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.visibility_outlined, size: 14, color: kWarningColor),
+                  const Icon(Icons.visibility_outlined,
+                      size: 14, color: kWarningColor),
                   const SizedBox(width: 4),
                   Text('View Only',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: kWarningColor)),
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: kWarningColor)),
                 ],
               ),
             ),
@@ -440,11 +477,13 @@ class InventoryScreenState extends State<InventoryScreen> {
         style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
         decoration: InputDecoration(
           hintText: 'Search by barcode or product name...',
-          hintStyle: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.4), fontSize: 15),
+          hintStyle: GoogleFonts.inter(
+              color: cs.onSurface.withValues(alpha: 0.4), fontSize: 15),
           prefixIcon: Icon(Icons.search, color: cs.primary),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.clear, color: cs.onSurface.withOpacity(0.5)),
+                  icon: Icon(Icons.clear,
+                      color: cs.onSurface.withValues(alpha: 0.5)),
                   onPressed: () {
                     _searchController.clear();
                     _onSearchChanged('');
@@ -455,17 +494,18 @@ class InventoryScreenState extends State<InventoryScreen> {
           fillColor: isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFC),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: cs.onSurface.withOpacity(0.15)),
+            borderSide: BorderSide(color: cs.onSurface.withValues(alpha: 0.15)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: cs.onSurface.withOpacity(0.15)),
+            borderSide: BorderSide(color: cs.onSurface.withValues(alpha: 0.15)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: cs.primary, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         ),
       ),
     );
@@ -477,11 +517,17 @@ class InventoryScreenState extends State<InventoryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.inventory_2_outlined, size: 80, color: cs.onSurface.withOpacity(0.2)),
+          Icon(Icons.inventory_2_outlined,
+              size: 80, color: cs.onSurface.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Text(
-            _searchQuery.isNotEmpty ? 'No products match your search' : 'No products yet',
-            style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.5)),
+            _searchQuery.isNotEmpty
+                ? 'No products match your search'
+                : 'No products yet',
+            style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface.withValues(alpha: 0.5)),
           ),
           const SizedBox(height: 8),
           Text(
@@ -490,7 +536,8 @@ class InventoryScreenState extends State<InventoryScreen> {
                 : _isAdmin
                     ? 'Tap "Add Product" to add your first product'
                     : 'Products will appear here once added by an admin',
-            style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface.withOpacity(0.4)),
+            style: GoogleFonts.inter(
+                fontSize: 15, color: cs.onSurface.withValues(alpha: 0.4)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -522,10 +569,13 @@ class InventoryScreenState extends State<InventoryScreen> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final headerBg = isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
-    final rowBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final rowBorder =
+        isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
 
     final headerStyle = GoogleFonts.inter(
-      fontWeight: FontWeight.w700, fontSize: 13, color: cs.onSurface.withOpacity(0.55),
+      fontWeight: FontWeight.w700,
+      fontSize: 13,
+      color: cs.onSurface.withValues(alpha: 0.55),
       letterSpacing: 0.5,
     );
 
@@ -537,15 +587,30 @@ class InventoryScreenState extends State<InventoryScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Row(
             children: [
-              Expanded(flex: 1, child: Text('#', style: headerStyle, textAlign: TextAlign.center)),
+              Expanded(
+                  flex: 1,
+                  child: Text('#',
+                      style: headerStyle, textAlign: TextAlign.center)),
               Expanded(flex: 3, child: Text('PRODUCT', style: headerStyle)),
               Expanded(flex: 2, child: Text('BARCODE', style: headerStyle)),
-              Expanded(flex: 2, child: Text('RETAIL', style: headerStyle, textAlign: TextAlign.end)),
-              Expanded(flex: 2, child: Text('WHOLESALE', style: headerStyle, textAlign: TextAlign.end)),
+              Expanded(
+                  flex: 2,
+                  child: Text('RETAIL',
+                      style: headerStyle, textAlign: TextAlign.end)),
+              Expanded(
+                  flex: 2,
+                  child: Text('WHOLESALE',
+                      style: headerStyle, textAlign: TextAlign.end)),
               if (_isAdmin)
-                Expanded(flex: 2, child: Text('COST', style: headerStyle, textAlign: TextAlign.end)),
+                Expanded(
+                    flex: 2,
+                    child: Text('COST',
+                        style: headerStyle, textAlign: TextAlign.end)),
               if (_isAdmin)
-                Expanded(flex: 2, child: Text('ACTIONS', style: headerStyle, textAlign: TextAlign.center)),
+                Expanded(
+                    flex: 2,
+                    child: Text('ACTIONS',
+                        style: headerStyle, textAlign: TextAlign.center)),
             ],
           ),
         ),
@@ -556,7 +621,8 @@ class InventoryScreenState extends State<InventoryScreen> {
             padding: const EdgeInsets.only(bottom: 80),
             itemCount: _products.length,
             separatorBuilder: (_, __) => Container(height: 1, color: rowBorder),
-            itemBuilder: (ctx, i) => _buildTableRow(_products[i], i + 1 + (_currentPage * _pageSize)),
+            itemBuilder: (ctx, i) => _buildTableRow(
+                _products[i], i + 1 + (_currentPage * _pageSize)),
           ),
         ),
       ],
@@ -571,7 +637,8 @@ class InventoryScreenState extends State<InventoryScreen> {
     final name = product['name'] as String? ?? '';
     final barcode = product['id'] as String? ?? '';
     final retailPrice = (product['price'] as num?)?.toDouble() ?? 0.0;
-    final wholesalePrice = (product['wholesale_price'] as num?)?.toDouble() ?? 0.0;
+    final wholesalePrice =
+        (product['wholesale_price'] as num?)?.toDouble() ?? 0.0;
     final cost = (product['cost'] as num?)?.toDouble() ?? 0.0;
 
     return InkWell(
@@ -581,59 +648,103 @@ class InventoryScreenState extends State<InventoryScreen> {
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         child: Row(
           children: [
-            Expanded(flex: 1, child: Text(
-              '$rowNum',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.4)),
-            )),
-            Expanded(flex: 3, child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: cs.onSurface),
-                    maxLines: 2, overflow: TextOverflow.ellipsis),
-                if (hasBundle)
-                  Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7C3AED).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text('Bundle', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF7C3AED), fontWeight: FontWeight.w700)),
-                  ),
-              ],
-            )),
-            Expanded(flex: 2, child: Row(
-              children: [
-                Icon(Icons.qr_code, size: 13, color: cs.onSurface.withOpacity(0.3)),
-                const SizedBox(width: 4),
-                Flexible(child: Text(barcode,
-                    style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.55)),
-                    overflow: TextOverflow.ellipsis)),
-              ],
-            )),
-            Expanded(flex: 2, child: Text(formatCurrency(retailPrice),
-                textAlign: TextAlign.end,
-                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: cs.primary))),
-            Expanded(flex: 2, child: Text(formatCurrency(wholesalePrice),
-                textAlign: TextAlign.end,
-                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: kSuccessColor))),
+            Expanded(
+                flex: 1,
+                child: Text(
+                  '$rowNum',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: cs.onSurface.withValues(alpha: 0.4)),
+                )),
+            Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                    if (hasBundle)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text('Bundle',
+                            style: GoogleFonts.inter(
+                                fontSize: 10,
+                                color: const Color(0xFF7C3AED),
+                                fontWeight: FontWeight.w700)),
+                      ),
+                  ],
+                )),
+            Expanded(
+                flex: 2,
+                child: Row(
+                  children: [
+                    Icon(Icons.qr_code,
+                        size: 13, color: cs.onSurface.withValues(alpha: 0.3)),
+                    const SizedBox(width: 4),
+                    Flexible(
+                        child: Text(barcode,
+                            style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: cs.onSurface.withValues(alpha: 0.55)),
+                            overflow: TextOverflow.ellipsis)),
+                  ],
+                )),
+            Expanded(
+                flex: 2,
+                child: Text(formatCurrency(retailPrice),
+                    textAlign: TextAlign.end,
+                    style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary))),
+            Expanded(
+                flex: 2,
+                child: Text(formatCurrency(wholesalePrice),
+                    textAlign: TextAlign.end,
+                    style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: kSuccessColor))),
             if (_isAdmin)
-              Expanded(flex: 2, child: Text(formatCurrency(cost),
-                  textAlign: TextAlign.end,
-                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, color: kWarningColor))),
+              Expanded(
+                  flex: 2,
+                  child: Text(formatCurrency(cost),
+                      textAlign: TextAlign.end,
+                      style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: kWarningColor))),
             if (_isAdmin)
-              Expanded(flex: 2, child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _tableActionBtn(Icons.edit_outlined, cs.primary, () => _editProduct(product)),
-                  const SizedBox(width: 8),
-                  _tableActionBtn(Icons.inventory_outlined, const Color(0xFF7C3AED), () => _manageBundles(product)),
-                  const SizedBox(width: 8),
-                  _tableActionBtn(Icons.delete_outline, const Color(0xFFDC2626), () => _deleteProduct(product)),
-                ],
-              )),
+              Expanded(
+                  flex: 2,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _tableActionBtn(Icons.edit_outlined, cs.primary,
+                          () => _editProduct(product)),
+                      const SizedBox(width: 8),
+                      _tableActionBtn(
+                          Icons.inventory_outlined,
+                          const Color(0xFF7C3AED),
+                          () => _manageBundles(product)),
+                      const SizedBox(width: 8),
+                      _tableActionBtn(
+                          Icons.delete_outline,
+                          const Color(0xFFDC2626),
+                          () => _deleteProduct(product)),
+                    ],
+                  )),
           ],
         ),
       ),
@@ -645,9 +756,10 @@ class InventoryScreenState extends State<InventoryScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        width: 36, height: 36,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: color, size: 19),
@@ -664,7 +776,8 @@ class InventoryScreenState extends State<InventoryScreen> {
     final name = product['name'] as String? ?? '';
     final barcode = product['id'] as String? ?? '';
     final retailPrice = (product['price'] as num?)?.toDouble() ?? 0.0;
-    final wholesalePrice = (product['wholesale_price'] as num?)?.toDouble() ?? 0.0;
+    final wholesalePrice =
+        (product['wholesale_price'] as num?)?.toDouble() ?? 0.0;
     final cost = (product['cost'] as num?)?.toDouble() ?? 0.0;
 
     return Card(
@@ -672,7 +785,8 @@ class InventoryScreenState extends State<InventoryScreen> {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: cs.onSurface.withOpacity(isDark ? 0.12 : 0.15)),
+        side: BorderSide(
+            color: cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.15)),
       ),
       color: isDark ? const Color(0xFF1E293B) : Colors.white,
       child: Padding(
@@ -691,17 +805,28 @@ class InventoryScreenState extends State<InventoryScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.qr_code, size: 13, color: cs.onSurface.withOpacity(0.4)),
+                          Icon(Icons.qr_code,
+                              size: 13,
+                              color: cs.onSurface.withValues(alpha: 0.4)),
                           const SizedBox(width: 4),
-                          Flexible(child: Text(barcode,
-                              style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.55), letterSpacing: 0.5),
-                              overflow: TextOverflow.ellipsis)),
+                          Flexible(
+                              child: Text(barcode,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color:
+                                          cs.onSurface.withValues(alpha: 0.55),
+                                      letterSpacing: 0.5),
+                                  overflow: TextOverflow.ellipsis)),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(name,
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: cs.onSurface),
-                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: cs.onSurface),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -709,16 +834,20 @@ class InventoryScreenState extends State<InventoryScreen> {
                 // Bundle badge
                 if (hasBundle)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.1),
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.4)),
+                      border: Border.all(
+                          color:
+                              const Color(0xFF6366F1).withValues(alpha: 0.4)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.inventory_outlined, size: 12, color: Color(0xFF6366F1)),
+                        const Icon(Icons.inventory_outlined,
+                            size: 12, color: Color(0xFF6366F1)),
                         const SizedBox(width: 4),
                         Text(
                           'Bundles',
@@ -734,7 +863,7 @@ class InventoryScreenState extends State<InventoryScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            Divider(height: 1, color: cs.onSurface.withOpacity(0.1)),
+            Divider(height: 1, color: cs.onSurface.withValues(alpha: 0.1)),
             const SizedBox(height: 10),
             // ── Price row ─────────────────────────────────────────────────
             Row(
@@ -744,7 +873,7 @@ class InventoryScreenState extends State<InventoryScreen> {
                     label: 'RETAIL',
                     value: formatCurrency(retailPrice),
                     color: kPrimaryColor,
-                    bgColor: kPrimaryColor.withOpacity(0.07),
+                    bgColor: kPrimaryColor.withValues(alpha: 0.07),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -753,7 +882,7 @@ class InventoryScreenState extends State<InventoryScreen> {
                     label: 'WHOLESALE',
                     value: formatCurrency(wholesalePrice),
                     color: kSuccessColor,
-                    bgColor: kSuccessColor.withOpacity(0.07),
+                    bgColor: kSuccessColor.withValues(alpha: 0.07),
                   ),
                 ),
                 if (_isAdmin) ...[
@@ -763,7 +892,7 @@ class InventoryScreenState extends State<InventoryScreen> {
                       label: 'COST',
                       value: formatCurrency(cost),
                       color: kWarningColor,
-                      bgColor: kWarningColor.withOpacity(0.07),
+                      bgColor: kWarningColor.withValues(alpha: 0.07),
                     ),
                   ),
                 ],
@@ -772,24 +901,33 @@ class InventoryScreenState extends State<InventoryScreen> {
             // ── Action buttons (admin only) ────────────────────────────────
             if (_isAdmin) ...[
               const SizedBox(height: 10),
-              Divider(height: 1, color: cs.onSurface.withOpacity(0.1)),
+              Divider(height: 1, color: cs.onSurface.withValues(alpha: 0.1)),
               const SizedBox(height: 8),
               Row(
                 children: [
-                   Expanded(child: _buildActionButton(
-                      label: 'Edit', icon: Icons.edit_outlined, color: cs.primary,
-                      onTap: () => _editProduct(product),
-                    )),
+                  Expanded(
+                      child: _buildActionButton(
+                    label: 'Edit',
+                    icon: Icons.edit_outlined,
+                    color: cs.primary,
+                    onTap: () => _editProduct(product),
+                  )),
                   const SizedBox(width: 6),
-                  Expanded(child: _buildActionButton(
-                      label: 'Bundles', icon: Icons.inventory_outlined, color: const Color(0xFF7C3AED),
-                      onTap: () => _manageBundles(product),
-                    )),
+                  Expanded(
+                      child: _buildActionButton(
+                    label: 'Bundles',
+                    icon: Icons.inventory_outlined,
+                    color: const Color(0xFF7C3AED),
+                    onTap: () => _manageBundles(product),
+                  )),
                   const SizedBox(width: 6),
-                  Expanded(child: _buildActionButton(
-                      label: 'Delete', icon: Icons.delete_outline, color: const Color(0xFFDC2626),
-                      onTap: () => _deleteProduct(product),
-                    )),
+                  Expanded(
+                      child: _buildActionButton(
+                    label: 'Delete',
+                    icon: Icons.delete_outline,
+                    color: const Color(0xFFDC2626),
+                    onTap: () => _deleteProduct(product),
+                  )),
                 ],
               ),
             ],
@@ -851,7 +989,7 @@ class InventoryScreenState extends State<InventoryScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
-          border: Border.all(color: color.withOpacity(0.35)),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -887,28 +1025,47 @@ class InventoryScreenState extends State<InventoryScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        border: Border(top: BorderSide(color: cs.onSurface.withOpacity(0.1))),
+        border:
+            Border(top: BorderSide(color: cs.onSurface.withValues(alpha: 0.1))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             'Showing $startItem–$endItem of $_totalCount',
-            style: GoogleFonts.inter(fontSize: 14, color: cs.onSurface.withOpacity(0.55)),
+            style: GoogleFonts.inter(
+                fontSize: 14, color: cs.onSurface.withValues(alpha: 0.55)),
           ),
           Row(
             children: [
-              _paginationBtn(icon: Icons.chevron_left, enabled: hasPrev, cs: cs, onTap: () {
-                if (hasPrev) { setState(() => _currentPage--); _loadProducts(); }
-              }),
+              _paginationBtn(
+                  icon: Icons.chevron_left,
+                  enabled: hasPrev,
+                  cs: cs,
+                  onTap: () {
+                    if (hasPrev) {
+                      setState(() => _currentPage--);
+                      _loadProducts();
+                    }
+                  }),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: Text('Page ${_currentPage + 1} / $totalPages',
-                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface)),
               ),
-              _paginationBtn(icon: Icons.chevron_right, enabled: hasNext, cs: cs, onTap: () {
-                if (hasNext) { setState(() => _currentPage++); _loadProducts(); }
-              }),
+              _paginationBtn(
+                  icon: Icons.chevron_right,
+                  enabled: hasNext,
+                  cs: cs,
+                  onTap: () {
+                    if (hasNext) {
+                      setState(() => _currentPage++);
+                      _loadProducts();
+                    }
+                  }),
             ],
           ),
         ],
@@ -929,13 +1086,18 @@ class InventoryScreenState extends State<InventoryScreen> {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: enabled ? cs.primary.withOpacity(0.08) : Colors.transparent,
+          color:
+              enabled ? cs.primary.withValues(alpha: 0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: enabled ? cs.primary.withOpacity(0.3) : cs.onSurface.withOpacity(0.1),
+            color: enabled
+                ? cs.primary.withValues(alpha: 0.3)
+                : cs.onSurface.withValues(alpha: 0.1),
           ),
         ),
-        child: Icon(icon, size: 22, color: enabled ? cs.primary : cs.onSurface.withOpacity(0.3)),
+        child: Icon(icon,
+            size: 22,
+            color: enabled ? cs.primary : cs.onSurface.withValues(alpha: 0.3)),
       ),
     );
   }

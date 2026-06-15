@@ -43,7 +43,7 @@ class POSScreenState extends State<POSScreen> {
   final FocusNode _qtyFocus = FocusNode();
 
   DateTime? _lastScanTime;
-  static const _beepChannel = MethodChannel('com.example.archer_pos/beep');
+  static const _beepChannel = MethodChannel('com.example.emma_store/beep');
 
   Future<void> _playBeep() async {
     try {
@@ -65,8 +65,6 @@ class POSScreenState extends State<POSScreen> {
   void _onSearchFocusChange() {
     if (mounted) setState(() {});
   }
-
-
 
   void _onQtyFocusChange() {
     if (!_qtyFocus.hasFocus) {
@@ -108,9 +106,11 @@ class POSScreenState extends State<POSScreen> {
               readOnly: true,
               showCursor: true,
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold),
+              style:
+                  GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const SizedBox(height: 16),
@@ -177,17 +177,17 @@ class POSScreenState extends State<POSScreen> {
     if (q.isEmpty) return [];
     final terms = q.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
     if (terms.isEmpty) return [];
-    return _searchSuggestions
-        .where((p) {
-          final id = (p['id'] as String).toLowerCase();
-          final name = (p['name'] as String).toLowerCase();
-          return terms.every((term) => id.contains(term) || name.contains(term));
-        })
-        .toList();
+    return _searchSuggestions.where((p) {
+      final id = (p['id'] as String).toLowerCase();
+      final name = (p['name'] as String).toLowerCase();
+      return terms.every((term) => id.contains(term) || name.contains(term));
+    }).toList();
   }
 
   List<Map<String, dynamic>> get _filteredSuggestions {
-    return _getFilteredSuggestionsForQuery(_searchController.text).take(8).toList();
+    return _getFilteredSuggestionsForQuery(_searchController.text)
+        .take(8)
+        .toList();
   }
 
   Future<void> _addItemByBarcode(String input) async {
@@ -214,9 +214,11 @@ class POSScreenState extends State<POSScreen> {
 
     if (product == null) {
       // Try name search
-      final byName = _searchSuggestions.where(
-        (p) => (p['name'] as String).toLowerCase() == barcode.toLowerCase(),
-      ).toList();
+      final byName = _searchSuggestions
+          .where(
+            (p) => (p['name'] as String).toLowerCase() == barcode.toLowerCase(),
+          )
+          .toList();
       if (byName.isNotEmpty) {
         await _addProductToCart(byName.first, qty.toDouble());
       } else {
@@ -237,16 +239,19 @@ class POSScreenState extends State<POSScreen> {
     _searchFocus.requestFocus();
   }
 
-  Future<void> _addProductToCart(Map<String, dynamic> product, double qty) async {
+  Future<void> _addProductToCart(
+      Map<String, dynamic> product, double qty) async {
     final cart = context.read<CartProvider>();
     // Get bundles for this product
-    final bundles = await DatabaseHelper.instance.getBundlesForProduct(product['id'] as String);
+    final bundles = await DatabaseHelper.instance
+        .getBundlesForProduct(product['id'] as String);
     cart.addItem(product, qty, cart.pricingMode, bundles: bundles);
   }
 
   Future<void> _handleProductNotFound(String barcode) async {
     if (widget.userRole != 'admin') {
-      _showSnackBar('Product not found. Only admins can add new products.', isError: true);
+      _showSnackBar('Product not found. Only admins can add new products.',
+          isError: true);
       return;
     }
 
@@ -263,7 +268,8 @@ class POSScreenState extends State<POSScreen> {
           details: 'Product ${result['name']} added from POS scan',
           userId: widget.username,
         );
-        final product = await DatabaseHelper.instance.getProductById(result['id'] as String);
+        final product = await DatabaseHelper.instance
+            .getProductById(result['id'] as String);
         if (product != null) {
           await _addProductToCart(product, 1);
           _showSnackBar('Product added to inventory and cart!');
@@ -294,14 +300,17 @@ class POSScreenState extends State<POSScreen> {
           content: TextField(
             controller: ctrl,
             obscureText: true,
-            decoration: const InputDecoration(labelText: 'Enter Admin Password'),
+            decoration:
+                const InputDecoration(labelText: 'Enter Admin Password'),
             onSubmitted: (v) async {
               password = v;
               Navigator.of(ctx).pop(true);
             },
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () {
                 password = ctrl.text;
@@ -314,7 +323,8 @@ class POSScreenState extends State<POSScreen> {
       },
     );
     if (ok == true && password != null) {
-      final user = await DatabaseHelper.instance.verifyLogin('admin', password!);
+      final user =
+          await DatabaseHelper.instance.verifyLogin('admin', password!);
       return user != null;
     }
     return false;
@@ -339,12 +349,14 @@ class POSScreenState extends State<POSScreen> {
 
     if (result != null && mounted) {
       try {
-        final saleItems = cart.items.map((item) => {
-          'product_id': item.barcode,
-          'product_name': item.name,
-          'quantity': item.quantity,
-          'price': item.price,
-        }).toList();
+        final saleItems = cart.items
+            .map((item) => {
+                  'product_id': item.barcode,
+                  'product_name': item.name,
+                  'quantity': item.quantity,
+                  'price': item.price,
+                })
+            .toList();
 
         final saleId = await DatabaseHelper.instance.createSale(
           totalAmount: cart.total,
@@ -352,13 +364,16 @@ class POSScreenState extends State<POSScreen> {
           balanceDue: result['balance_due'] as double,
           customerId: result['customer_id'] as int?,
           items: saleItems,
-          payments: [{'method': 'Cash', 'amount': result['amount_paid']}],
+          payments: [
+            {'method': 'Cash', 'amount': result['amount_paid']}
+          ],
           createdBy: widget.username,
         );
 
         await DatabaseHelper.instance.logAction(
           'POS_SALE',
-          details: 'Sale #$saleId - Total: ${formatCurrency(cart.total)} - Paid: ${formatCurrency(result['amount_paid'] as double)}',
+          details:
+              'Sale #$saleId - Total: ${formatCurrency(cart.total)} - Paid: ${formatCurrency(result['amount_paid'] as double)}',
           userId: widget.username,
         );
 
@@ -376,7 +391,8 @@ class POSScreenState extends State<POSScreen> {
             context: context,
             barrierDismissible: false,
             builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               title: Text(
                 'Print Receipt',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w800),
@@ -388,7 +404,9 @@ class POSScreenState extends State<POSScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(false),
-                  child: Text('No', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextSecondary)),
+                  child: Text('No',
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600, color: kTextSecondary)),
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.of(ctx).pop(true),
@@ -396,7 +414,8 @@ class POSScreenState extends State<POSScreen> {
                     backgroundColor: kPrimaryColor,
                     foregroundColor: Colors.white,
                   ),
-                  child: Text('Yes', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                  child: Text('Yes',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
@@ -450,7 +469,9 @@ class POSScreenState extends State<POSScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () {
                 label = ctrl.text.isEmpty ? null : ctrl.text;
@@ -500,16 +521,21 @@ class POSScreenState extends State<POSScreen> {
     );
     if (result != null && mounted) {
       final cart = context.read<CartProvider>();
-      cart.addItem({
-        'id': 'CUSTOM-${DateTime.now().millisecondsSinceEpoch}',
-        'name': result['name'],
-        'price': result['price'],
-        'wholesale_price': result['price'],
-        'cost': 0.0,
-      }, result['quantity'] as double, cart.pricingMode, bundles: []);
+      cart.addItem(
+          {
+            'id': 'CUSTOM-${DateTime.now().millisecondsSinceEpoch}',
+            'name': result['name'],
+            'price': result['price'],
+            'wholesale_price': result['price'],
+            'cost': 0.0,
+          },
+          result['quantity'] as double,
+          cart.pricingMode,
+          bundles: []);
       await DatabaseHelper.instance.logAction(
         'POS_QUICK_ADD',
-        details: 'Quick Add: ${result['name']} x${result['quantity']} @ ${formatCurrency(result['price'] as double)}',
+        details:
+            'Quick Add: ${result['name']} x${result['quantity']} @ ${formatCurrency(result['price'] as double)}',
         userId: widget.username,
       );
     }
@@ -537,14 +563,16 @@ class POSScreenState extends State<POSScreen> {
             onPressed: () => Navigator.of(ctx).pop(false),
             child: Text(
               'Cancel',
-              style: GoogleFonts.inter(color: kTextSecondary, fontWeight: FontWeight.w600),
+              style: GoogleFonts.inter(
+                  color: kTextSecondary, fontWeight: FontWeight.w600),
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: kErrorColor,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
               elevation: 0,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -603,7 +631,9 @@ class POSScreenState extends State<POSScreen> {
             width: summaryWidth,
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
-              border: Border(left: BorderSide(color: cs.onSurface.withOpacity(0.08))),
+              border: Border(
+                  left:
+                      BorderSide(color: cs.onSurface.withValues(alpha: 0.08))),
             ),
             child: _buildOrderSummaryPanel(),
           ),
@@ -611,8 +641,6 @@ class POSScreenState extends State<POSScreen> {
       ),
     );
   }
-
-
 
   Widget _buildSearchBar() {
     return StatefulBuilder(
@@ -649,14 +677,18 @@ class POSScreenState extends State<POSScreen> {
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFCBD5E1)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(color: cs.primary, width: 2),
                 ),
                 filled: true,
-                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                fillColor:
+                    isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               ),
               onChanged: (val) {
                 // Rebuild only the search bar to avoid full-screen and camera preview rebuild lag while typing
@@ -672,7 +704,10 @@ class POSScreenState extends State<POSScreen> {
               width: isNarrowLayout ? double.infinity : 120,
               height: 50,
               decoration: BoxDecoration(
-                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFCBD5E1)),
                 borderRadius: BorderRadius.circular(10),
                 color: cs.surface,
               ),
@@ -683,7 +718,8 @@ class POSScreenState extends State<POSScreen> {
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _updateQuantity(_quantity - 1),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 12),
                       child: Icon(Icons.remove, size: 16, color: cs.onSurface),
                     ),
                   ),
@@ -695,7 +731,10 @@ class POSScreenState extends State<POSScreen> {
                       showCursor: true,
                       onTap: _showMainQtyDialog,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: cs.onSurface),
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: cs.onSurface),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         isDense: true,
@@ -707,7 +746,8 @@ class POSScreenState extends State<POSScreen> {
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _updateQuantity(_quantity + 1),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 12),
                       child: Icon(Icons.add, size: 16, color: cs.onSurface),
                     ),
                   ),
@@ -728,7 +768,8 @@ class POSScreenState extends State<POSScreen> {
                   icon: const Icon(Icons.swap_horiz, size: 18),
                   label: Text(
                     label,
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700, fontSize: 13),
                     overflow: TextOverflow.ellipsis,
                   ),
                   style: ElevatedButton.styleFrom(
@@ -739,7 +780,8 @@ class POSScreenState extends State<POSScreen> {
                     minimumSize: const Size(80, 50),
                     maximumSize: const Size(130, 50),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 );
               },
@@ -778,8 +820,17 @@ class POSScreenState extends State<POSScreen> {
                       decoration: BoxDecoration(
                         color: cs.surface,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.1), blurRadius: 8, offset: const Offset(0, 4))],
+                        border: Border.all(
+                            color: isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFCBD5E1)),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black
+                                  .withValues(alpha: isDark ? 0.3 : 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4))
+                        ],
                       ),
                       child: ListView.builder(
                         shrinkWrap: true,
@@ -788,11 +839,22 @@ class POSScreenState extends State<POSScreen> {
                           final p = _filteredSuggestions[i];
                           return ListTile(
                             dense: true,
-                            leading: Icon(Icons.inventory_2, size: 18, color: cs.primary),
-                            title: Text(p['name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
-                            subtitle: Text('${p['id']}', style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.55), fontSize: 12)),
-                            trailing: Text(formatCurrency((p['price'] as num).toDouble()),
-                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: cs.primary)),
+                            leading: Icon(Icons.inventory_2,
+                                size: 18, color: cs.primary),
+                            title: Text(p['name'] as String,
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: cs.onSurface)),
+                            subtitle: Text('${p['id']}',
+                                style: GoogleFonts.inter(
+                                    color: cs.onSurface.withValues(alpha: 0.55),
+                                    fontSize: 12)),
+                            trailing: Text(
+                                formatCurrency((p['price'] as num).toDouble()),
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.primary)),
                             onTap: () {
                               _searchController.text = p['id'] as String;
                               setState(() => _showSuggestions = false);
@@ -821,12 +883,16 @@ class POSScreenState extends State<POSScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey[300]),
+                  Icon(Icons.shopping_cart_outlined,
+                      size: 64, color: Colors.grey[300]),
                   const SizedBox(height: 16),
-                  Text('Cart is empty', style: GoogleFonts.inter(color: kTextSecondary, fontSize: 18)),
+                  Text('Cart is empty',
+                      style: GoogleFonts.inter(
+                          color: kTextSecondary, fontSize: 18)),
                   const SizedBox(height: 8),
                   Text('Scan a barcode or search for a product',
-                      style: GoogleFonts.inter(color: kTextSecondary, fontSize: 14)),
+                      style: GoogleFonts.inter(
+                          color: kTextSecondary, fontSize: 14)),
                 ],
               ),
             );
@@ -843,7 +909,8 @@ class POSScreenState extends State<POSScreen> {
                 if (await _verifyAdmin()) {
                   cart.removeItem(i);
                   await DatabaseHelper.instance.logAction('POS_DELETE',
-                      details: 'Removed ${cart.items.length > i ? cart.items[i].name : "item"} from cart',
+                      details:
+                          'Removed ${cart.items.length > i ? cart.items[i].name : "item"} from cart',
                       userId: widget.username);
                 } else {
                   _showSnackBar('Admin access required.', isError: true);
@@ -877,12 +944,20 @@ class POSScreenState extends State<POSScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.shopping_cart_outlined, size: 80,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2)),
+                Icon(Icons.shopping_cart_outlined,
+                    size: 80,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.2)),
                 const SizedBox(height: 16),
                 Text('Cart is empty',
                     style: GoogleFonts.inter(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4), fontSize: 20)),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.4),
+                        fontSize: 20)),
               ],
             ),
           );
@@ -891,14 +966,23 @@ class POSScreenState extends State<POSScreen> {
           children: [
             // Table header
             Container(
-              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-              padding: const EdgeInsets.only(left: 16, right: 24, top: 12, bottom: 12),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF334155)
+                  : const Color(0xFFF1F5F9),
+              padding: const EdgeInsets.only(
+                  left: 16, right: 24, top: 12, bottom: 12),
               child: Row(
                 children: [
                   Expanded(flex: 8, child: _headerCell('Product')),
-                  Expanded(flex: 4, child: _headerCell('Price', textAlign: TextAlign.end)),
-                  Expanded(flex: 5, child: _headerCell('Qty', textAlign: TextAlign.center)),
-                  Expanded(flex: 5, child: _headerCell('Total', textAlign: TextAlign.end)),
+                  Expanded(
+                      flex: 4,
+                      child: _headerCell('Price', textAlign: TextAlign.end)),
+                  Expanded(
+                      flex: 5,
+                      child: _headerCell('Qty', textAlign: TextAlign.center)),
+                  Expanded(
+                      flex: 5,
+                      child: _headerCell('Total', textAlign: TextAlign.end)),
                   Expanded(flex: 4, child: _headerCell('')),
                 ],
               ),
@@ -939,12 +1023,15 @@ class POSScreenState extends State<POSScreen> {
     );
   }
 
-  Widget _headerCell(String text, {TextAlign textAlign = TextAlign.start}) => Text(
+  Widget _headerCell(String text, {TextAlign textAlign = TextAlign.start}) =>
+      Text(
         text,
         textAlign: textAlign,
         style: GoogleFonts.inter(
-            fontWeight: FontWeight.w700, fontSize: 15,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
       );
 
   Widget _buildOrderSummaryPanel() {
@@ -959,15 +1046,23 @@ class POSScreenState extends State<POSScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text('Order Summary',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 24, color: cs.onSurface)),
+                  style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 24,
+                      color: cs.onSurface)),
               const SizedBox(height: 4),
               Text('${cart.items.length} item(s)',
-                  style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.55), fontSize: 16)),
+                  style: GoogleFonts.inter(
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                      fontSize: 16)),
               const Divider(height: 24),
               Expanded(
                 child: cart.items.isEmpty
-                    ? Center(child: Text('No items',
-                        style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.4), fontSize: 16)))
+                    ? Center(
+                        child: Text('No items',
+                            style: GoogleFonts.inter(
+                                color: cs.onSurface.withValues(alpha: 0.4),
+                                fontSize: 16)))
                     : ListView.builder(
                         itemCount: cart.items.length,
                         itemBuilder: (ctx, i) {
@@ -978,16 +1073,23 @@ class POSScreenState extends State<POSScreen> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(item.name,
-                                          style: GoogleFonts.inter(fontWeight: FontWeight.w600,
-                                              fontSize: 16, color: cs.onSurface),
-                                          maxLines: 2, overflow: TextOverflow.ellipsis),
-                                      const SizedBox(height: 2),
-                                      Text('${item.quantity.toStringAsFixed(item.quantity.truncate() == item.quantity ? 0 : 2)} × ${formatCurrency(item.price)}',
                                           style: GoogleFonts.inter(
-                                              color: cs.onSurface.withOpacity(0.55), fontSize: 14)),
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 16,
+                                              color: cs.onSurface),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                          '${item.quantity.toStringAsFixed(item.quantity.truncate() == item.quantity ? 0 : 2)} × ${formatCurrency(item.price)}',
+                                          style: GoogleFonts.inter(
+                                              color: cs.onSurface
+                                                  .withValues(alpha: 0.55),
+                                              fontSize: 14)),
                                     ],
                                   ),
                                 ),
@@ -997,9 +1099,12 @@ class POSScreenState extends State<POSScreen> {
                                     fit: BoxFit.scaleDown,
                                     alignment: Alignment.centerRight,
                                     child: Text(
-                                      formatCurrency(item.price * item.quantity),
+                                      formatCurrency(
+                                          item.price * item.quantity),
                                       style: GoogleFonts.inter(
-                                          fontWeight: FontWeight.w700, fontSize: 16, color: cs.primary),
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                          color: cs.primary),
                                       maxLines: 1,
                                     ),
                                   ),
@@ -1012,19 +1117,22 @@ class POSScreenState extends State<POSScreen> {
               ),
               const Divider(height: 20),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
                 decoration: BoxDecoration(
-                  color: cs.primary.withOpacity(isDark ? 0.15 : 0.07),
+                  color: cs.primary.withValues(alpha: isDark ? 0.15 : 0.07),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: cs.primary.withOpacity(0.2)),
+                  border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('TOTAL',
                         style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w900, fontSize: 22,
-                            color: cs.onSurface, letterSpacing: 0.5)),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 22,
+                            color: cs.onSurface,
+                            letterSpacing: 0.5)),
                     Flexible(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
@@ -1033,7 +1141,9 @@ class POSScreenState extends State<POSScreen> {
                           formatCurrency(cart.total),
                           textAlign: TextAlign.end,
                           style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w900, fontSize: 38, color: cs.primary),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 38,
+                              color: cs.primary),
                           maxLines: 1,
                         ),
                       ),
@@ -1046,12 +1156,17 @@ class POSScreenState extends State<POSScreen> {
                 onPressed: _checkout,
                 icon: const Icon(Icons.point_of_sale, size: 24),
                 label: Text('CHECKOUT',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 1)),
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        letterSpacing: 1)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: cs.primary,
-                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  foregroundColor:
+                      isDark ? const Color(0xFF0F172A) : Colors.white,
                   minimumSize: const Size.fromHeight(68),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
               ),
@@ -1062,11 +1177,14 @@ class POSScreenState extends State<POSScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _parkSale,
                       icon: const Icon(Icons.pause, size: 18),
-                      label: Text('Park', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+                      label: Text('Park',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF0284C7),
                         side: const BorderSide(color: Color(0xFF0284C7)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -1076,11 +1194,14 @@ class POSScreenState extends State<POSScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _recallSale,
                       icon: const Icon(Icons.play_arrow, size: 18),
-                      label: Text('Recall', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+                      label: Text('Recall',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: kSuccessColor,
                         side: const BorderSide(color: kSuccessColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -1094,11 +1215,14 @@ class POSScreenState extends State<POSScreen> {
                     child: OutlinedButton.icon(
                       onPressed: _quickAdd,
                       icon: const Icon(Icons.add, size: 18),
-                      label: Text('Quick Add', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+                      label: Text('Quick Add',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF6366F1),
                         side: const BorderSide(color: Color(0xFF6366F1)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -1116,11 +1240,14 @@ class POSScreenState extends State<POSScreen> {
                         }
                       },
                       icon: const Icon(Icons.clear_all, size: 18),
-                      label: Text('Clear', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+                      label: Text('Clear',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: kErrorColor,
                         side: const BorderSide(color: kErrorColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
@@ -1145,7 +1272,12 @@ class POSScreenState extends State<POSScreen> {
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           decoration: BoxDecoration(
             color: cs.surface,
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.08), blurRadius: 8, offset: const Offset(0, -2))],
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2))
+            ],
           ),
           child: SafeArea(
             top: false,
@@ -1155,91 +1287,103 @@ class POSScreenState extends State<POSScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('TOTAL', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 16, color: cs.onSurface)),
+                    Text('TOTAL',
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            color: cs.onSurface)),
                     Flexible(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerRight,
                         child: Text(
                           formatCurrency(cart.total),
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 22, color: cs.primary),
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 22,
+                              color: cs.primary),
                           maxLines: 1,
                         ),
                       ),
                     ),
                   ],
                 ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _checkout,
-                  icon: const Icon(Icons.point_of_sale, size: 20),
-                  label: Text(
-                    'CHECKOUT (${cart.items.length} items)',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: cs.primary,
-                    foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-                    minimumSize: const Size.fromHeight(54),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _checkout,
+                    icon: const Icon(Icons.point_of_sale, size: 20),
+                    label: Text(
+                      'CHECKOUT (${cart.items.length} items)',
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w800, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: cs.primary,
+                      foregroundColor:
+                          isDark ? const Color(0xFF0F172A) : Colors.white,
+                      minimumSize: const Size.fromHeight(54),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _phoneActionBtn(
-                      icon: Icons.add_circle_outline,
-                      label: 'Quick Add',
-                      color: const Color(0xFF6366F1),
-                      onTap: _quickAdd,
-                    ),
-                    const SizedBox(width: 4),
-                    _phoneActionBtn(
-                      icon: Icons.pause_circle_outline,
-                      label: 'Park Sale',
-                      color: const Color(0xFF0284C7),
-                      onTap: _parkSale,
-                    ),
-                    const SizedBox(width: 4),
-                    _phoneActionBtn(
-                      icon: Icons.play_circle_outline,
-                      label: 'Recall',
-                      color: const Color(0xFF10B981),
-                      onTap: _recallSale,
-                    ),
-                    const SizedBox(width: 4),
-                    _phoneActionBtn(
-                      icon: Icons.clear_all,
-                      label: 'Clear Cart',
-                      color: kErrorColor,
-                      onTap: () async {
-                        if (cart.items.isEmpty) return;
-                        if (await _confirmClearCart()) {
-                          if (await _verifyAdmin()) {
-                            cart.clearCart();
-                            await DatabaseHelper.instance.logAction('POS_VOID_CART',
-                                details: 'Cart cleared', userId: widget.username);
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _phoneActionBtn(
+                        icon: Icons.add_circle_outline,
+                        label: 'Quick Add',
+                        color: const Color(0xFF6366F1),
+                        onTap: _quickAdd,
+                      ),
+                      const SizedBox(width: 4),
+                      _phoneActionBtn(
+                        icon: Icons.pause_circle_outline,
+                        label: 'Park Sale',
+                        color: const Color(0xFF0284C7),
+                        onTap: _parkSale,
+                      ),
+                      const SizedBox(width: 4),
+                      _phoneActionBtn(
+                        icon: Icons.play_circle_outline,
+                        label: 'Recall',
+                        color: const Color(0xFF10B981),
+                        onTap: _recallSale,
+                      ),
+                      const SizedBox(width: 4),
+                      _phoneActionBtn(
+                        icon: Icons.clear_all,
+                        label: 'Clear Cart',
+                        color: kErrorColor,
+                        onTap: () async {
+                          if (cart.items.isEmpty) return;
+                          if (await _confirmClearCart()) {
+                            if (await _verifyAdmin()) {
+                              cart.clearCart();
+                              await DatabaseHelper.instance.logAction(
+                                  'POS_VOID_CART',
+                                  details: 'Cart cleared',
+                                  userId: widget.username);
+                            }
                           }
-                        }
-                      },
-                    ),
-                  ],
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   Widget _phoneActionBtn({
     required IconData icon,
@@ -1250,9 +1394,11 @@ class POSScreenState extends State<POSScreen> {
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, color: color, size: 16),
-      label: Text(label, style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+      label: Text(label,
+          style: GoogleFonts.inter(
+              color: color, fontWeight: FontWeight.w600, fontSize: 12)),
       style: OutlinedButton.styleFrom(
-        side: BorderSide(color: color.withOpacity(0.4)),
+        side: BorderSide(color: color.withValues(alpha: 0.4)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,

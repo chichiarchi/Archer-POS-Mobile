@@ -64,7 +64,8 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: cs.onSurface.withOpacity(0.6)),
+                  icon: Icon(Icons.close,
+                      color: cs.onSurface.withValues(alpha: 0.6)),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -76,12 +77,13 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.pause_presentation_outlined, size: 48, color: cs.onSurface.withOpacity(0.4)),
+                      Icon(Icons.pause_presentation_outlined,
+                          size: 48, color: cs.onSurface.withValues(alpha: 0.4)),
                       const SizedBox(height: 12),
                       Text(
                         'No parked sales found.',
                         style: GoogleFonts.inter(
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -117,7 +119,9 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                           const SizedBox(height: 4),
                           Text(
                             formatDateTime(timestamp),
-                            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.55)),
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: cs.onSurface.withValues(alpha: 0.55)),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -148,7 +152,8 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                             onPressed: () => widget.onRecall(sale),
                             child: Text(
                               'Recall',
-                              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                              style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700),
                             ),
                           ),
                         ],

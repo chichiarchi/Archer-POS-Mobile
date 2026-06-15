@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
@@ -21,7 +20,7 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'archer_pos.db');
+    final path = join(dbPath, 'emma_store.db');
 
     bool exists = await databaseExists(path);
 
@@ -35,8 +34,9 @@ class DatabaseHelper {
 
       // Copy from assets
       try {
-        ByteData data = await rootBundle.load('assets/db/archer_pos.db');
-        List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+        ByteData data = await rootBundle.load('assets/db/emma_store.db');
+        List<int> bytes =
+            data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         await File(path).writeAsBytes(bytes, flush: true);
         print("Database successfully copied from assets.");
       } catch (e) {
@@ -198,27 +198,33 @@ class DatabaseHelper {
 
     // Create default admin user
     final result = await _hashPassword('admin');
-    await db.insert('users', {
-      'username': 'admin',
-      'password_hash': result['hash'],
-      'salt': result['salt'],
-      'role': 'admin',
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.insert(
+        'users',
+        {
+          'username': 'admin',
+          'password_hash': result['hash'],
+          'salt': result['salt'],
+          'role': 'admin',
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // Handle migrations
     if (oldVersion < 2) {
       try {
-        await db.execute('ALTER TABLE products ADD COLUMN cost REAL DEFAULT 0.0');
+        await db
+            .execute('ALTER TABLE products ADD COLUMN cost REAL DEFAULT 0.0');
       } catch (_) {}
       try {
-        await db.execute('ALTER TABLE product_bundles ADD COLUMN cost REAL DEFAULT 0.0');
+        await db.execute(
+            'ALTER TABLE product_bundles ADD COLUMN cost REAL DEFAULT 0.0');
       } catch (_) {}
     }
     if (oldVersion < 4) {
       try {
-        await db.execute("ALTER TABLE sales ADD COLUMN created_by TEXT DEFAULT 'admin'");
+        await db.execute(
+            "ALTER TABLE sales ADD COLUMN created_by TEXT DEFAULT 'admin'");
       } catch (_) {}
     }
   }
@@ -229,14 +235,16 @@ class DatabaseHelper {
     return md5.convert(utf8.encode(random)).toString();
   }
 
-  static Future<Map<String, String>> _hashPassword(String password, [String? salt]) async {
+  static Future<Map<String, String>> _hashPassword(String password,
+      [String? salt]) async {
     final s = salt ?? _generateSalt();
     final key = sha256.convert(utf8.encode('$s:$password')).toString();
     return {'hash': key, 'salt': s};
   }
 
   // ────────────── AUTHENTICATION ──────────────
-  Future<Map<String, dynamic>?> verifyLogin(String username, String password) async {
+  Future<Map<String, dynamic>?> verifyLogin(
+      String username, String password) async {
     final db = await database;
     final rows = await db.query(
       'users',
@@ -248,7 +256,11 @@ class DatabaseHelper {
     final user = rows.first;
     final result = await _hashPassword(password, user['salt'] as String);
     if (result['hash'] == user['password_hash']) {
-      return {'id': user['id'], 'role': user['role'], 'username': user['username']};
+      return {
+        'id': user['id'],
+        'role': user['role'],
+        'username': user['username']
+      };
     }
     return null;
   }
@@ -283,7 +295,8 @@ class DatabaseHelper {
 
   Future<Map<String, dynamic>?> getUserByUsername(String username) async {
     final db = await database;
-    final rows = await db.query('users', where: 'username = ?', whereArgs: [username]);
+    final rows =
+        await db.query('users', where: 'username = ?', whereArgs: [username]);
     return rows.isEmpty ? null : rows.first;
   }
 
@@ -294,12 +307,14 @@ class DatabaseHelper {
 
   Future<bool> deleteUser(int userId) async {
     final db = await database;
-    final count = await db.delete('users', where: 'id = ?', whereArgs: [userId]);
+    final count =
+        await db.delete('users', where: 'id = ?', whereArgs: [userId]);
     return count > 0;
   }
 
   // ────────────── PRODUCTS ──────────────
-  Future<List<Map<String, dynamic>>> getProducts({String? search, int limit = 100, int offset = 0}) async {
+  Future<List<Map<String, dynamic>>> getProducts(
+      {String? search, int limit = 100, int offset = 0}) async {
     final db = await database;
     if (search != null && search.isNotEmpty) {
       final like = '%$search%';
@@ -346,7 +361,8 @@ class DatabaseHelper {
   Future<bool> insertProduct(Map<String, dynamic> product) async {
     final db = await database;
     try {
-      await db.insert('products', product, conflictAlgorithm: ConflictAlgorithm.abort);
+      await db.insert('products', product,
+          conflictAlgorithm: ConflictAlgorithm.abort);
       return true;
     } catch (_) {
       return false;
@@ -355,7 +371,8 @@ class DatabaseHelper {
 
   Future<bool> updateProduct(String id, Map<String, dynamic> product) async {
     final db = await database;
-    final count = await db.update('products', product, where: 'id = ?', whereArgs: [id]);
+    final count =
+        await db.update('products', product, where: 'id = ?', whereArgs: [id]);
     return count > 0;
   }
 
@@ -366,9 +383,11 @@ class DatabaseHelper {
   }
 
   // ────────────── BUNDLES ──────────────
-  Future<List<Map<String, dynamic>>> getBundlesForProduct(String productId) async {
+  Future<List<Map<String, dynamic>>> getBundlesForProduct(
+      String productId) async {
     final db = await database;
-    return await db.query('product_bundles', where: 'product_id = ?', whereArgs: [productId]);
+    return await db.query('product_bundles',
+        where: 'product_id = ?', whereArgs: [productId]);
   }
 
   Future<bool> insertBundle(Map<String, dynamic> bundle) async {
@@ -383,13 +402,15 @@ class DatabaseHelper {
 
   Future<bool> updateBundle(int id, Map<String, dynamic> bundle) async {
     final db = await database;
-    final count = await db.update('product_bundles', bundle, where: 'id = ?', whereArgs: [id]);
+    final count = await db
+        .update('product_bundles', bundle, where: 'id = ?', whereArgs: [id]);
     return count > 0;
   }
 
   Future<bool> deleteBundle(int id) async {
     final db = await database;
-    final count = await db.delete('product_bundles', where: 'id = ?', whereArgs: [id]);
+    final count =
+        await db.delete('product_bundles', where: 'id = ?', whereArgs: [id]);
     return count > 0;
   }
 
@@ -399,7 +420,9 @@ class DatabaseHelper {
     if (search != null && search.isNotEmpty) {
       final like = '%$search%';
       return await db.query('customers',
-          where: 'name LIKE ? OR phone LIKE ?', whereArgs: [like, like], orderBy: 'name ASC');
+          where: 'name LIKE ? OR phone LIKE ?',
+          whereArgs: [like, like],
+          orderBy: 'name ASC');
     }
     return await db.query('customers', orderBy: 'name ASC');
   }
@@ -429,7 +452,8 @@ class DatabaseHelper {
     return await db.transaction((txn) async {
       // Get local time offset (+8 hours for Philippines)
       final now = DateTime.now().toUtc().add(const Duration(hours: 8));
-      final timestamp = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+      final timestamp =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
           '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
       final saleId = await txn.insert('sales', {
@@ -516,32 +540,38 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getSaleItems(int saleId) async {
     final db = await database;
-    return await db.query('sale_items', where: 'sale_id = ?', whereArgs: [saleId]);
+    return await db
+        .query('sale_items', where: 'sale_id = ?', whereArgs: [saleId]);
   }
 
   Future<List<Map<String, dynamic>>> getSalePayments(int saleId) async {
     final db = await database;
-    return await db.query('sale_payments', where: 'sale_id = ?', whereArgs: [saleId]);
+    return await db
+        .query('sale_payments', where: 'sale_id = ?', whereArgs: [saleId]);
   }
 
   // ────────────── DASHBOARD STATS ──────────────
   Future<Map<String, dynamic>> getDashboardStats() async {
     final db = await database;
     final now = DateTime.now().toUtc().add(const Duration(hours: 8));
-    final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final today =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
     final salesResult = await db.rawQuery(
       "SELECT SUM(total_amount) as total, COUNT(*) as count FROM sales WHERE DATE(timestamp) = ? AND voided = 0",
       [today],
     );
-    final productCount = await db.rawQuery('SELECT COUNT(*) as cnt FROM products');
-    final balanceResult = await db.rawQuery('SELECT SUM(balance_amount) as total FROM debtors');
+    final productCount =
+        await db.rawQuery('SELECT COUNT(*) as cnt FROM products');
+    final balanceResult =
+        await db.rawQuery('SELECT SUM(balance_amount) as total FROM debtors');
 
     return {
       'sales_today': (salesResult.first['total'] as num?)?.toDouble() ?? 0.0,
       'transactions_today': (salesResult.first['count'] as int?) ?? 0,
       'total_products': (productCount.first['cnt'] as int?) ?? 0,
-      'total_balance': (balanceResult.first['total'] as num?)?.toDouble() ?? 0.0,
+      'total_balance':
+          (balanceResult.first['total'] as num?)?.toDouble() ?? 0.0,
     };
   }
 
@@ -573,7 +603,8 @@ class DatabaseHelper {
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
-  Future<bool> resolveCustomerBalance(int customerId, double paymentAmount) async {
+  Future<bool> resolveCustomerBalance(
+      int customerId, double paymentAmount) async {
     final db = await database;
     double remainingPayment = paymentAmount;
 
@@ -590,7 +621,8 @@ class DatabaseHelper {
 
         final debtorId = debtor['id'] as int;
         final saleId = debtor['sale_id'] as int;
-        final currentDebtorBalance = (debtor['balance_amount'] as num).toDouble();
+        final currentDebtorBalance =
+            (debtor['balance_amount'] as num).toDouble();
 
         double paymentApplied = 0.0;
         double newDebtorBalance = 0.0;
@@ -612,10 +644,12 @@ class DatabaseHelper {
           whereArgs: [debtorId],
         );
 
-        final sales = await txn.query('sales', where: 'id = ?', whereArgs: [saleId]);
+        final sales =
+            await txn.query('sales', where: 'id = ?', whereArgs: [saleId]);
         if (sales.isNotEmpty) {
           final sale = sales.first;
-          final newPaid = (sale['amount_paid'] as num).toDouble() + paymentApplied;
+          final newPaid =
+              (sale['amount_paid'] as num).toDouble() + paymentApplied;
           await txn.update(
             'sales',
             {'amount_paid': newPaid, 'balance_due': newDebtorBalance},
@@ -629,12 +663,14 @@ class DatabaseHelper {
   }
 
   // ────────────── AUDIT LOGS ──────────────
-  Future<void> logAction(String action, {String? details, String userId = 'system'}) async {
+  Future<void> logAction(String action,
+      {String? details, String userId = 'system'}) async {
     final db = await database;
     final now = DateTime.now().toUtc().add(const Duration(hours: 8));
-    final timestamp = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+    final timestamp =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
-    
+
     await db.insert('audit_logs', {
       'action': action,
       'details': details,
@@ -643,7 +679,8 @@ class DatabaseHelper {
     });
   }
 
-  Future<List<Map<String, dynamic>>> getLogs({String? dateFrom, String? dateTo}) async {
+  Future<List<Map<String, dynamic>>> getLogs(
+      {String? dateFrom, String? dateTo}) async {
     final db = await database;
     if (dateFrom != null && dateTo != null) {
       return await db.rawQuery(
@@ -656,8 +693,7 @@ class DatabaseHelper {
 
   Future<void> enforceDataRetention() async {
     final db = await database;
-    await db.delete('audit_logs',
-        where: "timestamp < date('now', '-90 days')");
+    await db.delete('audit_logs', where: "timestamp < date('now', '-90 days')");
   }
 
   // ────────────── SETTINGS ──────────────
@@ -674,7 +710,8 @@ class DatabaseHelper {
   }
 
   // ────────────── PAYMENT NOTES ──────────────
-  Future<List<Map<String, dynamic>>> getPaymentNotes({String? dateFrom, String? dateTo}) async {
+  Future<List<Map<String, dynamic>>> getPaymentNotes(
+      {String? dateFrom, String? dateTo}) async {
     final db = await database;
     if (dateFrom != null && dateTo != null) {
       return await db.rawQuery(
@@ -685,14 +722,16 @@ class DatabaseHelper {
     return await db.query('payment_notes', orderBy: 'timestamp DESC');
   }
 
-  Future<void> addPaymentNote(double amount, String recipient, String? purpose, String? timestamp) async {
+  Future<void> addPaymentNote(double amount, String recipient, String? purpose,
+      String? timestamp) async {
     final db = await database;
-    final ts = timestamp ?? () {
-      final now = DateTime.now().toUtc().add(const Duration(hours: 8));
-      return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
-          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
-    }();
-    
+    final ts = timestamp ??
+        () {
+          final now = DateTime.now().toUtc().add(const Duration(hours: 8));
+          return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+              '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+        }();
+
     await db.insert('payment_notes', {
       'amount': amount,
       'recipient': recipient,
@@ -708,7 +747,8 @@ class DatabaseHelper {
 
   Future<List<String>> getDistinctRecipients() async {
     final db = await database;
-    final rows = await db.rawQuery('SELECT DISTINCT recipient FROM payment_notes ORDER BY recipient ASC');
+    final rows = await db.rawQuery(
+        'SELECT DISTINCT recipient FROM payment_notes ORDER BY recipient ASC');
     return rows.map((r) => r['recipient'] as String).toList();
   }
 
@@ -721,7 +761,8 @@ class DatabaseHelper {
   Future<int> parkSale(String? label, String cartData, double total) async {
     final db = await database;
     final now = DateTime.now().toUtc().add(const Duration(hours: 8));
-    final timestamp = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+    final timestamp =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
     return await db.insert('parked_sales', {
       'label': label,
@@ -741,10 +782,11 @@ class DatabaseHelper {
     Database? extDb;
     try {
       extDb = await openDatabase(externalDbPath);
-      
+
       // 1. Fetch products
-      final List<Map<String, dynamic>> extProducts = await extDb.query('products');
-      
+      final List<Map<String, dynamic>> extProducts =
+          await extDb.query('products');
+
       // 2. Fetch bundles
       List<Map<String, dynamic>> extBundles = [];
       try {

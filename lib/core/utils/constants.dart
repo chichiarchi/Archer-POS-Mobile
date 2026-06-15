@@ -31,7 +31,7 @@ const Color kDarkSurface     = Color(0xFF1E293B);
 const Color kDarkSurface2    = Color(0xFF1E3A5F);  // blue-tinted dark surface
 
 // App system info
-const String kSystemTitle       = 'Archer POS';
+const String kSystemTitle       = 'EmmaSarmingStore';
 const String kMasterRecoveryCode = '10152003';
 
 // Pagination

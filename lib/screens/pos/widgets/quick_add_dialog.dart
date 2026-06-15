@@ -13,8 +13,9 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _qtyController = TextEditingController(text: '1.0');
-  
+  final TextEditingController _qtyController =
+      TextEditingController(text: '1.0');
+
   late TextEditingController _activeController;
 
   @override
@@ -66,7 +67,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Name field
                 TextFormField(
                   controller: _nameController,
@@ -105,7 +106,9 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: _activeController == _priceController ? cs.primary : cs.onSurface.withOpacity(0.2),
+                        color: _activeController == _priceController
+                            ? cs.primary
+                            : cs.onSurface.withValues(alpha: 0.2),
                         width: _activeController == _priceController ? 2 : 1,
                       ),
                     ),
@@ -145,11 +148,15 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: _activeController == _qtyController ? cs.primary : cs.onSurface.withOpacity(0.2),
-                              width: _activeController == _qtyController ? 2 : 1,
+                              color: _activeController == _qtyController
+                                  ? cs.primary
+                                  : cs.onSurface.withValues(alpha: 0.2),
+                              width:
+                                  _activeController == _qtyController ? 2 : 1,
                             ),
                           ),
-                          prefixIcon: const Icon(Icons.production_quantity_limits),
+                          prefixIcon:
+                              const Icon(Icons.production_quantity_limits),
                         ),
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
@@ -174,18 +181,21 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                           });
                         } else if (q > 0.1) {
                           setState(() {
-                            final newVal = double.parse((q - 0.1).toStringAsFixed(1));
+                            final newVal =
+                                double.parse((q - 0.1).toStringAsFixed(1));
                             _qtyController.text = newVal.toString();
                           });
                         }
                       },
-                      icon: Icon(Icons.remove_circle_outline, color: cs.primary),
+                      icon:
+                          Icon(Icons.remove_circle_outline, color: cs.primary),
                     ),
                     IconButton(
                       onPressed: () {
                         final q = double.tryParse(_qtyController.text) ?? 1.0;
                         setState(() {
-                          final newVal = double.parse((q + 1.0).toStringAsFixed(1));
+                          final newVal =
+                              double.parse((q + 1.0).toStringAsFixed(1));
                           _qtyController.text = newVal.toString();
                         });
                       },
@@ -222,7 +232,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                         'Cancel',
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ),

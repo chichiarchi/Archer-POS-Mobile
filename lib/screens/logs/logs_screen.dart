@@ -44,10 +44,11 @@ class LogsScreenState extends State<LogsScreen> {
     try {
       final dfStr = DateFormat('yyyy-MM-dd').format(_dateFrom);
       final dtStr = DateFormat('yyyy-MM-dd').format(_dateTo);
-      
+
       // Load logs from DB using filter.
-      final allLogs = await DatabaseHelper.instance.getLogs(dateFrom: dfStr, dateTo: dtStr);
-      
+      final allLogs =
+          await DatabaseHelper.instance.getLogs(dateFrom: dfStr, dateTo: dtStr);
+
       if (mounted) {
         setState(() {
           _logs = allLogs;
@@ -114,7 +115,8 @@ class LogsScreenState extends State<LogsScreen> {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('Admin Verification Required', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
+          title: Text('Admin Verification Required',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -128,9 +130,11 @@ class LogsScreenState extends State<LogsScreen> {
                 obscureText: obscureText,
                 decoration: InputDecoration(
                   labelText: 'Master Code or Admin Password',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   suffixIcon: IconButton(
-                    icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
+                    icon: Icon(
+                        obscureText ? Icons.visibility_off : Icons.visibility),
                     onPressed: () {
                       setDialogState(() {
                         obscureText = !obscureText;
@@ -144,7 +148,8 @@ class LogsScreenState extends State<LogsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+              child: Text('Cancel',
+                  style: GoogleFonts.inter(color: kTextSecondary)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
@@ -155,13 +160,15 @@ class LogsScreenState extends State<LogsScreen> {
                   Navigator.of(ctx).pop();
                   return;
                 }
-                
+
                 // Try to verify against all admin users
                 final db = await DatabaseHelper.instance.database;
-                final admins = await db.query('users', where: 'role = ?', whereArgs: ['admin']);
+                final admins = await db
+                    .query('users', where: 'role = ?', whereArgs: ['admin']);
                 for (final admin in admins) {
                   final username = admin['username'] as String;
-                  final successUser = await DatabaseHelper.instance.verifyLogin(username, input);
+                  final successUser = await DatabaseHelper.instance
+                      .verifyLogin(username, input);
                   if (successUser != null) {
                     verified = true;
                     break;
@@ -172,11 +179,14 @@ class LogsScreenState extends State<LogsScreen> {
                   Navigator.of(ctx).pop();
                 } else {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Invalid code or admin password.'), backgroundColor: kErrorColor),
+                    const SnackBar(
+                        content: Text('Invalid code or admin password.'),
+                        backgroundColor: kErrorColor),
                   );
                 }
               },
-              child: Text('Verify', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+              child: Text('Verify',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -243,19 +253,24 @@ class LogsScreenState extends State<LogsScreen> {
                   children: [
                     Text(
                       'Receipt Preview',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18),
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w800, fontSize: 18),
                     ),
                     if (voided)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: kErrorColor.withOpacity(0.1),
+                          color: kErrorColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: kErrorColor),
                         ),
                         child: Text(
                           'VOIDED',
-                          style: GoogleFonts.inter(color: kErrorColor, fontWeight: FontWeight.w800, fontSize: 11),
+                          style: GoogleFonts.inter(
+                              color: kErrorColor,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11),
                         ),
                       ),
                   ],
@@ -268,16 +283,26 @@ class LogsScreenState extends State<LogsScreen> {
                       Center(
                         child: Text(
                           kSystemTitle.toUpperCase(),
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 22, color: kPrimaryColor),
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 22,
+                              color: kPrimaryColor),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text('Sale ID: #$saleId', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-                      Text('Date: ${formatDateTime(sale['timestamp'] as String)}'),
+                      Text('Sale ID: #$saleId',
+                          style:
+                              GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                      Text(
+                          'Date: ${formatDateTime(sale['timestamp'] as String)}'),
                       Text('Cashier: ${sale['created_by'] ?? 'admin'}'),
                       if (customerName != null) Text('Customer: $customerName'),
                       const Divider(height: 24),
-                      Text('ITEMS:', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: kTextSecondary)),
+                      Text('ITEMS:',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: kTextSecondary)),
                       const SizedBox(height: 8),
                       ...items.map((item) {
                         final qty = (item['quantity'] as num).toDouble();
@@ -300,8 +325,14 @@ class LogsScreenState extends State<LogsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('TOTAL DUE:', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
-                          Text(formatCurrency(total), style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 18, color: kPrimaryColor)),
+                          Text('TOTAL DUE:',
+                              style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w800)),
+                          Text(formatCurrency(total),
+                              style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 18,
+                                  color: kPrimaryColor)),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -316,8 +347,14 @@ class LogsScreenState extends State<LogsScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Balance Due:', style: GoogleFonts.inter(color: kErrorColor, fontWeight: FontWeight.w700)),
-                            Text(formatCurrency(balance), style: GoogleFonts.inter(color: kErrorColor, fontWeight: FontWeight.w700)),
+                            Text('Balance Due:',
+                                style: GoogleFonts.inter(
+                                    color: kErrorColor,
+                                    fontWeight: FontWeight.w700)),
+                            Text(formatCurrency(balance),
+                                style: GoogleFonts.inter(
+                                    color: kErrorColor,
+                                    fontWeight: FontWeight.w700)),
                           ],
                         )
                       else
@@ -340,17 +377,21 @@ class LogsScreenState extends State<LogsScreen> {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: kErrorColor,
                             side: const BorderSide(color: kErrorColor),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           onPressed: () async {
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (ctx3) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
                                 title: Text(
                                   'Void Sale',
-                                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: kErrorColor),
+                                  style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      color: kErrorColor),
                                 ),
                                 content: Text(
                                   'Are you sure you want to void sale #$saleId? This action cannot be undone.',
@@ -358,17 +399,25 @@ class LogsScreenState extends State<LogsScreen> {
                                 ),
                                 actions: [
                                   TextButton(
-                                    onPressed: () => Navigator.of(ctx3).pop(false),
-                                    child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+                                    onPressed: () =>
+                                        Navigator.of(ctx3).pop(false),
+                                    child: Text('Cancel',
+                                        style: GoogleFonts.inter(
+                                            color: kTextSecondary)),
                                   ),
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: kErrorColor,
                                       foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8)),
                                     ),
-                                    onPressed: () => Navigator.of(ctx3).pop(true),
-                                    child: Text('Void', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                                    onPressed: () =>
+                                        Navigator.of(ctx3).pop(true),
+                                    child: Text('Void',
+                                        style: GoogleFonts.inter(
+                                            fontWeight: FontWeight.w700)),
                                   ),
                                 ],
                               ),
@@ -377,7 +426,8 @@ class LogsScreenState extends State<LogsScreen> {
 
                             final verify = await _verifyAdminPermission();
                             if (verify) {
-                              final success = await DatabaseHelper.instance.voidSale(saleId, widget.username);
+                              final success = await DatabaseHelper.instance
+                                  .voidSale(saleId, widget.username);
                               if (success) {
                                 await DatabaseHelper.instance.logAction(
                                   kActionVoidSale,
@@ -385,15 +435,19 @@ class LogsScreenState extends State<LogsScreen> {
                                   userId: widget.username,
                                 );
                                 Navigator.of(ctx).pop();
-                                _showSnackBar('Sale #$saleId voided successfully!');
+                                _showSnackBar(
+                                    'Sale #$saleId voided successfully!');
                                 _loadLogs();
                               } else {
-                                _showSnackBar('Failed to void sale.', isError: true);
+                                _showSnackBar('Failed to void sale.',
+                                    isError: true);
                               }
                             }
                           },
                           icon: const Icon(Icons.block, size: 18),
-                          label: Text('VOID SALE', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                          label: Text('VOID SALE',
+                              style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700)),
                         ),
                       ),
                     if (!voided) const SizedBox(width: 12),
@@ -402,7 +456,8 @@ class LogsScreenState extends State<LogsScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimaryColor,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         onPressed: () async {
@@ -410,25 +465,30 @@ class LogsScreenState extends State<LogsScreen> {
                           try {
                             await ReceiptPrinter.printReceipt(
                               saleId: saleId,
-                              timestamp: sale['timestamp'] as String? ?? DateTime.now().toIso8601String(),
+                              timestamp: sale['timestamp'] as String? ??
+                                  DateTime.now().toIso8601String(),
                               cashier: sale['created_by'] as String? ?? 'admin',
                               totalAmount: total,
                               amountPaid: paid,
                               balanceDue: balance,
                               customerName: customerName,
-                              items: items.map((i) => {
-                                'product_id': i['product_id'] ?? '',
-                                'product_name': i['product_name'] ?? '',
-                                'quantity': i['quantity'] ?? 0.0,
-                                'price': i['price'] ?? 0.0,
-                              }).toList(),
+                              items: items
+                                  .map((i) => {
+                                        'product_id': i['product_id'] ?? '',
+                                        'product_name': i['product_name'] ?? '',
+                                        'quantity': i['quantity'] ?? 0.0,
+                                        'price': i['price'] ?? 0.0,
+                                      })
+                                  .toList(),
                             );
                           } catch (pe) {
                             _showSnackBar('Printing error: $pe', isError: true);
                           }
                         },
                         icon: const Icon(Icons.print, size: 18),
-                        label: Text('REPRINT RECEIPT', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                        label: Text('REPRINT RECEIPT',
+                            style:
+                                GoogleFonts.inter(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
@@ -457,12 +517,14 @@ class LogsScreenState extends State<LogsScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.date_range, color: Theme.of(context).colorScheme.primary),
+            icon: Icon(Icons.date_range,
+                color: Theme.of(context).colorScheme.primary),
             onPressed: _selectDateRange,
             tooltip: 'Filter Date Range',
           ),
           IconButton(
-            icon: Icon(Icons.refresh, color: Theme.of(context).colorScheme.primary),
+            icon: Icon(Icons.refresh,
+                color: Theme.of(context).colorScheme.primary),
             onPressed: _loadLogs,
             tooltip: 'Refresh Logs',
           ),
@@ -472,22 +534,32 @@ class LogsScreenState extends State<LogsScreen> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF1E293B)
+                : Colors.white,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Flexible(
                   child: Text(
                     'Range: ${DateFormat('MMM dd, yyyy').format(_dateFrom)} – ${DateFormat('MMM dd, yyyy').format(_dateTo)}',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                        fontSize: 13),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '${_logs.length} logs',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary, fontSize: 14),
+                  style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 14),
                 ),
               ],
             ),
@@ -510,9 +582,12 @@ class LogsScreenState extends State<LogsScreen> {
                             itemBuilder: (ctx, index) {
                               final log = paginatedLogs[index];
                               final action = log['action'] as String? ?? '';
-                              final user = log['user_id'] as String? ?? log['username'] as String? ?? 'system';
+                              final user = log['user_id'] as String? ??
+                                  log['username'] as String? ??
+                                  'system';
                               final details = log['details'] as String? ?? '';
-                              final timestamp = log['timestamp'] as String? ?? '';
+                              final timestamp =
+                                  log['timestamp'] as String? ?? '';
 
                               Color actionColor = kPrimaryColor;
                               IconData actionIcon = Icons.info_outline;
@@ -526,55 +601,86 @@ class LogsScreenState extends State<LogsScreen> {
                               } else if (action.contains('PRODUCT')) {
                                 actionColor = Colors.orange;
                                 actionIcon = Icons.inventory;
-                              } else if (action.contains('PASSWORD') || action.contains('LOGIN')) {
+                              } else if (action.contains('PASSWORD') ||
+                                  action.contains('LOGIN')) {
                                 actionColor = Colors.purple;
                                 actionIcon = Icons.security;
                               }
 
                               return Card(
-                                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
                                 child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 6),
                                   onTap: () => _handleRowTap(log),
                                   leading: CircleAvatar(
-                                    backgroundColor: actionColor.withOpacity(0.1),
+                                    backgroundColor:
+                                        actionColor.withValues(alpha: 0.1),
                                     child: Icon(actionIcon, color: actionColor),
                                   ),
                                   title: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Flexible(
                                         child: Text(
                                           action,
-                                          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14, color: actionColor),
+                                          style: GoogleFonts.inter(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 14,
+                                              color: actionColor),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
                                         formatDateTime(timestamp),
-                                        style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                                        style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.5)),
                                       ),
                                     ],
                                   ),
                                   subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const SizedBox(height: 4),
                                       Text(
                                         details,
-                                        style: GoogleFonts.inter(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w500),
+                                        style: GoogleFonts.inter(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         'User: $user',
-                                        style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55), fontWeight: FontWeight.w600),
+                                        style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.55),
+                                            fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ),
-                                  trailing: (action == 'POS_SALE' || action == 'VOID_SALE')
-                                      ? Icon(Icons.receipt, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))
+                                  trailing: (action == 'POS_SALE' ||
+                                          action == 'VOID_SALE')
+                                      ? Icon(Icons.receipt,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.4))
                                       : null,
                                 ),
                               );
@@ -583,7 +689,8 @@ class LogsScreenState extends State<LogsScreen> {
                           if (isTablet) {
                             return Center(
                               child: ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 900),
+                                constraints:
+                                    const BoxConstraints(maxWidth: 900),
                                 child: listView,
                               ),
                             );
@@ -595,7 +702,9 @@ class LogsScreenState extends State<LogsScreen> {
           if (_logs.length > _pageSize)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1E293B)
+                  : Colors.white,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -607,7 +716,8 @@ class LogsScreenState extends State<LogsScreen> {
                   ),
                   Text(
                     'Page ${_currentPage + 1} of ${(_logs.length / _pageSize).ceil()}',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15),
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700, fontSize: 15),
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_forward_ios, size: 18),

@@ -1,4 +1,4 @@
-/// Represents a product in the Archer POS inventory.
+/// Represents a product in the EmmaSarmingStore inventory.
 class Product {
   /// Barcode — also used as the unique identifier.
   final String id;

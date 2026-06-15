@@ -186,7 +186,8 @@ class _LoginScreenState extends State<LoginScreen>
     if (ok) {
       await DatabaseHelper.instance.logAction(
         'PASSWORD_RESET',
-        details: 'Admin password reset via master code for user: $adminUsername',
+        details:
+            'Admin password reset via master code for user: $adminUsername',
         userId: adminUsername.trim(),
       );
       _showSnackBar('Password updated successfully!', isError: false);
@@ -232,17 +233,20 @@ class _LoginScreenState extends State<LoginScreen>
                 style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface),
                 decoration: InputDecoration(
                   labelText: label,
-                  labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                  labelStyle:
+                      TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
                   hintText: hint,
-                  hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.4)),
-                  prefixIcon: Icon(icon, color: isDark ? cs.primary : _primaryBlue),
+                  hintStyle:
+                      TextStyle(color: cs.onSurface.withValues(alpha: 0.4)),
+                  prefixIcon:
+                      Icon(icon, color: isDark ? cs.primary : _primaryBlue),
                   suffixIcon: obscure
                       ? IconButton(
                           icon: Icon(
                             localObscure
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: cs.onSurface.withOpacity(0.55),
+                            color: cs.onSurface.withValues(alpha: 0.55),
                           ),
                           onPressed: () => setDialogState(
                               () => localObscure = !localObscure),
@@ -252,8 +256,8 @@ class _LoginScreenState extends State<LoginScreen>
                       borderRadius: BorderRadius.circular(10)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        BorderSide(color: isDark ? cs.primary : _primaryBlue, width: 2),
+                    borderSide: BorderSide(
+                        color: isDark ? cs.primary : _primaryBlue, width: 2),
                   ),
                 ),
                 onSubmitted: (_) => Navigator.of(ctx).pop(controller.text),
@@ -263,20 +267,20 @@ class _LoginScreenState extends State<LoginScreen>
                   onPressed: () => Navigator.of(ctx).pop(null),
                   child: Text('Cancel',
                       style: GoogleFonts.inter(
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                           fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cs.primary,
-                    foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                    foregroundColor:
+                        isDark ? const Color(0xFF0F172A) : Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: () => Navigator.of(ctx).pop(controller.text),
                   child: Text('Continue',
-                      style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                 ),
               ],
             );
@@ -319,8 +323,8 @@ class _LoginScreenState extends State<LoginScreen>
                 child: SlideTransition(
                   position: _slideAnim,
                   child: ConstrainedBox(
-                    constraints:
-                        BoxConstraints(maxWidth: isTablet ? 460 : double.infinity),
+                    constraints: BoxConstraints(
+                        maxWidth: isTablet ? 460 : double.infinity),
                     child: _buildCard(isLargePhone),
                   ),
                 ),
@@ -344,7 +348,9 @@ class _LoginScreenState extends State<LoginScreen>
         border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.3) : const Color(0xFF0072FF).withOpacity(0.18),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : const Color(0xFF0072FF).withValues(alpha: 0.18),
             blurRadius: 40,
             offset: const Offset(0, 16),
           ),
@@ -370,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen>
                 colors: [_primaryBlue, _secondaryBlue],
               ).createShader(bounds),
               child: Text(
-                'ARCHER POS',
+                'EMMASARMINGSTORE',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 28,
@@ -388,7 +394,7 @@ class _LoginScreenState extends State<LoginScreen>
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 14,
-                color: cs.onSurface.withOpacity(0.6),
+                color: cs.onSurface.withValues(alpha: 0.6),
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -402,24 +408,30 @@ class _LoginScreenState extends State<LoginScreen>
               style: GoogleFonts.inter(fontSize: 15, color: cs.onSurface),
               decoration: InputDecoration(
                 labelText: 'Username',
-                labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                labelStyle:
+                    TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
                 hintText: 'Enter your username',
-                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.4)),
-                prefixIcon: const Icon(Icons.person_outline,
-                    color: _primaryBlue),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                hintStyle:
+                    TextStyle(color: cs.onSurface.withValues(alpha: 0.4)),
+                prefixIcon:
+                    const Icon(Icons.person_outline, color: _primaryBlue),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFCBD5E1)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: isDark ? cs.primary : _primaryBlue, width: 2),
+                  borderSide: BorderSide(
+                      color: isDark ? cs.primary : _primaryBlue, width: 2),
                 ),
                 filled: true,
-                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                fillColor:
+                    isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) {
@@ -439,34 +451,39 @@ class _LoginScreenState extends State<LoginScreen>
               onFieldSubmitted: (_) => _isLoading ? null : _handleLogin(),
               decoration: InputDecoration(
                 labelText: 'Password',
-                labelStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                labelStyle:
+                    TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
                 hintText: 'Enter your password',
-                hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.4)),
-                prefixIcon:
-                    const Icon(Icons.lock_outline, color: _primaryBlue),
+                hintStyle:
+                    TextStyle(color: cs.onSurface.withValues(alpha: 0.4)),
+                prefixIcon: const Icon(Icons.lock_outline, color: _primaryBlue),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePassword
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
-                    color: cs.onSurface.withOpacity(0.55),
+                    color: cs.onSurface.withValues(alpha: 0.55),
                   ),
                   onPressed: () =>
                       setState(() => _obscurePassword = !_obscurePassword),
                 ),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  borderSide: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFCBD5E1)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      BorderSide(color: isDark ? cs.primary : _primaryBlue, width: 2),
+                  borderSide: BorderSide(
+                      color: isDark ? cs.primary : _primaryBlue, width: 2),
                 ),
                 filled: true,
-                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                fillColor:
+                    isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               ),
               validator: (v) {
                 if (v == null || v.isEmpty) {
@@ -487,8 +504,8 @@ class _LoginScreenState extends State<LoginScreen>
                 onPressed: _isLoading ? null : _handleForgotPassword,
                 style: TextButton.styleFrom(
                   foregroundColor: isDark ? cs.primary : _primaryBlue,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
                 child: Text(
                   'Forgot Password?',
@@ -506,7 +523,7 @@ class _LoginScreenState extends State<LoginScreen>
 
             // ── Version footer ─────────────────────────────────────────
             Text(
-              'Archer POS v2.0.0',
+              'EmmaSarmingStore v2.0.0',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 11,
@@ -533,16 +550,21 @@ class _LoginScreenState extends State<LoginScreen>
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: _primaryBlue.withOpacity(0.35),
+              color: _primaryBlue.withValues(alpha: 0.35),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: const Icon(
-          Icons.point_of_sale_rounded,
-          color: Colors.white,
-          size: 46,
+        child: Center(
+          child: Text(
+            'E',
+            style: GoogleFonts.inter(
+              fontSize: 52,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
         ),
       ),
     );
@@ -565,7 +587,7 @@ class _LoginScreenState extends State<LoginScreen>
             ? null
             : [
                 BoxShadow(
-                  color: _primaryBlue.withOpacity(0.40),
+                  color: _primaryBlue.withValues(alpha: 0.40),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -584,8 +606,7 @@ class _LoginScreenState extends State<LoginScreen>
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
                 : Text(
