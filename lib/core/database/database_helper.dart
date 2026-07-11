@@ -323,6 +323,37 @@ class DatabaseHelper {
     ''', [limit, offset]);
   }
 
+  Future<List<Map<String, dynamic>>> getProductsByTerms(List<String> terms, {int limit = 100}) async {
+    final db = await database;
+    if (terms.isEmpty) {
+      return await getProducts(limit: limit);
+    }
+    
+    final List<String> whereClauses = [];
+    final List<dynamic> whereArgs = [];
+    
+    for (final term in terms) {
+      whereClauses.add('(p.id LIKE ? OR p.name LIKE ?)');
+      final like = '%$term%';
+      whereArgs.add(like);
+      whereArgs.add(like);
+    }
+    
+    whereArgs.add(limit);
+    
+    final queryStr = '''
+      SELECT p.*, 
+        CASE WHEN EXISTS (SELECT 1 FROM product_bundles WHERE product_id = p.id) 
+             THEN 1 ELSE 0 END as has_bundle
+      FROM products p
+      WHERE ${whereClauses.join(' AND ')}
+      ORDER BY p.name ASC
+      LIMIT ?
+    ''';
+    
+    return await db.rawQuery(queryStr, whereArgs);
+  }
+
   Future<int> getProductCount({String? search}) async {
     final db = await database;
     if (search != null && search.isNotEmpty) {

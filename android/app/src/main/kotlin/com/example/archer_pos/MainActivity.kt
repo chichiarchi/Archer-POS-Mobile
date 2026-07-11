@@ -71,6 +71,10 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         super.onDestroy()
         try {
+            toneGen?.release()
+            toneGen = null
+        } catch (e: Exception) {}
+        try {
             unregisterReceiver(usbReceiver)
         } catch (e: Exception) {
             // ignore
@@ -156,7 +160,7 @@ class MainActivity : FlutterActivity() {
             if (call.method == "playBeep") {
                 try {
                     if (toneGen == null) {
-                        toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+                        toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
                     }
                     toneGen?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
                     result.success(null)

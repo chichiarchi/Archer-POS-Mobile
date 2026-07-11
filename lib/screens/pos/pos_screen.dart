@@ -337,8 +337,34 @@ class POSScreenState extends State<POSScreen> {
   }
 
   Future<void> _loadSuggestions() async {
-    final products = await DatabaseHelper.instance.getProducts(limit: 500);
+    final products = await DatabaseHelper.instance.getProducts(limit: 100);
     if (mounted) setState(() => _searchSuggestions = products);
+  }
+
+  Future<void> _onSearchQueryChanged(String val, StateSetter setStateSearchBar) async {
+    final query = val.trim();
+    if (query.isEmpty) {
+      final products = await DatabaseHelper.instance.getProducts(limit: 100);
+      if (mounted) {
+        setState(() {
+          _searchSuggestions = products;
+          _showSuggestions = false;
+        });
+        setStateSearchBar(() {});
+      }
+      return;
+    }
+
+    final terms = query.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    final products = await DatabaseHelper.instance.getProductsByTerms(terms, limit: 100);
+    
+    if (mounted) {
+      setState(() {
+        _searchSuggestions = products;
+        _showSuggestions = true;
+      });
+      setStateSearchBar(() {});
+    }
   }
 
   List<Map<String, dynamic>> _getFilteredSuggestionsForQuery(String query) {
@@ -346,13 +372,67 @@ class POSScreenState extends State<POSScreen> {
     if (q.isEmpty) return [];
     final terms = q.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
     if (terms.isEmpty) return [];
-    return _searchSuggestions
+    
+    final matches = _searchSuggestions
         .where((p) {
           final id = (p['id'] as String).toLowerCase();
           final name = (p['name'] as String).toLowerCase();
           return terms.every((term) => id.contains(term) || name.contains(term));
         })
         .toList();
+
+    // Sort matches by relevance score
+    matches.sort((a, b) {
+      final aName = (a['name'] as String).toLowerCase();
+      final bName = (b['name'] as String).toLowerCase();
+      
+      final aScore = _calculateRelevanceScore(aName, q, terms);
+      final bScore = _calculateRelevanceScore(bName, q, terms);
+      
+      if (aScore != bScore) {
+        return bScore.compareTo(aScore); // Higher score first
+      }
+      
+      return aName.compareTo(bName);
+    });
+
+    return matches;
+  }
+
+  int _calculateRelevanceScore(String name, String query, List<String> terms) {
+    int score = 0;
+    
+    if (name == query) {
+      score += 10000;
+    }
+    
+    if (name.startsWith(query)) {
+      score += 5000;
+    }
+    
+    final words = name.split(RegExp(r'\s+'));
+    bool wordStartsWithQuery = false;
+    int wordMatchCount = 0;
+    for (final word in words) {
+      if (word.startsWith(query)) {
+        wordStartsWithQuery = true;
+      }
+      for (final term in terms) {
+        if (word == term) {
+          wordMatchCount += 2;
+        } else if (word.startsWith(term)) {
+          wordMatchCount += 1;
+        }
+      }
+    }
+    
+    if (wordStartsWithQuery) {
+      score += 2000;
+    }
+    
+    score += wordMatchCount * 100;
+    
+    return score;
   }
 
   List<Map<String, dynamic>> get _filteredSuggestions {
@@ -820,9 +900,7 @@ class POSScreenState extends State<POSScreen> {
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
-                          setStateSearchBar(() {
-                            _showSuggestions = false;
-                          });
+                          _onSearchQueryChanged('', setStateSearchBar);
                         },
                       )
                     : null,
@@ -838,10 +916,7 @@ class POSScreenState extends State<POSScreen> {
                 fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               ),
               onChanged: (val) {
-                // Rebuild only the search bar to avoid full-screen and camera preview rebuild lag while typing
-                setStateSearchBar(() {
-                  _showSuggestions = val.isNotEmpty;
-                });
+                _onSearchQueryChanged(val, setStateSearchBar);
               },
               onSubmitted: _addItemByBarcode,
               style: GoogleFonts.inter(fontSize: 16, color: cs.onSurface),
