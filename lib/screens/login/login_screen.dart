@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/database/database_helper.dart';
 import '../main/main_screen.dart';
+import '../../core/utils/r2_sync_service.dart';
 
 // ---------------------------------------------------------------------------
 // LoginScreen
@@ -91,9 +92,32 @@ class _LoginScreenState extends State<LoginScreen>
     final success = await auth.login(username, password);
 
     if (!mounted) return;
-    setState(() => _isLoading = false);
 
     if (success) {
+      // Check if daily sync is needed
+      try {
+        final isSyncNeeded = await R2SyncService.instance.isDailySyncNeeded();
+        if (isSyncNeeded) {
+          _showSnackBar('First login of the day: Syncing catalog from R2...', isError: false);
+          final result = await R2SyncService.instance.performSync();
+          if (mounted) {
+            if (result['success'] == true) {
+              _showSnackBar('Cloud sync complete! 🎉', isError: false);
+            } else {
+              _showSnackBar('Sync failed: ${result['message']}. Using local catalog.', isError: true);
+              // Give the user a brief moment to read the snackbar before proceeding
+              await Future.delayed(const Duration(seconds: 2));
+            }
+          }
+        }
+      } catch (e) {
+        // Log error and proceed to ensure login resilience
+        debugPrint('R2 auto-sync error: $e');
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
       final role = auth.role ?? 'staff';
       final loggedUser = auth.username ?? username;
       Navigator.of(context).pushReplacement(
@@ -106,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       );
     } else {
+      setState(() => _isLoading = false);
       _showSnackBar(auth.error ?? 'Invalid username or password.');
     }
   }

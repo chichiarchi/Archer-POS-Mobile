@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/providers/cart_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/database/database_helper.dart';
@@ -45,6 +47,11 @@ class POSScreenState extends State<POSScreen> {
   DateTime? _lastScanTime;
   static const _beepChannel = MethodChannel('com.example.archer_pos/beep');
 
+  // Camera Barcode Scanner State
+  bool _isCameraActive = false;
+  bool _cameraSettingEnabled = true;
+  MobileScannerController? _scannerController;
+
   Future<void> _playBeep() async {
     try {
       await _beepChannel.invokeMethod('playBeep');
@@ -60,6 +67,16 @@ class POSScreenState extends State<POSScreen> {
     _qtyFocus.addListener(_onQtyFocusChange);
     _searchFocus.addListener(_onSearchFocusChange);
     _loadSuggestions();
+    _loadScannerSetting();
+  }
+
+  Future<void> _loadScannerSetting() async {
+    final val = await DatabaseHelper.instance.getSetting('camera_barcode_enabled');
+    if (mounted) {
+      setState(() {
+        _cameraSettingEnabled = val != 'false';
+      });
+    }
   }
 
   void _onSearchFocusChange() {
@@ -160,7 +177,159 @@ class POSScreenState extends State<POSScreen> {
     _qtyController.dispose();
     _qtyFocus.removeListener(_onQtyFocusChange);
     _qtyFocus.dispose();
+    _scannerController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleCamera() async {
+    if (_isCameraActive) {
+      setState(() {
+        _isCameraActive = false;
+      });
+      _scannerController?.dispose();
+      _scannerController = null;
+    } else {
+      final status = await Permission.camera.request();
+      if (status.isGranted) {
+        setState(() {
+          _isCameraActive = true;
+          _scannerController = MobileScannerController(
+            formats: [
+              BarcodeFormat.ean8,
+              BarcodeFormat.ean13,
+              BarcodeFormat.code39,
+              BarcodeFormat.code128,
+              BarcodeFormat.upcA,
+              BarcodeFormat.upcE,
+            ],
+          );
+        });
+      } else {
+        _showSnackBar('Camera permission is required to scan barcodes.', isError: true);
+      }
+    }
+  }
+
+  void _onBarcodeScanned(String code) {
+    final now = DateTime.now();
+    if (_lastScanTime != null && now.difference(_lastScanTime!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastScanTime = now;
+    _playBeep();
+    _addItemByBarcode(code);
+    _showSnackBar('Scanned: $code');
+  }
+
+  Widget _buildCameraScannerWidget() {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      height: 200,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.primary, width: 2),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          MobileScanner(
+            controller: _scannerController,
+            onDetect: (capture) {
+              final List<Barcode> barcodes = capture.barcodes;
+              for (final barcode in barcodes) {
+                final String? rawValue = barcode.rawValue;
+                if (rawValue != null && rawValue.isNotEmpty) {
+                  _onBarcodeScanned(rawValue);
+                  break;
+                }
+              }
+            },
+          ),
+          Center(
+            child: Container(
+              width: 240,
+              height: 100,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white.withOpacity(0.6), width: 2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Stack(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 1000),
+                    alignment: Alignment.center,
+                    child: Container(
+                      height: 2,
+                      color: cs.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Row(
+              children: [
+                IconButton(
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black54,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: _scannerController != null
+                      ? ValueListenableBuilder(
+                          valueListenable: _scannerController!,
+                          builder: (context, state, child) {
+                            final torchState = state.torchState;
+                            switch (torchState) {
+                              case TorchState.off:
+                                return const Icon(Icons.flash_off, size: 18);
+                              case TorchState.on:
+                                return const Icon(Icons.flash_on, size: 18);
+                              case TorchState.unavailable:
+                                return const Icon(Icons.flash_off, size: 18);
+                              case TorchState.auto:
+                                return const Icon(Icons.flash_auto, size: 18);
+                            }
+                          },
+                        )
+                      : const Icon(Icons.flash_off, size: 18),
+                  onPressed: () => _scannerController?.toggleTorch(),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black54,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: _toggleCamera,
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 8,
+            left: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Point camera at a barcode',
+                style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void refresh() {
@@ -575,6 +744,7 @@ class POSScreenState extends State<POSScreen> {
       body: Column(
         children: [
           _buildSearchBar(),
+          if (_isCameraActive) _buildCameraScannerWidget(),
           _buildCartList(flex: 1),
           _buildBottomBar(),
         ],
@@ -595,6 +765,7 @@ class POSScreenState extends State<POSScreen> {
             child: Column(
               children: [
                 _buildSearchBar(),
+                if (_isCameraActive) _buildCameraScannerWidget(),
                 Expanded(child: _buildCartTable()),
               ],
             ),
@@ -635,7 +806,15 @@ class POSScreenState extends State<POSScreen> {
                 hintText: isNarrow
                     ? 'Scan or search...'
                     : 'Scan barcode or type product name...',
-                prefixIcon: Icon(Icons.qr_code_scanner, color: cs.primary),
+                prefixIcon: _cameraSettingEnabled
+                    ? IconButton(
+                        icon: Icon(
+                          _isCameraActive ? Icons.camera : Icons.qr_code_scanner,
+                          color: _isCameraActive ? Colors.green : cs.primary,
+                        ),
+                        onPressed: _toggleCamera,
+                      )
+                    : Icon(Icons.qr_code_scanner, color: cs.primary),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear),

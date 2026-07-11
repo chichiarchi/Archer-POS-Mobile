@@ -6,10 +6,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/utils/constants.dart';
+import '../../core/utils/r2_sync_service.dart';
 
 class AccountScreen extends StatefulWidget {
   final String username;
@@ -31,10 +34,25 @@ class AccountScreenState extends State<AccountScreen> {
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
+  // R2 Sync state and controllers
+  final TextEditingController _r2AccountIdController = TextEditingController();
+  final TextEditingController _r2AccessKeyController = TextEditingController();
+  final TextEditingController _r2SecretKeyController = TextEditingController();
+  final TextEditingController _r2BucketController = TextEditingController();
+  final TextEditingController _r2FileNameController = TextEditingController();
+
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+
+  // R2 states
+  bool _r2AutoSync = true;
+  String _r2LastSync = 'Never';
+  bool _obscureR2Secret = true;
+  bool _isR2Syncing = false;
+  bool _isSavingR2 = false;
+  bool _cameraBarcodeEnabled = true;
 
   List<Map<String, dynamic>> _users = [];
   bool _loadingUsers = false;
@@ -43,6 +61,78 @@ class AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     _loadUsers();
+    _loadR2Settings();
+  }
+
+  Future<void> _loadR2Settings() async {
+    final accountId = await DatabaseHelper.instance.getSetting(R2SyncService.keyAccountId);
+    final accessKey = await DatabaseHelper.instance.getSetting(R2SyncService.keyAccessKeyId);
+    final secretKey = await DatabaseHelper.instance.getSetting(R2SyncService.keySecretAccessKey);
+    final bucket = await DatabaseHelper.instance.getSetting(R2SyncService.keyBucketName);
+    final fileName = await DatabaseHelper.instance.getSetting(R2SyncService.keyFileName);
+    final autoSync = await DatabaseHelper.instance.getSetting(R2SyncService.keyAutoSync);
+    final lastSync = await DatabaseHelper.instance.getSetting(R2SyncService.keyLastSyncDate);
+    final camVal = await DatabaseHelper.instance.getSetting('camera_barcode_enabled');
+
+    if (mounted) {
+      setState(() {
+        _r2AccountIdController.text = accountId ?? '';
+        _r2AccessKeyController.text = accessKey ?? '';
+        _r2SecretKeyController.text = secretKey ?? '';
+        _r2BucketController.text = bucket ?? R2SyncService.defaultBucket;
+        _r2FileNameController.text = fileName ?? R2SyncService.defaultFileName;
+        _r2AutoSync = autoSync != 'false';
+        _r2LastSync = lastSync ?? 'Never';
+        _cameraBarcodeEnabled = camVal != 'false';
+      });
+    }
+  }
+
+  Future<void> _saveR2Settings() async {
+    setState(() => _isSavingR2 = true);
+    try {
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyAccountId, _r2AccountIdController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyAccessKeyId, _r2AccessKeyController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keySecretAccessKey, _r2SecretKeyController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyBucketName, _r2BucketController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyFileName, _r2FileNameController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyAutoSync, _r2AutoSync.toString());
+      
+      _showSnackBar('R2 configurations saved successfully!');
+    } catch (e) {
+      _showSnackBar('Failed to save configuration: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isSavingR2 = false);
+    }
+  }
+
+  Future<void> _runR2Sync() async {
+    // Save current configuration first if admin
+    if (widget.userRole.toLowerCase() == 'admin') {
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyAccountId, _r2AccountIdController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyAccessKeyId, _r2AccessKeyController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keySecretAccessKey, _r2SecretKeyController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyBucketName, _r2BucketController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyFileName, _r2FileNameController.text.trim());
+      await DatabaseHelper.instance.setSetting(R2SyncService.keyAutoSync, _r2AutoSync.toString());
+    }
+
+    setState(() => _isR2Syncing = true);
+    
+    final result = await R2SyncService.instance.performSync();
+    
+    if (mounted) {
+      setState(() => _isR2Syncing = false);
+      if (result['success'] == true) {
+        _showSnackBar(result['message'] as String);
+        final lastSync = await DatabaseHelper.instance.getSetting(R2SyncService.keyLastSyncDate);
+        setState(() {
+          _r2LastSync = lastSync ?? 'Never';
+        });
+      } else {
+        _showSnackBar(result['message'] as String, isError: true);
+      }
+    }
   }
 
 
@@ -254,6 +344,11 @@ class AccountScreenState extends State<AccountScreen> {
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _r2AccountIdController.dispose();
+    _r2AccessKeyController.dispose();
+    _r2SecretKeyController.dispose();
+    _r2BucketController.dispose();
+    _r2FileNameController.dispose();
     super.dispose();
   }
 
@@ -413,13 +508,39 @@ class AccountScreenState extends State<AccountScreen> {
         return;
       }
 
-      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-      if (selectedDirectory != null) {
-        final targetPath = p.join(selectedDirectory, 'archer_pos_backup.db');
-        await sourceFile.copy(targetPath);
-        _showSnackBar('Database exported successfully to: $targetPath');
+      if (Platform.isAndroid) {
+        // Use native Android MediaStore channel to save directly to local Downloads folder
+        const platformChannel = MethodChannel('com.example.archer_pos/file_export');
+        final timestamp = DateTime.now().toIso8601String().replaceAll(RegExp(r'[-:T.]'), '_').substring(0, 15);
+        final fileName = 'archer_pos_backup_$timestamp.db';
+        
+        setState(() => _isLoading = true);
+        final bool? success = await platformChannel.invokeMethod<bool>('exportToDownloads', {
+          'sourcePath': sourcePath,
+          'fileName': fileName,
+        });
+        setState(() => _isLoading = false);
+
+        if (success == true) {
+          _showSnackBar('Database exported successfully to local storage (Downloads)! 📂');
+        } else {
+          _showSnackBar('Failed to export database to local storage.', isError: true);
+        }
+      } else {
+        // Fallback for non-Android platforms
+        final bytes = await sourceFile.readAsBytes();
+        final outputFile = await FilePicker.platform.saveFile(
+          dialogTitle: 'Select location to save database backup:',
+          fileName: 'archer_pos_backup.db',
+          bytes: bytes,
+        );
+
+        if (outputFile != null) {
+          _showSnackBar('Database exported successfully! 🎉');
+        }
       }
     } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
       _showSnackBar('Failed to export database: $e', isError: true);
     }
   }
@@ -603,9 +724,9 @@ class AccountScreenState extends State<AccountScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Appearance', style: sectionTitleStyle),
+                          Text('Appearance & Scanner Settings', style: sectionTitleStyle),
                           const SizedBox(height: 4),
-                          Text('Switch between light and dark interface themes.', style: sectionSubStyle),
+                          Text('Configure app look and barcode scanner options.', style: sectionSubStyle),
                           const Divider(height: 28),
                           Row(
                             children: [
@@ -636,6 +757,43 @@ class AccountScreenState extends State<AccountScreen> {
                               Switch(
                                 value: tp.isDarkMode,
                                 onChanged: (val) => tp.setDarkMode(val),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          Row(
+                            children: [
+                              Container(
+                                width: 44, height: 44,
+                                decoration: BoxDecoration(
+                                  color: cs.primary.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.qr_code_scanner_rounded,
+                                  color: cs.primary,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Camera Barcode Scanner',
+                                        style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15, color: cs.onSurface)),
+                                    Text('Enable camera barcode scanning on POS screen.',
+                                        style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.55))),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: _cameraBarcodeEnabled,
+                                onChanged: (val) async {
+                                  setState(() => _cameraBarcodeEnabled = val);
+                                  await DatabaseHelper.instance.setSetting('camera_barcode_enabled', val.toString());
+                                  _showSnackBar(val ? 'Camera barcode scanner enabled. 🎉' : 'Camera barcode scanner disabled.');
+                                },
                               ),
                             ],
                           ),
@@ -731,6 +889,160 @@ class AccountScreenState extends State<AccountScreen> {
                   ),
                   const SizedBox(height: 20),
                 ],
+
+                // R2 Cloud Sync Card
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cardBorder)),
+                  elevation: 0,
+                  color: cardColor,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.cloud_sync, color: cs.primary, size: 28),
+                            const SizedBox(width: 10),
+                            Text('Cloudflare R2 Synchronization', style: sectionTitleStyle),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Synchronize your product catalog directly from Cloudflare R2 object storage.',
+                          style: sectionSubStyle,
+                        ),
+                        const Divider(height: 28),
+                        
+                        if (widget.userRole.toLowerCase() == 'admin') ...[
+                          Text(
+                            'Configuration (Admin Only)',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14, color: cs.primary),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _r2AccountIdController,
+                            decoration: InputDecoration(
+                              labelText: 'R2 Account ID *',
+                              prefixIcon: const Icon(Icons.business),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _r2AccessKeyController,
+                            decoration: InputDecoration(
+                              labelText: 'R2 Access Key ID *',
+                              prefixIcon: const Icon(Icons.vpn_key),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _r2SecretKeyController,
+                            obscureText: _obscureR2Secret,
+                            decoration: InputDecoration(
+                              labelText: 'R2 Secret Access Key *',
+                              prefixIcon: const Icon(Icons.security),
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscureR2Secret ? Icons.visibility_off : Icons.visibility),
+                                onPressed: () => setState(() => _obscureR2Secret = !_obscureR2Secret),
+                              ),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _r2BucketController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Bucket Name',
+                                    hintText: 'archerpos',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _r2FileNameController,
+                                  decoration: InputDecoration(
+                                    labelText: 'File Name',
+                                    hintText: 'archer_pos_latest.db',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('Daily First Sign-in Auto-Sync',
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
+                            subtitle: Text('Automatically pull data on the first sign-in of the day.',
+                                style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.55))),
+                            value: _r2AutoSync,
+                            onChanged: (val) => setState(() => _r2AutoSync = val),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: _isSavingR2 ? null : _saveR2Settings,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: cs.primary.withOpacity(0.12),
+                              foregroundColor: cs.primary,
+                              elevation: 0,
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: _isSavingR2
+                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.save, size: 18),
+                            label: Text('SAVE CONFIGURATION', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13)),
+                          ),
+                          const Divider(height: 32),
+                        ],
+                        
+                        // Sync Actions
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Sync Status', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Last synced: $_r2LastSync',
+                                  style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.55)),
+                                ),
+                              ],
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: _isR2Syncing ? null : _runR2Sync,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kSuccessColor,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                              ),
+                              icon: _isR2Syncing
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : const Icon(Icons.sync, size: 18),
+                              label: Text(
+                                _isR2Syncing ? 'SYNCING...' : 'SYNC NOW',
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
 
                 // Database Management Card
                 Card(

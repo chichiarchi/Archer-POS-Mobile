@@ -1,5 +1,11 @@
 package com.example.archer_pos
 
+import android.content.ContentValues
+import android.net.Uri
+import android.provider.MediaStore
+import java.io.File
+import java.io.FileInputStream
+import java.io.OutputStream
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -77,6 +83,73 @@ class MainActivity : FlutterActivity() {
             toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         } catch (e: Exception) {
             // ignore
+        }
+
+        val FILE_CHANNEL = "com.example.archer_pos/file_export"
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "exportToDownloads") {
+                val sourceFilePath = call.argument<String>("sourcePath")
+                val fileName = call.argument<String>("fileName")
+                if (sourceFilePath == null || fileName == null) {
+                    result.error("ERR_INVALID_ARGS", "Missing sourcePath or fileName", null)
+                    return@setMethodCallHandler
+                }
+
+                val sourceFile = File(sourceFilePath)
+                if (!sourceFile.exists()) {
+                    result.error("ERR_FILE_NOT_FOUND", "Source file does not exist", null)
+                    return@setMethodCallHandler
+                }
+
+                try {
+                    val resolver = contentResolver
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "application/x-sqlite3")
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+                        }
+                    }
+
+                    val uri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                        val targetFile = File(downloadsDir, fileName)
+                        val targetUri = Uri.fromFile(targetFile)
+                        downloadsDir.mkdirs()
+                        targetUri
+                    }
+
+                    if (uri == null) {
+                        result.error("ERR_URI_CREATION", "Failed to create destination uri", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val outputStream: OutputStream? = resolver.openOutputStream(uri)
+                    if (outputStream == null) {
+                        result.error("ERR_STREAM_OPEN", "Failed to open output stream", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val inputStream = FileInputStream(sourceFile)
+                    val buf = ByteArray(1024)
+                    var len: Int
+                    while (inputStream.read(buf).also { len = it } > 0) {
+                        outputStream.write(buf, 0, len)
+                    }
+                    inputStream.close()
+                    outputStream.flush()
+                    outputStream.close()
+
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.error("ERR_EXPORT_FAILED", e.message, null)
+                }
+            } else {
+                result.notImplemented()
+            }
         }
         
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BEEP_CHANNEL).setMethodCallHandler { call, result ->
