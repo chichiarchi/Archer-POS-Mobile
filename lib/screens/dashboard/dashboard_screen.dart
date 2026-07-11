@@ -240,6 +240,11 @@ class DashboardScreenState extends State<DashboardScreen>
                 child: _buildWelcomeSection(isTablet),
               ),
 
+              // ── Sales breakdown ──
+              SliverToBoxAdapter(
+                child: _buildSalesBreakdown(isTablet),
+              ),
+
               // ── Quick stats row ──
               SliverToBoxAdapter(
                 child: _buildQuickInfoRow(isTablet),
@@ -591,6 +596,189 @@ class DashboardScreenState extends State<DashboardScreen>
                     : Icons.badge_rounded,
                 size: isTablet ? 36 : 30,
                 color: cs.primary.withOpacity(0.15),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSalesBreakdown(bool isTablet) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final double retailSales = (_stats['sales_today_retail'] as num?)?.toDouble() ?? 0.0;
+    final double wholesaleSales = (_stats['sales_today_wholesale'] as num?)?.toDouble() ?? 0.0;
+    final double total = retailSales + wholesaleSales;
+
+    final double retailPct = total > 0 ? (retailSales / total) : 0.0;
+    final double wholesalePct = total > 0 ? (wholesaleSales / total) : 0.0;
+
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          isTablet ? 24 : 16,
+          12,
+          isTablet ? 24 : 16,
+          0,
+        ),
+        child: Container(
+          padding: EdgeInsets.all(isTablet ? 20 : 16),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
+            boxShadow: [
+              BoxShadow(
+                color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'TODAY\'S SALES BREAKDOWN',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF94A3B8),
+                  letterSpacing: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF3B82F6),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Retail Sales',
+                              style: GoogleFonts.inter(
+                                fontSize: isTablet ? 13 : 12,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          Formatters.currency(retailSales),
+                          style: GoogleFonts.inter(
+                            fontSize: isTablet ? 22 : 18,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF3B82F6),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${(retailPct * 100).toStringAsFixed(1)}% of total',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: cs.onSurface.withOpacity(0.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 50,
+                    width: 1,
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF8B5CF6),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Wholesale Sales',
+                              style: GoogleFonts.inter(
+                                fontSize: isTablet ? 13 : 12,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          Formatters.currency(wholesaleSales),
+                          style: GoogleFonts.inter(
+                            fontSize: isTablet ? 22 : 18,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF8B5CF6),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${(wholesalePct * 100).toStringAsFixed(1)}% of total',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: cs.onSurface.withOpacity(0.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  height: 10,
+                  width: double.infinity,
+                  child: total > 0
+                      ? Row(
+                          children: [
+                            if (retailSales > 0)
+                              Expanded(
+                                flex: (retailPct * 1000).toInt(),
+                                child: Container(color: const Color(0xFF3B82F6)),
+                              ),
+                            if (wholesaleSales > 0)
+                              Expanded(
+                                flex: (wholesalePct * 1000).toInt(),
+                                child: Container(color: const Color(0xFF8B5CF6)),
+                              ),
+                          ],
+                        )
+                      : Container(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+                ),
               ),
             ],
           ),

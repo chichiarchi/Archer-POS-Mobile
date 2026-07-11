@@ -44,12 +44,59 @@ class DatabaseHelper {
       }
     }
 
-    return await openDatabase(
+    final db = await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+
+    // Self-healing migrations check
+    await _runSelfHealingMigrations(db);
+
+    return db;
+  }
+
+  Future<void> _runSelfHealingMigrations(Database db) async {
+    // 1. Check products table for cost column
+    try {
+      final columns = await db.rawQuery('PRAGMA table_info(products)');
+      final hasCost = columns.any((col) => col['name'] == 'cost');
+      if (!hasCost) {
+        await db.execute('ALTER TABLE products ADD COLUMN cost REAL DEFAULT 0.0');
+        print("Self-healing: Added cost column to products.");
+      }
+    } catch (_) {}
+
+    // 2. Check product_bundles table for cost column
+    try {
+      final columns = await db.rawQuery('PRAGMA table_info(product_bundles)');
+      final hasCost = columns.any((col) => col['name'] == 'cost');
+      if (!hasCost) {
+        await db.execute('ALTER TABLE product_bundles ADD COLUMN cost REAL DEFAULT 0.0');
+        print("Self-healing: Added cost column to product_bundles.");
+      }
+    } catch (_) {}
+
+    // 3. Check sales table for created_by column
+    try {
+      final columns = await db.rawQuery('PRAGMA table_info(sales)');
+      final hasCreatedBy = columns.any((col) => col['name'] == 'created_by');
+      if (!hasCreatedBy) {
+        await db.execute("ALTER TABLE sales ADD COLUMN created_by TEXT DEFAULT 'admin'");
+        print("Self-healing: Added created_by column to sales.");
+      }
+    } catch (_) {}
+
+    // 4. Check sale_items table for pricing_mode column
+    try {
+      final columns = await db.rawQuery('PRAGMA table_info(sale_items)');
+      final hasPricingMode = columns.any((col) => col['name'] == 'pricing_mode');
+      if (!hasPricingMode) {
+        await db.execute("ALTER TABLE sale_items ADD COLUMN pricing_mode TEXT DEFAULT 'retail'");
+        print("Self-healing: Added pricing_mode column to sale_items.");
+      }
+    } catch (_) {}
   }
 
   Future<void> closeDatabase() async {
@@ -132,6 +179,7 @@ class DatabaseHelper {
         product_name TEXT NOT NULL,
         quantity REAL NOT NULL,
         price REAL NOT NULL,
+        pricing_mode TEXT DEFAULT 'retail',
         FOREIGN KEY(sale_id) REFERENCES sales(id)
       )
     ''');
@@ -219,6 +267,11 @@ class DatabaseHelper {
     if (oldVersion < 4) {
       try {
         await db.execute("ALTER TABLE sales ADD COLUMN created_by TEXT DEFAULT 'admin'");
+      } catch (_) {}
+    }
+    if (oldVersion < 5) {
+      try {
+        await db.execute("ALTER TABLE sale_items ADD COLUMN pricing_mode TEXT DEFAULT 'retail'");
       } catch (_) {}
     }
   }
@@ -480,6 +533,7 @@ class DatabaseHelper {
           'product_name': item['product_name'],
           'quantity': item['quantity'],
           'price': item['price'],
+          'pricing_mode': item['pricing_mode'] ?? 'retail',
         });
       }
 
@@ -565,11 +619,24 @@ class DatabaseHelper {
       "SELECT SUM(total_amount) as total, COUNT(*) as count FROM sales WHERE DATE(timestamp) = ? AND voided = 0",
       [today],
     );
+
+    final retailSalesResult = await db.rawQuery(
+      "SELECT SUM(si.quantity * si.price) as total FROM sale_items si JOIN sales s ON si.sale_id = s.id WHERE DATE(s.timestamp) = ? AND s.voided = 0 AND (si.pricing_mode IS NULL OR si.pricing_mode != 'wholesale')",
+      [today],
+    );
+
+    final wholesaleSalesResult = await db.rawQuery(
+      "SELECT SUM(si.quantity * si.price) as total FROM sale_items si JOIN sales s ON si.sale_id = s.id WHERE DATE(s.timestamp) = ? AND s.voided = 0 AND si.pricing_mode = 'wholesale'",
+      [today],
+    );
+
     final productCount = await db.rawQuery('SELECT COUNT(*) as cnt FROM products');
     final balanceResult = await db.rawQuery('SELECT SUM(balance_amount) as total FROM debtors');
 
     return {
       'sales_today': (salesResult.first['total'] as num?)?.toDouble() ?? 0.0,
+      'sales_today_retail': (retailSalesResult.first['total'] as num?)?.toDouble() ?? 0.0,
+      'sales_today_wholesale': (wholesaleSalesResult.first['total'] as num?)?.toDouble() ?? 0.0,
       'transactions_today': (salesResult.first['count'] as int?) ?? 0,
       'total_products': (productCount.first['cnt'] as int?) ?? 0,
       'total_balance': (balanceResult.first['total'] as num?)?.toDouble() ?? 0.0,

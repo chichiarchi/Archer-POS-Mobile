@@ -593,6 +593,7 @@ class POSScreenState extends State<POSScreen> {
           'product_name': item.name,
           'quantity': item.quantity,
           'price': item.price,
+          'pricing_mode': item.pricingMode,
         }).toList();
 
         final saleId = await DatabaseHelper.instance.createSale(

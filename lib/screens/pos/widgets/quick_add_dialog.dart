@@ -13,7 +13,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _qtyController = TextEditingController(text: '1.0');
+  final TextEditingController _qtyController = TextEditingController(text: '1');
   
   late TextEditingController _activeController;
 
@@ -155,7 +155,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                           if (val == null || val.trim().isEmpty) {
                             return 'Please enter a quantity.';
                           }
-                          final qty = double.tryParse(val);
+                          final qty = int.tryParse(val);
                           if (qty == null || qty <= 0) {
                             return 'Enter a valid quantity.';
                           }
@@ -166,15 +166,10 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                     const SizedBox(width: 8),
                     IconButton(
                       onPressed: () {
-                        final q = double.tryParse(_qtyController.text) ?? 1.0;
+                        final q = int.tryParse(_qtyController.text) ?? 1;
                         if (q > 1) {
                           setState(() {
-                            final newVal = q - 1.0;
-                            _qtyController.text = newVal.toString();
-                          });
-                        } else if (q > 0.1) {
-                          setState(() {
-                            final newVal = double.parse((q - 0.1).toStringAsFixed(1));
+                            final newVal = q - 1;
                             _qtyController.text = newVal.toString();
                           });
                         }
@@ -183,9 +178,9 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                     ),
                     IconButton(
                       onPressed: () {
-                        final q = double.tryParse(_qtyController.text) ?? 1.0;
+                        final q = int.tryParse(_qtyController.text) ?? 1;
                         setState(() {
-                          final newVal = double.parse((q + 1.0).toStringAsFixed(1));
+                          final newVal = q + 1;
                           _qtyController.text = newVal.toString();
                         });
                       },
@@ -208,7 +203,7 @@ class _QuickAddDialogState extends State<QuickAddDialog> {
                 const SizedBox(height: 8),
                 NumericKeypad(
                   controller: _activeController,
-                  isDecimal: true,
+                  isDecimal: _activeController == _priceController,
                 ),
                 const SizedBox(height: 24),
 
