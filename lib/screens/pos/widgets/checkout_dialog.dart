@@ -39,6 +39,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   void initState() {
     super.initState();
     _cashController.addListener(_onCashChanged);
+    _customerNameController.addListener(() => setState(() {}));
     _loadCustomers();
   }
 
@@ -83,10 +84,10 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   }
 
   Future<void> _onConfirm() async {
-    if (_amountPaid < 0) {
+    if (_cashController.text.trim().isEmpty || _amountPaid < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a valid amount paid.'),
+          content: Text('Please enter the payment amount.'),
           backgroundColor: kErrorColor,
         ),
       );
@@ -161,7 +162,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.close, color: cs.onSurface.withOpacity(0.6)),
+                icon: Icon(Icons.close, color: cs.onSurface.withValues(alpha: 0.6)),
                 onPressed: () => Navigator.of(context).pop(),
               )
             ],
@@ -187,7 +188,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     letterSpacing: 1.0,
                   ),
                 ),
@@ -222,15 +223,40 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
               color: cs.onSurface,
             ),
             decoration: InputDecoration(
-              labelText: 'Amount Paid (Cash)',
-              labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w500),
-              prefixIcon: Icon(Icons.payments_outlined, color: cs.primary),
+              labelText: _cashController.text.trim().isEmpty
+                  ? 'Amount Paid (Cash) * (Required)'
+                  : 'Amount Paid (Cash)',
+              labelStyle: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                color: _cashController.text.trim().isEmpty ? cs.error : null,
+              ),
+              errorText: _cashController.text.trim().isEmpty
+                  ? 'Payment amount is required'
+                  : null,
+              prefixIcon: Icon(
+                Icons.payments_outlined,
+                color: _cashController.text.trim().isEmpty ? cs.error : cs.primary,
+              ),
               suffixIcon: IconButton(
                 icon: const Icon(Icons.clear),
                 onPressed: () => _cashController.clear(),
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: _cashController.text.trim().isEmpty ? cs.error : cs.outline,
+                  width: _cashController.text.trim().isEmpty ? 1.5 : 1.0,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: _cashController.text.trim().isEmpty ? cs.error : cs.primary,
+                  width: 2.0,
+                ),
               ),
             ),
           ),
@@ -247,19 +273,19 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
           const SizedBox(height: 20),
 
           // Reactive Change / Balance Due Display
-          if (_amountPaid > 0)
+          if (_cashController.text.trim().isNotEmpty)
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: _amountPaid >= widget.total 
-                    ? (isDark ? const Color(0xFF10B981).withOpacity(0.15) : const Color(0xFFD1FAE5)) 
-                    : (isDark ? const Color(0xFFEF4444).withOpacity(0.15) : const Color(0xFFFEF2F2)),
+                    ? (isDark ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFD1FAE5)) 
+                    : (isDark ? const Color(0xFFEF4444).withValues(alpha: 0.15) : const Color(0xFFFEF2F2)),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: _amountPaid >= widget.total 
-                      ? (isDark ? const Color(0xFF10B981).withOpacity(0.4) : const Color(0xFFA7F3D0)) 
-                      : (isDark ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFFFCA5A5)),
+                      ? (isDark ? const Color(0xFF10B981).withValues(alpha: 0.4) : const Color(0xFFA7F3D0)) 
+                      : (isDark ? const Color(0xFFEF4444).withValues(alpha: 0.4) : const Color(0xFFFCA5A5)),
                 ),
               ),
               child: Row(
@@ -320,9 +346,9 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
             // ── Segmented toggle: Add New | Select Existing ──
             Container(
               decoration: BoxDecoration(
-                color: cs.surfaceVariant.withOpacity(0.35),
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.outline.withOpacity(0.25)),
+                border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
@@ -347,13 +373,35 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
             if (!_isNewCustomer) ...[
               DropdownButtonFormField<int>(
                 decoration: InputDecoration(
-                  labelText: 'Select Debtor',
+                  labelText: _selectedCustomerId == null ? 'Select Debtor * (Required)' : 'Select Debtor *',
+                  labelStyle: TextStyle(
+                    color: _selectedCustomerId == null ? cs.error : null,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  errorText: _selectedCustomerId == null ? 'Please select a debtor for balance sales' : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  prefixIcon: const Icon(Icons.person_search_outlined),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: _selectedCustomerId == null ? cs.error : cs.outline,
+                      width: _selectedCustomerId == null ? 1.5 : 1.0,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: _selectedCustomerId == null ? cs.error : cs.primary,
+                      width: 2.0,
+                    ),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.person_search_outlined,
+                    color: _selectedCustomerId == null ? cs.error : null,
+                  ),
                 ),
-                value: _selectedCustomerId,
+                initialValue: _selectedCustomerId,
                 items: _allCustomers.map((c) {
                   final id = c['id'] as int;
                   final phone = c['phone']?.toString().trim() ?? '';
@@ -379,9 +427,9 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.08),
+                    color: cs.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: cs.primary.withOpacity(0.2)),
+                    border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,7 +439,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                         children: [
                           Text(
                             'Current Outstanding Debt:',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.6), fontSize: 13),
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.6), fontSize: 13),
                           ),
                           Flexible(
                             child: FittedBox(
@@ -438,9 +486,36 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
               TextField(
                 controller: _customerNameController,
                 decoration: InputDecoration(
-                  labelText: 'Customer Name *',
+                  labelText: _customerNameController.text.trim().isEmpty
+                      ? 'Customer Name * (Required)'
+                      : 'Customer Name *',
+                  labelStyle: TextStyle(
+                    color: _customerNameController.text.trim().isEmpty ? cs.error : null,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  errorText: _customerNameController.text.trim().isEmpty
+                      ? 'Customer Name is required for balance sales'
+                      : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: _customerNameController.text.trim().isEmpty ? cs.error : cs.outline,
+                      width: _customerNameController.text.trim().isEmpty ? 1.5 : 1.0,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: _customerNameController.text.trim().isEmpty ? cs.error : cs.primary,
+                      width: 2.0,
+                    ),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.person_outline,
+                    color: _customerNameController.text.trim().isEmpty ? cs.error : null,
                   ),
                 ),
               ),
@@ -500,7 +575,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
           style: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: cs.onSurface.withOpacity(0.8),
+            color: cs.onSurface.withValues(alpha: 0.8),
           ),
         ),
         const SizedBox(height: 16),
@@ -561,7 +636,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: cs.onSurface.withOpacity(0.8),
+                        color: cs.onSurface.withValues(alpha: 0.8),
                       ),
                       textAlign: TextAlign.center,
                     ),
