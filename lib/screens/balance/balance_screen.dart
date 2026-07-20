@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/utils/constants.dart';
 import '../../core/utils/formatters.dart';
+import '../pos/widgets/numeric_keypad.dart';
 
 class BalanceScreen extends StatefulWidget {
   final String userRole;
@@ -91,153 +92,250 @@ class BalanceScreenState extends State<BalanceScreen> {
             });
           });
 
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Text(
-              'Resolve Balance',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  customerName,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: cs.primary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Unpaid Transactions: $salesCount',
-                  style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cs.error.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: cs.error.withOpacity(0.3)),
-                  ),
-                  child: Row(
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            elevation: 24,
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: 420,
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Title Header
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'TOTAL BALANCE DUE',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          color: cs.error,
-                          letterSpacing: 0.8,
+                        'Resolve Balance',
+                        style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: cs.onSurface),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        icon: Icon(Icons.close, color: cs.onSurface.withValues(alpha: 0.6)),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            customerName,
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: cs.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Unpaid Transactions: $salesCount',
+                            style: GoogleFonts.inter(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.6)),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: cs.error.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: cs.error.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'TOTAL BALANCE DUE',
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                    color: cs.error,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                                Text(
+                                  formatCurrency(currentBalance),
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                    color: cs.error,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          TextField(
+                            controller: amountController,
+                            readOnly: true,
+                            showCursor: true,
+                            decoration: InputDecoration(
+                              labelText: 'Payment Amount (₱) *',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              prefixIcon: Icon(Icons.payments_outlined, color: successColor),
+                              suffixIcon: amountController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 20),
+                                      onPressed: () {
+                                        amountController.clear();
+                                      },
+                                    )
+                                  : null,
+                            ),
+                          ),
+                          if (paymentAmount > 0) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: successColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: successColor.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    paymentAmount >= currentBalance ? 'CHANGE' : 'REMAINING BALANCE',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      color: successColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    paymentAmount >= currentBalance
+                                        ? formatCurrency(change)
+                                        : formatCurrency(currentBalance - paymentAmount),
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                      color: successColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+
+                          // Quick Preset Cash Chips
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                ActionChip(
+                                  label: Text('Exact (${formatCurrency(currentBalance)})',
+                                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12)),
+                                  backgroundColor: cs.primary.withValues(alpha: 0.12),
+                                  labelStyle: TextStyle(color: cs.primary),
+                                  side: BorderSide(color: cs.primary.withValues(alpha: 0.4)),
+                                  onPressed: () {
+                                    amountController.text = formatInputWithCommas(currentBalance.toStringAsFixed(2));
+                                  },
+                                ),
+                                const SizedBox(width: 6),
+                                for (final val in [50, 100, 500, 1000]) ...[
+                                  ActionChip(
+                                    label: Text('₱$val',
+                                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12)),
+                                    onPressed: () {
+                                      amountController.text = formatInputWithCommas(val.toString());
+                                    },
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // On-screen Numeric Keypad
+                          NumericKeypad(
+                            controller: amountController,
+                            isDecimal: true,
+                            formatAsThousands: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Actions
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.inter(color: cs.onSurface.withValues(alpha: 0.7), fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
-                      Text(
-                        formatCurrency(currentBalance),
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                          color: cs.error,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: cs.primary,
+                            foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () async {
+                            if (paymentAmount <= 0) {
+                              _showSnackBar('Please enter a valid payment amount.', isError: true);
+                              return;
+                            }
+
+                            try {
+                              final success = await DatabaseHelper.instance.resolveCustomerBalance(
+                                customerId,
+                                paymentAmount,
+                              );
+
+                              if (success) {
+                                await DatabaseHelper.instance.logAction(
+                                  'BALANCE_RESOLVE',
+                                  details: 'Resolved balance. Customer: $customerName. Paid: ${formatCurrency(paymentAmount)}',
+                                  userId: widget.username,
+                                );
+                                if (ctx.mounted) Navigator.of(ctx).pop();
+                                _showSnackBar(
+                                  paymentAmount >= currentBalance
+                                      ? 'Balance resolved fully! Change: ${formatCurrency(change)}'
+                                      : 'Partial payment received. Remaining balance: ${formatCurrency(currentBalance - paymentAmount)}',
+                                );
+                                _loadBalances();
+                              } else {
+                                _showSnackBar('Failed to update balance.', isError: true);
+                              }
+                            } catch (e) {
+                              _showSnackBar('Error resolving balance: $e', isError: true);
+                            }
+                          },
+                          child: Text('Confirm', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: amountController,
-                  autofocus: true,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Payment Amount (₱) *',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: Icon(Icons.payments_outlined, color: successColor),
-                  ),
-                ),
-                if (paymentAmount > 0) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: successColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: successColor.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          paymentAmount >= currentBalance ? 'CHANGE' : 'NEW BALANCE',
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                            color: successColor,
-                          ),
-                        ),
-                        Text(
-                          paymentAmount >= currentBalance 
-                              ? formatCurrency(change) 
-                              : formatCurrency(currentBalance - paymentAmount),
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                            color: successColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('Cancel', style: GoogleFonts.inter(color: cs.onSurface.withOpacity(0.6), fontWeight: FontWeight.w600)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: cs.primary,
-                  foregroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () async {
-                  if (paymentAmount <= 0) {
-                    _showSnackBar('Please enter a valid payment amount.', isError: true);
-                    return;
-                  }
-
-                  try {
-                    final success = await DatabaseHelper.instance.resolveCustomerBalance(
-                      customerId,
-                      paymentAmount,
-                    );
-
-                    if (success) {
-                      await DatabaseHelper.instance.logAction(
-                        'BALANCE_RESOLVE',
-                        details: 'Resolved balance. Customer: $customerName. Paid: ${formatCurrency(paymentAmount)}',
-                        userId: widget.username,
-                      );
-                      Navigator.of(ctx).pop();
-                      _showSnackBar(
-                        paymentAmount >= currentBalance
-                            ? 'Balance resolved fully! Change: ${formatCurrency(change)}'
-                            : 'Partial payment received. Remaining balance: ${formatCurrency(currentBalance - paymentAmount)}',
-                      );
-                      _loadBalances();
-                    } else {
-                      _showSnackBar('Failed to update balance.', isError: true);
-                    }
-                  } catch (e) {
-                    _showSnackBar('Error resolving balance: $e', isError: true);
-                  }
-                },
-                child: Text('Confirm', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-              ),
-            ],
           );
         },
       ),

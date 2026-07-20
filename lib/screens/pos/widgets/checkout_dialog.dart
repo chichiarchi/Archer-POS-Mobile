@@ -29,7 +29,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   
   List<Map<String, dynamic>> _allCustomers = [];
   int? _selectedCustomerId;
-  bool _isNewCustomer = false;
+  bool _isNewCustomer = true;
   double _amountPaid = 0.0;
   double _balanceDue = 0.0;
   double _change = 0.0;
@@ -122,6 +122,8 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
         return;
       }
     }
+
+    if (!mounted) return;
 
     Navigator.of(context).pop({
       'amount_paid': _amountPaid,
@@ -234,19 +236,13 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
           ),
           const SizedBox(height: 12),
 
-          // Quick Cash Buttons
+          // Quick Cash Buttons (Philippine Peso Denomination Predictions)
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              _buildQuickCashButton(widget.total, 'Exact'),
-              if (widget.total < 50) _buildQuickCashButton(50, '₱50'),
-              if (widget.total < 100) _buildQuickCashButton(100, '₱100'),
-              if (widget.total < 200) _buildQuickCashButton(200, '₱200'),
-              if (widget.total < 500) _buildQuickCashButton(500, '₱500'),
-              if (widget.total < 1000) _buildQuickCashButton(1000, '₱1000'),
-              _buildQuickCashButton((widget.total / 100).ceil() * 100.0, 'Round UP'),
-            ],
+            children: _getPhilippinePaymentSuggestions(widget.total)
+                .map((s) => _buildQuickCashButton(s.amount, s.label))
+                .toList(),
           ),
           const SizedBox(height: 20),
 
@@ -321,32 +317,31 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('Select Existing'),
-                    selected: !_isNewCustomer,
-                    onSelected: (val) {
-                      setState(() {
-                        _isNewCustomer = false;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('Add New Customer'),
+            // ── Segmented toggle: Add New | Select Existing ──
+            Container(
+              decoration: BoxDecoration(
+                color: cs.surfaceVariant.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: cs.outline.withOpacity(0.25)),
+              ),
+              child: Row(
+                children: [
+                  _buildToggleSegment(
+                    label: 'Add New',
+                    icon: Icons.person_add_alt_1_rounded,
                     selected: _isNewCustomer,
-                    onSelected: (val) {
-                      setState(() {
-                        _isNewCustomer = true;
-                      });
-                    },
+                    isFirst: true,
+                    onTap: () => setState(() => _isNewCustomer = true),
                   ),
-                ),
-              ],
+                  _buildToggleSegment(
+                    label: 'Select Existing',
+                    icon: Icons.manage_accounts_rounded,
+                    selected: !_isNewCustomer,
+                    isFirst: false,
+                    onTap: () => setState(() => _isNewCustomer = false),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             if (!_isNewCustomer) ...[
@@ -496,6 +491,28 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
       );
     }
 
+    // Build the numpad panel (shared between layouts)
+    final numpadPanel = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Enter Cash Paid',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurface.withOpacity(0.8),
+          ),
+        ),
+        const SizedBox(height: 16),
+        NumericKeypad(
+          controller: _cashController,
+          onSubmit: _onConfirm,
+          isDecimal: true,
+          formatAsThousands: true,
+        ),
+      ],
+    );
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 24,
@@ -503,42 +520,35 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
       child: Container(
         constraints: BoxConstraints(maxWidth: useSideBySide ? 850 : 500),
         padding: const EdgeInsets.all(24),
-        child: SingleChildScrollView(
-          child: useSideBySide
-              ? Row(
+        child: useSideBySide
+            // ── Tablet landscape: fixed-height container, only form scrolls ──
+            ? ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 560),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Left: form column is the only scrollable area
                     Expanded(
                       flex: 5,
-                      child: buildFormContent(),
+                      child: SingleChildScrollView(
+                        child: buildFormContent(),
+                      ),
                     ),
                     const SizedBox(width: 24),
+                    // Right: numpad pinned to top, completely independent of form height
                     Expanded(
                       flex: 4,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Enter Cash Paid',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface.withOpacity(0.8),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          NumericKeypad(
-                            controller: _cashController,
-                            onSubmit: _onConfirm,
-                            isDecimal: true,
-                            formatAsThousands: true,
-                          ),
-                        ],
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: numpadPanel,
                       ),
                     ),
                   ],
-                )
-              : Column(
+                ),
+              )
+            // ── Phone / portrait: simple single-column scroll ──
+            : SingleChildScrollView(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -564,7 +574,7 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
                     ),
                   ],
                 ),
-        ),
+              ),
       ),
     );
   }
@@ -572,17 +582,181 @@ class _CheckoutDialogState extends State<CheckoutDialog> {
   Widget _buildQuickCashButton(double amount, String label) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isExact = label.startsWith('Exact');
+    final isRoundUp = label.startsWith('Round UP');
 
     return ActionChip(
       label: Text(label),
       onPressed: () => _applyQuickCash(amount),
-      backgroundColor: cs.primary.withOpacity(0.08),
+      backgroundColor: (isExact || isRoundUp) ? cs.primary.withValues(alpha: 0.15) : cs.primary.withValues(alpha: 0.08),
       labelStyle: GoogleFonts.inter(
         color: cs.primary,
-        fontWeight: FontWeight.w700,
+        fontWeight: (isExact || isRoundUp) ? FontWeight.w800 : FontWeight.w700,
         fontSize: 13,
       ),
-      side: BorderSide(color: cs.primary),
+      side: BorderSide(color: cs.primary.withValues(alpha: (isExact || isRoundUp) ? 0.9 : 0.4), width: (isExact || isRoundUp) ? 1.5 : 1.0),
     );
   }
+
+  Widget _buildToggleSegment({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required bool isFirst,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final activeBg = cs.primary;
+    final activeFg = isDark ? const Color(0xFF0F172A) : Colors.white;
+    final inactiveFg = cs.onSurface.withValues(alpha: 0.65);
+
+    return Expanded(
+      child: Material(
+        color: selected ? activeBg : Colors.transparent,
+        borderRadius: BorderRadius.horizontal(
+          left: isFirst ? const Radius.circular(11) : Radius.zero,
+          right: !isFirst ? const Radius.circular(11) : Radius.zero,
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.horizontal(
+            left: isFirst ? const Radius.circular(11) : Radius.zero,
+            right: !isFirst ? const Radius.circular(11) : Radius.zero,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? activeFg : inactiveFg,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected ? activeFg : inactiveFg,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentSuggestion {
+  final double amount;
+  final String label;
+
+  _PaymentSuggestion(this.amount, this.label);
+}
+
+List<_PaymentSuggestion> _getPhilippinePaymentSuggestions(double total) {
+  if (total <= 0) return [];
+
+  final List<_PaymentSuggestion> suggestions = [];
+  final Set<double> addedAmounts = {};
+
+  void add(double amount, String label, {bool forceAdd = false}) {
+    final rounded = (amount * 100).roundToDouble() / 100;
+    if (rounded >= total && (forceAdd || !addedAmounts.contains(rounded))) {
+      addedAmounts.add(rounded);
+      suggestions.add(_PaymentSuggestion(rounded, label));
+    }
+  }
+
+  // 1. Exact Amount
+  add(total, 'Exact (${formatCurrency(total)})');
+
+  // 2. Round UP Button (Always guaranteed)
+  double roundUpAmt = (total / 100).ceil() * 100.0;
+  if (roundUpAmt <= total) {
+    roundUpAmt = total + 100.0;
+  }
+  add(roundUpAmt, 'Round UP', forceAdd: true);
+
+  // Single PH standard banknotes: 20, 50, 100, 200, 500, 1000
+  final List<double> bills = [20, 50, 100, 200, 500, 1000];
+
+  // 3. Single bill values > total
+  for (final b in bills) {
+    if (b > total) {
+      add(b, '₱${b.toInt()}');
+    }
+  }
+
+  // 4. Multiples of 50, 100, 200, 500, 1000
+  if (total < 1000) {
+    final next50 = (total / 50).ceil() * 50.0;
+    if (next50 > total) add(next50, '₱${next50.toInt()}');
+
+    final next100 = (total / 100).ceil() * 100.0;
+    if (next100 > total) add(next100, '₱${next100.toInt()}');
+
+    final next200 = (total / 200).ceil() * 200.0;
+    if (next200 > total) add(next200, '₱${next200.toInt()}');
+
+    final next500 = (total / 500).ceil() * 500.0;
+    if (next500 > total) add(next500, '₱${next500.toInt()}');
+  }
+
+  final next1000 = (total / 1000).ceil() * 1000.0;
+  if (next1000 > total) {
+    add(next1000, '₱${next1000.toInt()}');
+  } else if (next1000 == total && total >= 1000) {
+    add(total + 1000, '₱${(total + 1000).toInt()}');
+  }
+
+  // 5. Smart Philippine "Pambarya" (Coin & small bill additions for clean change)
+  final remainder10 = total % 10;
+  final remainder50 = total % 50;
+
+  if (remainder10 > 0 && total < 1000) {
+    final next5 = (total / 5).ceil() * 5.0;
+    if (next5 > total) add(next5, '₱${next5.toInt()}');
+
+    final next10 = (total / 10).ceil() * 10.0;
+    if (next10 > total) add(next10, '₱${next10.toInt()}');
+  }
+
+  if (remainder50 > 0) {
+    double baseBill = 0;
+    if (total < 200) {
+      baseBill = 200;
+    } else if (total < 500) {
+      baseBill = 500;
+    } else if (total < 1000) {
+      baseBill = 1000;
+    }
+    if (baseBill > 0) {
+      final dagdag = baseBill + remainder50;
+      if (dagdag > total) {
+        add(dagdag, '₱${dagdag.toInt()}');
+      }
+    }
+  }
+
+  // Sort by amount ascending
+  suggestions.sort((a, b) => a.amount.compareTo(b.amount));
+
+  if (suggestions.length > 7) {
+    return suggestions.sublist(0, 7);
+  }
+
+  return suggestions;
 }

@@ -18,6 +18,7 @@ import 'widgets/park_recall_dialog.dart';
 import 'widgets/quick_add_dialog.dart';
 import 'widgets/add_product_dialog.dart';
 import 'widgets/numeric_keypad.dart';
+import 'widgets/sale_summary_dialog.dart';
 
 class POSScreen extends StatefulWidget {
   final String userRole;
@@ -697,6 +698,22 @@ class POSScreenState extends State<POSScreen> {
               _showSnackBar('Printing error: $pe', isError: true);
             }
           }
+
+          // Show Sale Summary (Change, Total, Customer info)
+          if (mounted) {
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => SaleSummaryDialog(
+                saleId: saleId,
+                totalAmount: cart.total,
+                amountPaid: result['amount_paid'] as double,
+                balanceDue: result['balance_due'] as double,
+                customerName: customerName,
+                itemCount: saleItems.length,
+              ),
+            );
+          }
         }
 
         cart.clearCart();
@@ -775,6 +792,7 @@ class POSScreenState extends State<POSScreen> {
   Future<void> _quickAdd() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => const QuickAddDialog(),
     );
     if (result != null && mounted) {
@@ -840,11 +858,31 @@ class POSScreenState extends State<POSScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTablet = constraints.maxWidth >= 768;
-        return isTablet ? _buildTabletLayout(constraints) : _buildPhoneLayout();
+        if (isLandscape && constraints.maxWidth >= 768) {
+          return _buildTabletLayout(constraints);
+        } else if (constraints.maxWidth >= 600) {
+          return _buildTabletPortraitLayout();
+        } else {
+          return _buildPhoneLayout();
+        }
       },
+    );
+  }
+
+  Widget _buildTabletPortraitLayout() {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Column(
+        children: [
+          _buildSearchBar(),
+          if (_isCameraActive) _buildCameraScannerWidget(),
+          Expanded(child: _buildCartTable()),
+          _buildBottomBar(),
+        ],
+      ),
     );
   }
 

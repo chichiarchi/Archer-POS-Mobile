@@ -139,7 +139,13 @@ class _CartItemTileState extends State<CartItemTile>
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              widget.item.name,
+              style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: controller,
               readOnly: true,
@@ -148,6 +154,32 @@ class _CartItemTileState extends State<CartItemTile>
                 labelText: 'Quantity',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppConstants.radiusSM),
+                ),
+                prefixIcon: const Icon(Icons.production_quantity_limits, size: 20),
+                suffixIcon: Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      icon: const Icon(Icons.arrow_drop_down),
+                      isDense: true,
+                      menuMaxHeight: 300,
+                      items: List.generate(
+                        500,
+                        (i) => DropdownMenuItem<int>(
+                          value: i + 1,
+                          child: Text(
+                            '${i + 1}',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                      onChanged: (val) {
+                        if (val != null) {
+                          controller.text = val.toString();
+                        }
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -420,9 +452,9 @@ class _CartItemTileState extends State<CartItemTile>
         vertical: compact ? 3 : 5,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppConstants.radiusFull),
-        border: Border.all(color: color.withOpacity(0.35), width: 0.8),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 0.8),
       ),
       child: Text(
         label,
@@ -472,7 +504,7 @@ class _CartItemTileState extends State<CartItemTile>
           icon: Icons.add,
           size: btnSize,
           onTap: _increment,
-          backgroundColor: cs.primary.withOpacity(0.12),
+          backgroundColor: cs.primary.withValues(alpha: 0.12),
           iconColor: cs.primary,
         ),
       ],
@@ -490,7 +522,7 @@ class _CartItemTileState extends State<CartItemTile>
       animation: _flashController,
       builder: (context, child) {
         final flashColor = Color.lerp(
-          cs.primary.withOpacity(isDark ? 0.35 : 0.15),
+          cs.primary.withValues(alpha: isDark ? 0.35 : 0.15),
           Colors.transparent,
           _flashController.value,
         );
@@ -502,10 +534,10 @@ class _CartItemTileState extends State<CartItemTile>
           elevation: AppConstants.elevationCard,
           margin: const EdgeInsets.symmetric(
               horizontal: AppConstants.spaceSM,
-              vertical: AppConstants.spaceXS),
+              vertical: 2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-            side: BorderSide(color: cs.onSurface.withOpacity(0.12), width: 0.8),
+            side: BorderSide(color: cs.onSurface.withValues(alpha: 0.12), width: 0.8),
           ),
           child: child,
         );
@@ -514,31 +546,28 @@ class _CartItemTileState extends State<CartItemTile>
         borderRadius: BorderRadius.circular(AppConstants.radiusMD),
         onLongPress: _showLongPressMenu,
         child: Padding(
-          padding: const EdgeInsets.all(AppConstants.spaceMD),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(
-                          widget.item.name,
-                          style: GoogleFonts.inter(
-                            fontSize: 14, fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
+                        Flexible(
+                          child: Text(
+                            widget.item.name,
+                            style: GoogleFonts.inter(
+                              fontSize: 14, fontWeight: FontWeight.w700,
+                              color: cs.onSurface,
+                            ),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
-                        if (widget.item.barcode.isNotEmpty)
-                          Text(
-                            widget.item.barcode,
-                            style: GoogleFonts.inter(fontSize: 11, color: cs.onSurface.withOpacity(0.45)),
-                          ),
+                        const SizedBox(width: 6),
+                        _pricingBadge(compact: true),
                       ],
                     ),
                   ),
@@ -549,42 +578,52 @@ class _CartItemTileState extends State<CartItemTile>
                       alignment: Alignment.centerRight,
                       child: Text(
                         formatCurrency(widget.item.subtotal),
-                        style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: cs.primary),
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: cs.primary),
                         maxLines: 1,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: AppConstants.spaceSM),
-              Row(
-                children: [
-                  _pricingBadge(),
-                  const SizedBox(width: AppConstants.spaceSM),
-                  if (widget.item.manuallyDiscounted)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Icon(Icons.local_offer, size: 13, color: AppColors.warning),
-                    ),
-                  Text(
-                    '${formatCurrency(widget.item.price)} / unit',
-                    style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.5)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppConstants.spaceSM),
+              const SizedBox(height: 6),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _qtyControls(),
-                  IconButton(
-                    onPressed: _confirmDelete,
-                    icon: const Icon(Icons.delete_outline),
-                    color: AppColors.error,
-                    iconSize: 20,
-                    tooltip: 'Remove',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  Row(
+                    children: [
+                      if (widget.item.manuallyDiscounted)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 4),
+                          child: Icon(Icons.local_offer, size: 12, color: AppColors.warning),
+                        ),
+                      Text(
+                        '${formatCurrency(widget.item.price)}/unit',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.5)),
+                      ),
+                      if (widget.item.barcode.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          '#${widget.item.barcode}',
+                          style: GoogleFonts.inter(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _qtyControls(compact: true),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        onPressed: _confirmDelete,
+                        icon: const Icon(Icons.delete_outline),
+                        color: AppColors.error,
+                        iconSize: 18,
+                        tooltip: 'Remove',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -605,7 +644,7 @@ class _CartItemTileState extends State<CartItemTile>
       animation: _flashController,
       builder: (context, child) {
         final flashColor = Color.lerp(
-          cs.primary.withOpacity(isDark ? 0.35 : 0.15),
+          cs.primary.withValues(alpha: isDark ? 0.35 : 0.15),
           Colors.transparent,
           _flashController.value,
         );
@@ -623,7 +662,7 @@ class _CartItemTileState extends State<CartItemTile>
                 flashColor ?? Colors.transparent,
                 isDark ? const Color(0xFF1E293B) : Colors.white,
               ),
-              border: Border(bottom: BorderSide(color: cs.onSurface.withOpacity(0.1), width: 0.8)),
+              border: Border(bottom: BorderSide(color: cs.onSurface.withValues(alpha: 0.1), width: 0.8)),
             ),
             child: Row(
               children: [
@@ -643,7 +682,7 @@ class _CartItemTileState extends State<CartItemTile>
                           const SizedBox(width: 8),
                           Text(
                             widget.item.barcode,
-                            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.45)),
+                            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.45)),
                           ),
                         ],
                       ],
@@ -663,13 +702,13 @@ class _CartItemTileState extends State<CartItemTile>
                           formatCurrency(widget.item.price),
                           style: GoogleFonts.inter(
                             fontSize: 15, fontWeight: FontWeight.w600,
-                            color: cs.onSurface.withOpacity(0.65),
+                            color: cs.onSurface.withValues(alpha: 0.65),
                           ),
                           maxLines: 1,
                         ),
                       ),
                       if (widget.item.manuallyDiscounted)
-                        Icon(Icons.local_offer, size: 13, color: AppColors.warning),
+                        const Icon(Icons.local_offer, size: 13, color: AppColors.warning),
                     ],
                   ),
                 ),
