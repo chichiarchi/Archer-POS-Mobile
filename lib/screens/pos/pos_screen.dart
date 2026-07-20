@@ -237,6 +237,35 @@ class POSScreenState extends State<POSScreen> {
         children: [
           MobileScanner(
             controller: _scannerController,
+            errorBuilder: (context, error, child) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 36),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Camera Error: ${error.errorCode.name}',
+                        style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (error.errorDetails?.message != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          error.errorDetails!.message!,
+                          style: GoogleFonts.inter(color: Colors.white70, fontSize: 11),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
             onDetect: (capture) {
               final List<Barcode> barcodes = capture.barcodes;
               for (final barcode in barcodes) {
