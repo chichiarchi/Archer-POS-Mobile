@@ -26,14 +26,60 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
     _sales = List.from(widget.parkedSales);
   }
 
-  Future<void> _deleteSale(int id, int index) async {
-    await DatabaseHelper.instance.deleteParkedSale(id);
-    setState(() {
-      _sales.removeAt(index);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Parked sale deleted.')),
+  Future<void> _deleteSale(int id, int index, String label) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final cs = theme.colorScheme;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Delete Parked Sale',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            'Are you sure you want to delete the parked sale "$label"? This action cannot be undone.',
+            style: GoogleFonts.inter(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.error,
+                foregroundColor: cs.onError,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                'Delete',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        );
+      },
     );
+
+    if (confirm == true) {
+      await DatabaseHelper.instance.deleteParkedSale(id);
+      if (!mounted) return;
+      setState(() {
+        _sales.removeAt(index);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Parked sale deleted.')),
+      );
+    }
   }
 
   @override
@@ -64,7 +110,7 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: cs.onSurface.withOpacity(0.6)),
+                  icon: Icon(Icons.close, color: cs.onSurface.withValues(alpha: 0.6)),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -76,12 +122,12 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.pause_presentation_outlined, size: 48, color: cs.onSurface.withOpacity(0.4)),
+                      Icon(Icons.pause_presentation_outlined, size: 48, color: cs.onSurface.withValues(alpha: 0.4)),
                       const SizedBox(height: 12),
                       Text(
                         'No parked sales found.',
                         style: GoogleFonts.inter(
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -117,7 +163,7 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                           const SizedBox(height: 4),
                           Text(
                             formatDateTime(timestamp),
-                            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withOpacity(0.55)),
+                            style: GoogleFonts.inter(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.55)),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -135,7 +181,7 @@ class _ParkRecallDialogState extends State<ParkRecallDialog> {
                         children: [
                           IconButton(
                             icon: Icon(Icons.delete_outline, color: cs.error),
-                            onPressed: () => _deleteSale(id, index),
+                            onPressed: () => _deleteSale(id, index, label),
                           ),
                           const SizedBox(width: 4),
                           ElevatedButton(
